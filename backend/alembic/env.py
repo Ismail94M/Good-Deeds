@@ -1,0 +1,85 @@
+import asyncio
+import sys
+from logging.config import fileConfig
+from typing import Literal
+
+from alembic import context
+from sqlalchemy import pool
+from sqlalchemy.engine import Connection
+from sqlalchemy.ext.asyncio import create_async_engine
+
+from app.core import audit, events  # noqa: F401  (register core tables)
+from app.core.config import get_settings
+from app.core.db import Base
+from app.modules.registry import load_modules
+
+config = context.config
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
+
+load_modules()
+target_metadata = Base.metadata
+
+# Tables owned by extensions or libraries, not by our models.
+_EXTERNAL_TABLE_PREFIXES = (
+    "procrastinate_",
+    "spatial_ref_sys",
+    "geography_columns",
+    "geometry_columns",
+)
+
+
+def include_name(
+    name: str | None,
+    type_: Literal[
+        "schema", "table", "column", "index", "unique_constraint", "foreign_key_constraint"
+    ],
+    parent_names: object,
+) -> bool:
+    if type_ == "table" and name is not None:
+        return not name.startswith(_EXTERNAL_TABLE_PREFIXES)
+    return True
+
+
+def run_migrations_offline() -> None:
+    context.configure(
+        url=get_settings().database_url,
+        target_metadata=target_metadata,
+        include_name=include_name,
+        literal_binds=True,
+        dialect_opts={"paramstyle": "named"},
+    )
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+def do_run_migrations(connection: Connection) -> None:
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        include_name=include_name,
+        compare_type=True,
+    )
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+async def run_async_migrations() -> None:
+    connectable = create_async_engine(get_settings().database_url, poolclass=pool.NullPool)
+    async with connectable.connect() as connection:
+        await connection.run_sync(do_run_migrations)
+    await connectable.dispose()
+
+
+def run_migrations_online() -> None:
+    # psycopg's async mode needs a selector event loop on Windows.
+    if sys.platform == "win32":
+        asyncio.run(run_async_migrations(), loop_factory=asyncio.SelectorEventLoop)
+    else:
+        asyncio.run(run_async_migrations())
+
+
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    run_migrations_online()
