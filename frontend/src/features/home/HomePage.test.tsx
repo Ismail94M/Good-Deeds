@@ -29,7 +29,7 @@ describe('HomePage', () => {
     renderApp('/')
     const main = await screen.findByRole('main')
     await waitFor(() => expect(within(main).getByRole('link', { name: 'Sign up' })).toBeVisible())
-    expect(within(main).getByRole('link', { name: 'Log in' })).toHaveAttribute('href', '/login')
+    expect(within(main).getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/login')
   })
 
   it('welcomes signed-in users with quick links', async () => {

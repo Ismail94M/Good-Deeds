@@ -52,22 +52,22 @@ export function MyQrPage() {
       intro="Show this to someone who saw your good deed. They scan it to recognise you."
     >
       <QrImage value={data.scan_url} label={`QR code for ${data.display_id}`} />
-      <p className="text-center text-sm text-stone-500" aria-live="off">
+      <p className="text-center text-sm text-slate-500" aria-live="off">
         {secondsLeft > 0 ? `Refreshes in ${secondsLeft}s` : 'Refreshing…'} · it changes often so
         screenshots can&apos;t be reused
       </p>
 
       <section className="space-y-1 text-center">
-        <h2 className="text-sm font-semibold tracking-wide text-stone-600 uppercase">
+        <h2 className="text-sm font-semibold tracking-wide text-slate-600 uppercase">
           Or share your ID
         </h2>
-        <p className="font-mono text-3xl font-bold tracking-wider text-stone-900 select-all sm:text-4xl">
+        <p className="font-mono text-3xl font-bold tracking-wider text-slate-900 select-all sm:text-4xl">
           {data.display_id}
         </p>
-        <p className="text-sm text-stone-500">They can type this into the app instead.</p>
+        <p className="text-sm text-slate-500">They can type this into the app instead.</p>
       </section>
 
-      <section className="space-y-3 rounded-2xl border border-stone-200 bg-white p-4">
+      <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
         <h2 className="font-semibold">Worried someone copied your QR?</h2>
         {resetDone && (
           <p role="status" className="text-brand-700">

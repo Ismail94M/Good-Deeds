@@ -54,39 +54,39 @@ export function ProfilePage() {
 function ProfileView({ me, onEdit }: { me: Me; onEdit: () => void }) {
   return (
     <div className="space-y-5">
-      <section className="space-y-1 rounded-2xl border border-stone-200 bg-white p-4">
+      <section className="space-y-1 rounded-2xl border border-slate-200 bg-white p-4">
         <p className="text-xl font-semibold">{me.display_name}</p>
-        <p className="text-stone-600">@{me.handle}</p>
-        <p className="text-stone-600">
+        <p className="text-slate-600">@{me.handle}</p>
+        <p className="text-slate-600">
           {me.area ? `${me.area}, ` : ''}
           {me.city}
         </p>
         {me.bio ? (
           <p className="pt-2 whitespace-pre-line">{me.bio}</p>
         ) : (
-          <p className="pt-2 text-stone-500">No bio yet. Tell people a little about yourself.</p>
+          <p className="pt-2 text-slate-500">No bio yet. Tell people a little about yourself.</p>
         )}
       </section>
-      <dl className="grid gap-3 rounded-2xl border border-stone-200 bg-white p-4 text-sm">
+      <dl className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm">
         {me.onboarding.complete && me.short_id && (
           <div>
-            <dt className="text-stone-500">Your ID</dt>
+            <dt className="text-slate-500">Your ID</dt>
             <dd className="font-mono text-base">{me.short_id}</dd>
           </div>
         )}
         {me.email && (
           <div>
-            <dt className="text-stone-500">Email</dt>
+            <dt className="text-slate-500">Email</dt>
             <dd className="text-base break-all">{me.email}</dd>
           </div>
         )}
         <div>
-          <dt className="text-stone-500">Phone (only you can see this)</dt>
+          <dt className="text-slate-500">Phone (only you can see this)</dt>
           <dd className="text-base">
             {me.phone_e164 ? (
               <>
                 {me.phone_e164}
-                <span className="block text-sm text-stone-500">
+                <span className="block text-sm text-slate-500">
                   To change your number, please contact support.
                 </span>
               </>
@@ -202,7 +202,7 @@ function ProfileForm({
         error={errors.area}
       />
       <div className="space-y-1">
-        <label htmlFor={bioId} className="block font-medium text-stone-800">
+        <label htmlFor={bioId} className="block font-medium text-slate-800">
           Bio
         </label>
         <textarea
@@ -213,11 +213,11 @@ function ProfileForm({
           value={values.bio}
           onChange={(e) => update({ bio: e.target.value })}
           aria-describedby={`${bioId}-count`}
-          className="block w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-base focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
+          className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-base focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
         />
         <p
           id={`${bioId}-count`}
-          className={`text-right text-sm ${bioLeft < 20 ? 'text-amber-700' : 'text-stone-500'}`}
+          className={`text-right text-sm ${bioLeft < 20 ? 'text-amber-700' : 'text-slate-500'}`}
         >
           {values.bio.length}/{BIO_MAX}
         </p>

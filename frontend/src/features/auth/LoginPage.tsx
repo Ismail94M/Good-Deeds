@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router'
-import { Button, ErrorAlert, Page, TextField, TextLink } from '../../components/ui'
+import { Button, ErrorAlert, PasswordField, TextField, TextLink } from '../../components/ui'
 import { errorMessage } from '../../lib/api'
+import { AuthShell } from './AuthShell'
 import { useAuth } from './authContext'
 import { SocialButtons } from './social/SocialButtons'
 
@@ -34,11 +35,15 @@ export function LoginPage() {
   const query = params.size ? `?${params.toString()}` : ''
 
   return (
-    <Page title="Welcome back" intro="Log in to see your QR code and profile.">
+    <AuthShell
+      title="Small acts. A world of good."
+      intro="Celebrate the kindness you see around you, and inspire a community that values every small act."
+    >
       <form noValidate onSubmit={(e) => void handleSubmit(e)} className="space-y-5">
         {error && <ErrorAlert>{error}</ErrorAlert>}
         <TextField
-          label="Email"
+          label="Email address"
+          placeholder="you@example.com"
           name="email"
           type="email"
           autoComplete="email"
@@ -47,23 +52,28 @@ export function LoginPage() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
-        <TextField
+        <PasswordField
           label="Password"
+          placeholder="Enter your password"
           name="password"
-          type="password"
           autoComplete="current-password"
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
         <Button type="submit" disabled={submitting} className="w-full">
-          {submitting ? 'Logging in…' : 'Log in'}
+          {submitting ? 'Signing in…' : 'Sign in'}
+          {!submitting && (
+            <span aria-hidden className="ml-2">
+              →
+            </span>
+          )}
         </Button>
       </form>
       <SocialButtons />
-      <p className="text-center text-stone-600">
+      <p className="text-center text-sm text-slate-600">
         New here? <TextLink to={`/signup${query}`}>Create an account</TextLink>
       </p>
-    </Page>
+    </AuthShell>
   )
 }

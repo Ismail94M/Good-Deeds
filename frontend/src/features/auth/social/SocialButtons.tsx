@@ -39,10 +39,10 @@ export function SocialButtons({ onSuccess }: { onSuccess?: (me: Me) => void }) {
 
   return (
     <section aria-label="Other ways to sign in" className="space-y-3">
-      <p className="flex items-center gap-3 text-sm text-stone-500">
-        <span aria-hidden className="h-px flex-1 bg-stone-200" />
-        or
-        <span aria-hidden className="h-px flex-1 bg-stone-200" />
+      <p className="flex items-center gap-3 text-xs text-slate-400">
+        <span aria-hidden className="h-px flex-1 bg-slate-200" />
+        or continue with
+        <span aria-hidden className="h-px flex-1 bg-slate-200" />
       </p>
       {googleId && (
         <GoogleButton
@@ -60,7 +60,7 @@ export function SocialButtons({ onSuccess }: { onSuccess?: (me: Me) => void }) {
         />
       )}
       {busy && (
-        <p role="status" className="text-sm text-stone-600">
+        <p role="status" className="text-sm text-slate-600">
           Signing you in…
         </p>
       )}
@@ -145,7 +145,7 @@ function FacebookButton({
       type="button"
       onClick={() => void handleClick()}
       disabled={disabled || failed}
-      className="flex min-h-11 w-full items-center justify-center rounded-full bg-[#1877f2] px-4 font-semibold text-white hover:bg-[#166fe0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1877f2] disabled:opacity-60"
+      className="flex min-h-11 w-full items-center justify-center rounded-lg bg-[#1877f2] px-4 font-semibold text-white hover:bg-[#166fe0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1877f2] disabled:opacity-60"
     >
       {failed ? 'Facebook sign-in unavailable' : 'Continue with Facebook'}
     </button>

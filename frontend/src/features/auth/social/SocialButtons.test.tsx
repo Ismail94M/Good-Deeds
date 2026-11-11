@@ -18,7 +18,7 @@ describe('SocialButtons', () => {
   it('hides social buttons when no provider is configured', async () => {
     mockApi()
     renderApp('/login')
-    await screen.findByRole('heading', { name: 'Welcome back' })
+    await screen.findByRole('heading', { name: 'Small acts. A world of good.' })
     expect(screen.queryByRole('button', { name: /facebook/i })).not.toBeInTheDocument()
     expect(screen.queryByTestId('google-button')).not.toBeInTheDocument()
     expect(renderGoogleButton).not.toHaveBeenCalled()

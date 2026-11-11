@@ -42,7 +42,7 @@ export function AgeConsentStep() {
   return (
     <form noValidate onSubmit={(e) => void handleSubmit(e)} className="space-y-5">
       <h2 className="text-lg font-semibold">Confirm your age</h2>
-      <p className="text-stone-600">Good Deeds is for people aged 18 and over.</p>
+      <p className="text-slate-600">Good Deeds is for people aged 18 and over.</p>
       {error && <ErrorAlert>{error}</ErrorAlert>}
       <ConsentFields
         values={values}

@@ -38,7 +38,7 @@ export function OnboardingPage() {
               className={`rounded-lg border px-3 py-2 text-sm ${
                 isCurrent
                   ? 'border-brand-700 bg-brand-50 font-semibold text-brand-900'
-                  : 'border-stone-200 text-stone-600'
+                  : 'border-slate-200 text-slate-600'
               }`}
             >
               <span className="block text-xs tracking-wide uppercase">
@@ -49,7 +49,7 @@ export function OnboardingPage() {
           )
         })}
       </ol>
-      <section className="rounded-2xl border border-stone-200 bg-white p-4 sm:p-6">
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
         {current.key === 'age' ? <AgeConsentStep /> : <PhoneStep />}
       </section>
     </Page>

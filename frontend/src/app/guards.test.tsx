@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { makeMe, mockApi, NOT_ONBOARDED, renderApp, signedIn } from '../test/utils'
@@ -9,7 +9,9 @@ describe('route guards', () => {
     const { router } = renderApp('/me/qr')
     await waitFor(() => expect(router.state.location.pathname).toBe('/login'))
     expect(router.state.location.search).toBe('?next=%2Fme%2Fqr')
-    expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: 'Small acts. A world of good.' }),
+    ).toBeInTheDocument()
   })
 
   it('protects the profile page', async () => {
@@ -48,7 +50,10 @@ describe('route guards', () => {
     const user = userEvent.setup()
     renderApp('/profile')
     await user.click(await screen.findByRole('button', { name: 'Log out' }))
-    expect(await screen.findByRole('link', { name: 'Sign up' }, { timeout: 2000 })).toBeVisible()
+    const header = screen.getByRole('banner')
+    expect(
+      await within(header).findByRole('link', { name: 'Create an account' }, { timeout: 2000 }),
+    ).toBeVisible()
     expect(api.calls('POST /auth/logout')).toHaveLength(1)
   })
 })

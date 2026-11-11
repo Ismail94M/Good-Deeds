@@ -74,7 +74,7 @@ export function PhoneStep() {
     return (
       <form noValidate onSubmit={handleStart} className="space-y-5">
         <h2 className="text-lg font-semibold">Verify your phone</h2>
-        <p className="text-stone-600">
+        <p className="text-slate-600">
           This keeps Good Deeds free of fake accounts. We won&apos;t show your number to anyone.
         </p>
         {error && <ErrorAlert>{error}</ErrorAlert>}
@@ -100,7 +100,7 @@ export function PhoneStep() {
     <form noValidate onSubmit={(e) => void handleVerify(e)} className="space-y-5">
       <h2 className="text-lg font-semibold">Enter your code</h2>
       {notice && (
-        <p role="status" className="text-stone-700">
+        <p role="status" className="text-slate-700">
           {notice}
         </p>
       )}

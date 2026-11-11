@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router'
-import { Button, ErrorAlert, Page, TextField, TextLink } from '../../components/ui'
+import { Button, ErrorAlert, PasswordField, TextField, TextLink } from '../../components/ui'
 import { ApiError, errorMessage } from '../../lib/api'
+import { AuthShell } from './AuthShell'
 import { useAuth } from './authContext'
 import { ConsentFields } from './ConsentFields'
 import { SocialButtons } from './social/SocialButtons'
@@ -102,7 +103,10 @@ export function SignupPage() {
   const query = params.size ? `?${params.toString()}` : ''
 
   return (
-    <Page title="Join Good Deeds" intro="Celebrate the kindness you see around Bangalore.">
+    <AuthShell
+      title="Join Good Deeds"
+      intro="Celebrate the kindness you see around Bangalore. Do good, share good."
+    >
       <form noValidate onSubmit={(e) => void handleSubmit(e)} className="space-y-5">
         {formError && <ErrorAlert>{formError}</ErrorAlert>}
         <TextField
@@ -127,7 +131,8 @@ export function SignupPage() {
           error={errors.handle}
         />
         <TextField
-          label="Email"
+          label="Email address"
+          placeholder="you@example.com"
           name="email"
           type="email"
           autoComplete="email"
@@ -137,10 +142,9 @@ export function SignupPage() {
           onChange={(e) => update({ email: e.target.value })}
           error={errors.email}
         />
-        <TextField
+        <PasswordField
           label="Password"
           name="password"
-          type="password"
           autoComplete="new-password"
           required
           value={values.password}
@@ -154,9 +158,9 @@ export function SignupPage() {
         </Button>
       </form>
       <SocialButtons />
-      <p className="text-center text-stone-600">
-        Already have an account? <TextLink to={`/login${query}`}>Log in</TextLink>
+      <p className="text-center text-sm text-slate-600">
+        Already have an account? <TextLink to={`/login${query}`}>Sign in</TextLink>
       </p>
-    </Page>
+    </AuthShell>
   )
 }

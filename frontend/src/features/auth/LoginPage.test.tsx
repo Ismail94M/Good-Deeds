@@ -4,9 +4,9 @@ import { describe, expect, it } from 'vitest'
 import { makeMe, mockApi, NOT_ONBOARDED, renderApp, TOKEN } from '../../test/utils'
 
 async function logIn(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(await screen.findByLabelText('Email'), 'asha@example.com')
+  await user.type(await screen.findByLabelText('Email address'), 'asha@example.com')
   await user.type(screen.getByLabelText('Password'), 'kindness-123')
-  await user.click(screen.getByRole('button', { name: 'Log in' }))
+  await user.click(screen.getByRole('button', { name: 'Sign in' }))
 }
 
 describe('LoginPage', () => {
@@ -27,7 +27,7 @@ describe('LoginPage', () => {
     const api = mockApi()
     const user = userEvent.setup()
     renderApp('/login')
-    await user.click(await screen.findByRole('button', { name: 'Log in' }))
+    await user.click(await screen.findByRole('button', { name: 'Sign in' }))
     expect(screen.getByRole('alert')).toHaveTextContent('Please enter your email and password.')
     expect(api.calls('POST /auth/login')).toHaveLength(0)
   })

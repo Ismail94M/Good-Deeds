@@ -14,7 +14,7 @@ function yearsAgo(years: number, extraDays = 0): string {
 async function fillValidForm(user: ReturnType<typeof userEvent.setup>) {
   await user.type(await screen.findByLabelText('Your name'), 'Asha Rao')
   await user.type(screen.getByLabelText('Handle'), 'asha')
-  await user.type(screen.getByLabelText('Email'), 'asha@example.com')
+  await user.type(screen.getByLabelText('Email address'), 'asha@example.com')
   await user.type(screen.getByLabelText('Password'), 'kindness-123')
   await user.type(screen.getByLabelText('Date of birth'), yearsAgo(25))
   await user.click(screen.getByRole('checkbox', { name: /i agree to the terms/i }))
