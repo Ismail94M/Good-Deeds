@@ -4,6 +4,7 @@ A module may provide:
   - router.py   with `router: APIRouter`   (mounted under /api)
   - models.py   SQLAlchemy models          (imported so Alembic sees them)
   - handlers.py event subscribers          (imported so the worker registers them)
+  - jobs.py     background and periodic jobs
 
 Modules talk to each other only through another module's service.py or through events.
 """
@@ -14,10 +15,10 @@ import importlib.util
 from fastapi import APIRouter
 
 MODULES: list[str] = [
-    # Added milestone by milestone, e.g. "identity", "deeds", "verification", ...
+    "identity",
 ]
 
-_OPTIONAL_PARTS = ("models", "handlers")
+_OPTIONAL_PARTS = ("models", "handlers", "jobs")
 
 
 def _import_if_exists(name: str) -> object | None:

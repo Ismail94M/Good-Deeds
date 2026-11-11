@@ -8,7 +8,7 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from app.core import audit, events  # noqa: F401  (register core tables)
+from app.core import audit, events, ratelimit  # noqa: F401  (register core tables)
 from app.core.config import get_settings
 from app.core.db import Base
 from app.modules.registry import load_modules
@@ -20,14 +20,6 @@ if config.config_file_name is not None:
 load_modules()
 target_metadata = Base.metadata
 
-# Tables owned by extensions or libraries, not by our models.
-_EXTERNAL_TABLE_PREFIXES = (
-    "procrastinate_",
-    "spatial_ref_sys",
-    "geography_columns",
-    "geometry_columns",
-)
-
 
 def include_name(
     name: str | None,
@@ -36,8 +28,15 @@ def include_name(
     ],
     parent_names: object,
 ) -> bool:
-    if type_ == "table" and name is not None:
-        return not name.startswith(_EXTERNAL_TABLE_PREFIXES)
+    """Only compare tables our models define.
+
+    The database also holds tables owned by PostGIS (incl. the tiger geocoder that ships in
+    the postgis image) and Procrastinate; autogenerate must never try to drop those.
+    """
+    if type_ == "schema":
+        return name in (None, "public")
+    if type_ == "table":
+        return name in target_metadata.tables
     return True
 
 

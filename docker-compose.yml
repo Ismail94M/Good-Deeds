@@ -21,8 +21,11 @@ services:
     build: ./backend
     command: ["alembic", "upgrade", "head"]
     environment: &backend-env
+      GD_ENV: development
+      GD_COOKIE_SECURE: "false"
       GD_DATABASE_URL: postgresql+psycopg://gooddeeds:gooddeeds@db:5432/gooddeeds
       GD_CORS_ORIGINS: '["http://localhost:5173"]'
+      GD_WEB_BASE_URL: http://localhost:5173
     depends_on:
       db:
         condition: service_healthy
