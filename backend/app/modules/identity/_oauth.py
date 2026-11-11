@@ -18,6 +18,8 @@ from app.core.config import get_settings
 # httpx logs full request URLs at INFO; keep tokens out of logs.
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
+logger = logging.getLogger(__name__)
+
 
 class OAuthError(Exception):
     pass
@@ -38,6 +40,7 @@ class OAuthVerifier(Protocol):
 
 class GoogleVerifier:
     _ISSUERS = ("accounts.google.com", "https://accounts.google.com")
+    _CLOCK_LEEWAY_SECONDS = 30
 
     def __init__(self, client_id: str) -> None:
         self._client_id = client_id
@@ -54,8 +57,13 @@ class GoogleVerifier:
                 algorithms=["RS256"],
                 audience=self._client_id,
                 issuer=self._ISSUERS,
+                # Google's `iat` is "now"; a server clock a second or two behind
+                # (common in Docker Desktop) would otherwise reject every token.
+                leeway=self._CLOCK_LEEWAY_SECONDS,
             )
         except jwt.PyJWTError as exc:
+            # Log the reason only, never the token.
+            logger.warning("Google token rejected: %s: %s", type(exc).__name__, exc)
             raise OAuthError("Invalid Google token") from exc
         return OAuthIdentity(
             provider="google",
