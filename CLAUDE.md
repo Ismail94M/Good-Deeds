@@ -81,6 +81,7 @@ npm run lint && npm run typecheck && npm run format:check
 
 - **Settings default to production and refuse unsafe values** (dev secret, insecure cookies, console SMS, `*`/http CORS). Running locally needs `GD_ENV=development` and `GD_COOKIE_SECURE=false`. docker-compose sets them; for running outside Docker, copy `backend/.env.example` to `backend/.env`. Tests set `GD_ENV=test`.
 - Locally, OTP codes appear in the API log: `docker compose logs api | grep "DEV SMS"`.
+- The Google sign-in button appears only when `GD_GOOGLE_CLIENT_ID` is set in the root `.env` (docker-compose passes it to the API). Setup steps are in `docs/SETUP-GOOGLE-SIGNIN.md`.
 
 - On Windows, psycopg's async mode needs a selector event loop. `alembic/env.py` and `tests/conftest.py` already handle this. Do the same in any new entry point that runs asyncio on Windows.
 - The local directory `backend/alembic/` has the same name as the `alembic` package. Ruff is configured to treat `alembic` as third-party.

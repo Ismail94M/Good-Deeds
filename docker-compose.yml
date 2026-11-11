@@ -26,6 +26,8 @@ services:
       GD_DATABASE_URL: postgresql+psycopg://gooddeeds:gooddeeds@db:5432/gooddeeds
       GD_CORS_ORIGINS: '["http://localhost:5173"]'
       GD_WEB_BASE_URL: http://localhost:5173
+      # Read from the root .env file (see docs/SETUP-GOOGLE-SIGNIN.md). Empty hides the button.
+      GD_GOOGLE_CLIENT_ID: ${GD_GOOGLE_CLIENT_ID:-}
     depends_on:
       db:
         condition: service_healthy
