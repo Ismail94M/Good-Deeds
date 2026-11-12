@@ -1,0 +1,198 @@
+<mxfile host="drawio" agent="architecture-diagram">
+  <diagram id="compose" name="Local Docker Compose">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" page="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="compose-title" value="&lt;b&gt;05 Infrastructure: local Docker Compose (project good-deeds)&lt;/b&gt;&lt;br&gt;Synced to c6395cf (branch m1-identity)" style="text;html=1;align=left;verticalAlign=top;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="20" y="20" width="700" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="compose-legend" value="&lt;b&gt;Legend&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;align=left;verticalAlign=top;spacingLeft=6;" vertex="1" parent="1">
+          <mxGeometry x="1300" y="20" width="280" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="compose-legend-implemented" value="implemented" style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=10;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="1310" y="50" width="125" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="compose-legend-partial" value="partial" style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=10;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="1445" y="50" width="125" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="compose-legend-planned" value="planned (Mx)" style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=10;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1310" y="92" width="125" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="compose-legend-proposed" value="proposed" style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=10;fillColor=#ffffff;strokeColor=#9673a6;dashed=1;dashPattern=1 4;" vertex="1" parent="1">
+          <mxGeometry x="1445" y="92" width="125" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="compose-host" value="Docker host: docker compose up -d --build" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;dashed=1;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacingLeft=8;spacingBottom=4;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="150" width="980" height="630" as="geometry" />
+        </mxCell>
+        <object id="browser" label="&lt;b&gt;Developer browser&lt;/b&gt;" status="implemented" milestone="M0" source="docker-compose.yml#web; CLAUDE.md#Commands">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="40" y="235" width="220" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object id="web" label="&lt;b&gt;web&lt;/b&gt;&lt;br&gt;build ./frontend&lt;br&gt;npm run dev -- --host 0.0.0.0&lt;br&gt;port 5173:5173&lt;br&gt;bind ./frontend/src:/app/src&lt;br&gt;VITE_API_PROXY_TARGET=http://api:8000&lt;br&gt;&lt;i&gt;depends_on: api (started)&lt;/i&gt;" status="implemented" milestone="M0" source="docker-compose.yml#web; frontend/vite.config.ts">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="335" y="180" width="262" height="170" as="geometry" />
+          </mxCell>
+        </object>
+        <object id="api" label="&lt;b&gt;api&lt;/b&gt;&lt;br&gt;build ./backend&lt;br&gt;uvicorn app.main:app --reload&lt;br&gt;port 8000:8000&lt;br&gt;bind ./backend/app:/app/app&lt;br&gt;&lt;i&gt;depends_on: migrate&lt;br&gt;(service_completed_successfully)&lt;/i&gt;" status="implemented" milestone="M0" source="docker-compose.yml#api">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="690" y="180" width="262" height="170" as="geometry" />
+          </mxCell>
+        </object>
+        <object id="worker" label="&lt;b&gt;worker&lt;/b&gt;&lt;br&gt;build ./backend&lt;br&gt;procrastinate --app=&lt;br&gt;app.core.jobs.job_app worker&lt;br&gt;bind ./backend/app:/app/app&lt;br&gt;&lt;i&gt;depends_on: migrate&lt;br&gt;(service_completed_successfully)&lt;/i&gt;" status="implemented" milestone="M0" source="docker-compose.yml#worker; backend/app/core/jobs.py">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="1030" y="180" width="262" height="170" as="geometry" />
+          </mxCell>
+        </object>
+        <object id="frontimg" label="&lt;b&gt;frontend/Dockerfile&lt;/b&gt;&lt;br&gt;node:22-slim, npm ci&lt;br&gt;runs the Vite dev server" status="implemented" milestone="M0" source="frontend/Dockerfile" details="No production web image; the container serves the dev server.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="335" y="430" width="262" height="90" as="geometry" />
+          </mxCell>
+        </object>
+        <object id="db" label="&lt;b&gt;db&lt;/b&gt;&lt;br&gt;image postgis/postgis:16-3.4&lt;br&gt;port 5432:5432&lt;br&gt;healthcheck pg_isready&lt;br&gt;(every 3 s, 20 retries)" status="implemented" milestone="M0" source="docker-compose.yml#db">
+          <mxCell style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="690" y="420" width="262" height="130" as="geometry" />
+          </mxCell>
+        </object>
+        <object id="volume" label="&lt;b&gt;named volume db-data&lt;/b&gt;&lt;br&gt;/var/lib/postgresql/data" status="implemented" milestone="M0" source="docker-compose.yml#volumes">
+          <mxCell style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="1030" y="445" width="262" height="80" as="geometry" />
+          </mxCell>
+        </object>
+        <object id="envanchor" label="&lt;b&gt;&amp;amp;backend-env&lt;/b&gt;&lt;br&gt;(migrate, api, worker)&lt;br&gt;GD_ENV=development&lt;br&gt;GD_COOKIE_SECURE=false&lt;br&gt;GD_DATABASE_URL=...@db:5432/...&lt;br&gt;GD_CORS_ORIGINS, GD_WEB_BASE_URL&lt;br&gt;GD_GOOGLE_CLIENT_ID" status="implemented" milestone="M1" source="docker-compose.yml#migrate" details="GD_SECRET_KEY, GD_SMS_PROVIDER and GD_FACEBOOK_* are not set, so dev defaults apply and Facebook stays off.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="335" y="600" width="262" height="150" as="geometry" />
+          </mxCell>
+        </object>
+        <object id="migrate" label="&lt;b&gt;migrate&lt;/b&gt; (one-shot)&lt;br&gt;build ./backend&lt;br&gt;alembic upgrade head&lt;br&gt;&lt;i&gt;depends_on: db (service_healthy)&lt;/i&gt;" status="implemented" milestone="M0" source="docker-compose.yml#migrate; backend/alembic/env.py">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="690" y="625" width="262" height="100" as="geometry" />
+          </mxCell>
+        </object>
+        <object id="backendimg" label="&lt;b&gt;backend/Dockerfile&lt;/b&gt;&lt;br&gt;python:3.12-slim + uv 0.13.7&lt;br&gt;uv sync --frozen --no-dev&lt;br&gt;(image for migrate, api, worker)" status="implemented" milestone="M0" source="backend/Dockerfile; backend/.dockerignore" details=".dockerignore excludes backend/.env, so container settings come only from compose environment.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="1030" y="625" width="262" height="100" as="geometry" />
+          </mxCell>
+        </object>
+        <object id="rootenv" label="&lt;b&gt;Root .env&lt;/b&gt; (git-ignored)&lt;br&gt;GD_GOOGLE_CLIENT_ID=...&lt;br&gt;template: .env.example" status="implemented" milestone="M1" source=".env.example; docker-compose.yml#GD_GOOGLE_CLIENT_ID; docs/SETUP-GOOGLE-SIGNIN.md" details="Compose interpolates ${GD_GOOGLE_CLIENT_ID:-}; empty hides the Google button. No other variable is read from it.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="335" y="850" width="262" height="80" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="compose-e1" value="HTTP :5173" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="browser" target="web">
+          <mxGeometry relative="1" x="-0.3" as="geometry" />
+        </mxCell>
+        <mxCell id="compose-e2" value="proxy /api" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="web" target="api">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="compose-e3" value="build" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="frontimg" target="web">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="compose-e4" value="SQL :5432" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=0.3;exitY=1;exitDx=0;exitDy=0;entryX=0.3;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="api" target="db">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="compose-e5" value="jobs / outbox" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=0.15;exitY=1;exitDx=0;exitDy=0;entryX=0.85;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="worker" target="db">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="compose-e6" value="mount" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="db" target="volume">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="compose-e7" value="alembic upgrade head" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="migrate" target="db">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="compose-e8" value="environment" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="envanchor" target="migrate">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="compose-e9" value="build" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="backendimg" target="migrate">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="compose-e10" value="${GD_GOOGLE_CLIENT_ID:-}" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="rootenv" target="envanchor">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="ci-cd" name="CI and deployment">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" page="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="ci-cd-title" value="&lt;b&gt;05 Infrastructure: CI (GitHub Actions) and deployment&lt;/b&gt;&lt;br&gt;Synced to c6395cf (branch m1-identity)" style="text;html=1;align=left;verticalAlign=top;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="20" y="20" width="700" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ci-cd-legend" value="&lt;b&gt;Legend&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;align=left;verticalAlign=top;spacingLeft=6;" vertex="1" parent="1">
+          <mxGeometry x="1300" y="20" width="280" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="ci-cd-legend-implemented" value="implemented" style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=10;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="1310" y="50" width="125" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="ci-cd-legend-partial" value="partial" style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=10;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="1445" y="50" width="125" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="ci-cd-legend-planned" value="planned (Mx)" style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=10;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1310" y="92" width="125" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="ci-cd-legend-proposed" value="proposed" style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=10;fillColor=#ffffff;strokeColor=#9673a6;dashed=1;dashPattern=1 4;" vertex="1" parent="1">
+          <mxGeometry x="1445" y="92" width="125" height="32" as="geometry" />
+        </mxCell>
+        <object id="trigger" label="&lt;b&gt;GitHub repository&lt;/b&gt;&lt;br&gt;on: push to main, pull_request" status="implemented" milestone="M0" source=".github/workflows/ci.yml">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="350" y="90" width="800" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="ci-boundary" value="Workflow CI (.github/workflows/ci.yml), runs-on ubuntu-latest" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;dashed=1;strokeColor=#6c8ebf;align=left;verticalAlign=bottom;spacingLeft=8;spacingBottom=4;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="225" width="860" height="495" as="geometry" />
+        </mxCell>
+        <object id="jobbackend" label="&lt;b&gt;job: backend&lt;/b&gt; (working dir backend)&lt;br&gt;actions/checkout@v4&lt;br&gt;astral-sh/setup-uv@v6 (uv 0.13.7)&lt;br&gt;uv sync --frozen&lt;br&gt;uv run ruff check .&lt;br&gt;uv run ruff format --check .&lt;br&gt;uv run mypy app tests&lt;br&gt;uv run pytest" status="implemented" milestone="M0" source=".github/workflows/ci.yml#backend">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="350" y="270" width="380" height="210" as="geometry" />
+          </mxCell>
+        </object>
+        <object id="cidb" label="&lt;b&gt;service container db&lt;/b&gt;&lt;br&gt;postgis/postgis:16-3.4, port 5432&lt;br&gt;health: pg_isready (3 s, 20 retries)" status="implemented" milestone="M0" source=".github/workflows/ci.yml#backend">
+          <mxCell style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="350" y="560" width="380" height="100" as="geometry" />
+          </mxCell>
+        </object>
+        <object id="jobfrontend" label="&lt;b&gt;job: frontend&lt;/b&gt; (working dir frontend)&lt;br&gt;actions/checkout@v4&lt;br&gt;actions/setup-node@v4 (Node 22, npm cache)&lt;br&gt;npm ci&lt;br&gt;npm run lint&lt;br&gt;npm run format:check&lt;br&gt;npm run typecheck&lt;br&gt;npm test&lt;br&gt;npm run build" status="implemented" milestone="M0" source=".github/workflows/ci.yml#frontend" details="npm run build output (dist) is not published anywhere.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="780" y="270" width="370" height="210" as="geometry" />
+          </mxCell>
+        </object>
+        <object id="cd" label="&lt;b&gt;CD / deployment pipeline&lt;/b&gt;&lt;br&gt;image build, registry, release (unscheduled)" status="planned" milestone="unscheduled" source="CLAUDE.md#Specialist subagents; docs/PRD.md#11" details="No deployment config in the repo. CLAUDE.md: a DevOps agent will be added when deployment work begins. Not in ROADMAP.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1">
+            <mxGeometry x="1260" y="320" width="300" height="90" as="geometry" />
+          </mxCell>
+        </object>
+        <object id="prod" label="&lt;b&gt;Production hosting&lt;/b&gt;&lt;br&gt;stateless API + worker, managed Postgres/PostGIS, HTTPS (unscheduled)" status="planned" milestone="unscheduled" source="docs/PRD.md#11" details="PRD section 11: stateless, horizontally scalable, low-cost initial deployment. No provider chosen.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1">
+            <mxGeometry x="1260" y="480" width="300" height="90" as="geometry" />
+          </mxCell>
+        </object>
+        <object id="prodguard" label="&lt;b&gt;Production config guard&lt;/b&gt;&lt;br&gt;Settings default to production; refuse dev secret, insecure cookie, console SMS, non-https CORS" status="implemented" milestone="M1" source="backend/app/core/config.py" details="Already enforced in code, ready for whatever deployment is chosen.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="1260" y="640" width="300" height="100" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="ci-cd-e1" value="push / PR" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=0.2375;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="trigger" target="jobbackend">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ci-cd-e2" value="push / PR" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=0.7688;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="trigger" target="jobfrontend">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ci-cd-e3" value="localhost:5432 (pytest)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="jobbackend" target="cidb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ci-cd-e4" value="not wired" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=1;exitY=0.4524;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="jobfrontend" target="cd">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ci-cd-e5" value="deploy" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="cd" target="prod">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ci-cd-e6" value="enforced at startup" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="prod" target="prodguard">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

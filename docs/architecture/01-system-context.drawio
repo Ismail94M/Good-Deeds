@@ -1,0 +1,145 @@
+<mxfile host="drawio" agent="architecture-diagram">
+  <diagram id="context" name="System context">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" page="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="context-title" value="&lt;b&gt;01 System context (C4 level 1)&lt;/b&gt;&lt;br&gt;Synced to c6395cf (branch m1-identity)" style="text;html=1;align=left;verticalAlign=top;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="20" y="20" width="700" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="context-legend" value="&lt;b&gt;Legend&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;align=left;verticalAlign=top;spacingLeft=6;" vertex="1" parent="1">
+          <mxGeometry x="1300" y="20" width="280" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="context-legend-implemented" value="implemented" style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=10;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="1310" y="50" width="125" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="context-legend-partial" value="partial" style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=10;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="1445" y="50" width="125" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="context-legend-planned" value="planned (Mx)" style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=10;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1310" y="92" width="125" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="context-legend-proposed" value="proposed" style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=10;fillColor=#ffffff;strokeColor=#9673a6;dashed=1;dashPattern=1 4;" vertex="1" parent="1">
+          <mxGeometry x="1445" y="92" width="125" height="32" as="geometry" />
+        </mxCell>
+        <object id="system" label="&lt;b&gt;Good Deeds&lt;/b&gt;&lt;br&gt;[Software system]&lt;br&gt;Mobile-responsive web app: a feed of good deeds witnessed by others, Bangalore launch.&lt;br&gt;&lt;br&gt;&lt;i&gt;Today (M0+M1): accounts, phone OTP, consent, profiles, QR&lt;/i&gt;" status="implemented" milestone="M1" source="docs/PRD.md#1; backend/app/main.py; backend/app/modules/registry.py; frontend/src/app/routes.tsx" details="Only the identity module is registered. Deeds, feed, scoring etc. are M2-M8.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="620" y="360" width="360" height="300" as="geometry" />
+          </mxCell>
+        </object>
+        <object id="doer" label="&lt;b&gt;Doer&lt;/b&gt;&lt;br&gt;[Person]&lt;br&gt;Signs up, verifies phone, shows rotating QR + short ID" status="implemented" milestone="M1" source="docs/PRD.md#2; frontend/src/features/qr/MyQrPage.tsx; backend/app/modules/identity/router.py#/users/me/qr" details="Can sign up (email/Google/Facebook), verify phone, pass age+consent gate and show 'My QR' today. Cannot yet be verified for a deed or earn points (M2/M4).">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=36;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="60" y="360" width="260" height="80" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="context-e1" value="signs up, shows QR" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.1333;entryDx=0;entryDy=0;" edge="1" parent="1" source="doer" target="system">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object id="witness" label="&lt;b&gt;Witness / reporter&lt;/b&gt;&lt;br&gt;[Person]&lt;br&gt;Scans a doer's QR, reports the deed (M2)" status="planned" milestone="M2" source="docs/PRD.md#2; docs/ROADMAP.md#M2; frontend/src/features/scan/ScanPage.tsx" details="Can sign up today; a scanned QR (/scan/:token) lands on a placeholder page. Reporting and verification are M2.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=36;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1">
+            <mxGeometry x="60" y="470" width="260" height="80" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="context-e2" value="reports deeds (M2)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="witness" target="system">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object id="viewer" label="&lt;b&gt;Viewer&lt;/b&gt;&lt;br&gt;[Person]&lt;br&gt;Scrolls, likes, comments, shares (M3)" status="planned" milestone="M3" source="docs/PRD.md#2; docs/ROADMAP.md#M3; frontend/src/features/profile/PublicProfilePage.tsx" details="Today a visitor can only open public profiles (/u/:handle). Feed and social actions are M3.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=36;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1">
+            <mxGeometry x="60" y="580" width="260" height="80" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="context-e3" value="browses feed (M3)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.8667;entryDx=0;entryDy=0;" edge="1" parent="1" source="viewer" target="system">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object id="admin" label="&lt;b&gt;Admin / moderator&lt;/b&gt;&lt;br&gt;[Person]&lt;br&gt;Review, overrides, takedowns (M5)" status="planned" milestone="M5" source="docs/ROADMAP.md#M5; docs/PRD.md#11; backend/app/modules/identity/models.py#Role" details="users.role (member/moderator/admin) and require_role exist since M1, but no admin UI or endpoints. Admin queue M5, moderation M7, prize review and analytics M8.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=36;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1">
+            <mxGeometry x="400" y="190" width="220" height="80" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="context-e4" value="reviews, moderates (M5)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.15;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="admin" target="system">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object id="sponsor" label="&lt;b&gt;Sponsor / advertiser&lt;/b&gt;&lt;br&gt;[Organisation]&lt;br&gt;Funds challenges, prizes, ads (M6)" status="planned" milestone="M6" source="docs/PRD.md#13; docs/ROADMAP.md#M6; docs/ROADMAP.md#M8" details="Sponsored challenges in M6; sponsors, ad slots and sponsor-funded prizes in M8.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=36;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1">
+            <mxGeometry x="690" y="190" width="220" height="80" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="context-e5" value="sponsors (M6/M8)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="sponsor" target="system">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object id="org" label="&lt;b&gt;Organisation / NGO&lt;/b&gt;&lt;br&gt;[Organisation]&lt;br&gt;Org accounts, editions (unscheduled)" status="planned" milestone="unscheduled" source="docs/PRD.md#7; docs/PRD.md#13" details="PRD section 7 lists organisation/NGO accounts as future (not v1); section 13 says 'later'. Not in ROADMAP.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=36;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1">
+            <mxGeometry x="980" y="190" width="220" height="80" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="context-e6" value="org editions" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.85;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="org" target="system">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object id="google" label="&lt;b&gt;Google Identity Services&lt;/b&gt;&lt;br&gt;[External] sign-in with Google" status="implemented" milestone="M1" source="backend/app/modules/identity/_oauth.py; frontend/src/features/auth/social/google.ts; docker-compose.yml#GD_GOOGLE_CLIENT_ID" details="Active when GD_GOOGLE_CLIENT_ID is set (root .env via docker-compose); the button is hidden when empty.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="1260" y="368" width="300" height="64" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="context-e7" value="verify ID token" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=1;exitY=0.1333;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="system" target="google">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object id="facebook" label="&lt;b&gt;Facebook Login&lt;/b&gt;&lt;br&gt;[External] sign-in with Facebook" status="partial" milestone="M1" source="backend/app/modules/identity/_oauth.py; frontend/src/features/auth/social/facebook.ts; backend/.env.example" details="Built (SDK + Graph API verify) but GD_FACEBOOK_APP_ID/SECRET are empty and docker-compose does not pass them.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+            <mxGeometry x="1260" y="448" width="300" height="64" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="context-e8" value="verify access token" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=1;exitY=0.4;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="system" target="facebook">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object id="sms" label="&lt;b&gt;SMS gateway&lt;/b&gt;&lt;br&gt;[External] phone OTP; today console only" status="partial" milestone="pre-launch" source="backend/app/core/sms.py; backend/.env.example; docs/ROADMAP.md#Deferred from M1" details="ConsoleSmsProvider logs OTPs (dev only). Real provider (MSG91 or Twilio + DLT) is deferred to pre-launch.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+            <mxGeometry x="1260" y="528" width="300" height="64" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="context-e9" value="send OTP" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=1;exitY=0.6667;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="system" target="sms">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object id="captcha" label="&lt;b&gt;CAPTCHA (Turnstile / hCaptcha)&lt;/b&gt;&lt;br&gt;[External] (pre-launch)" status="planned" milestone="pre-launch" source="docs/ROADMAP.md#Deferred from M1">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1">
+            <mxGeometry x="1260" y="608" width="300" height="64" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="context-e10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=1;exitY=0.9333;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="system" target="captcha">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object id="storage" label="&lt;b&gt;Object storage&lt;/b&gt;&lt;br&gt;[External] S3-compatible, photos/videos (M3)" status="planned" milestone="M3" source="docs/ROADMAP.md#M3; docs/PRD.md#14; CLAUDE.md#Gotchas" details="Provider not chosen: CLAUDE.md says the MinIO image is gone and a replacement is picked in M3.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1">
+            <mxGeometry x="345" y="770" width="210" height="80" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="context-e11" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=0.125;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="system" target="storage">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object id="ai" label="&lt;b&gt;AI model provider&lt;/b&gt;&lt;br&gt;[External] impact evaluator,&lt;br&gt;pre-screen (M4)" status="planned" milestone="M4" source="docs/ROADMAP.md#M4; docs/ROADMAP.md#M7; docs/PRD.md#14" details="Provider-agnostic ImpactEvaluator in shadow mode (M4); AI moderation pre-screen in M7.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1">
+            <mxGeometry x="575" y="770" width="210" height="80" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="context-e12" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=0.375;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="system" target="ai">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object id="email" label="&lt;b&gt;Email delivery&lt;/b&gt;&lt;br&gt;[External] notifications, verification (M6)" status="planned" milestone="M6" source="docs/ROADMAP.md#M6; docs/ROADMAP.md#Deferred from M1" details="M6 notifications 'plus email'; email verification is also listed as pre-launch. No provider named.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1">
+            <mxGeometry x="805" y="770" width="210" height="80" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="context-e13" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=0.625;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="system" target="email">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object id="whatsapp" label="&lt;b&gt;WhatsApp / Web Share&lt;/b&gt;&lt;br&gt;[External] share links (M3)" status="planned" milestone="M3" source="docs/ROADMAP.md#M3; docs/PRD.md#5" details="Feed shares via Web Share API + WhatsApp link (M3); PRD also suggests sending invite links over WhatsApp (M2).">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1">
+            <mxGeometry x="1035" y="770" width="210" height="80" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="context-e14" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=0.875;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="system" target="whatsapp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

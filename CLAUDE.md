@@ -94,5 +94,6 @@ Project subagents live in `.claude/agents/`. For each roadmap milestone:
 2. **database-specialist** handles schema changes and migrations. **backend-developer** and **frontend-developer** build the features, in parallel where the task list allows.
 3. **qa-engineer** tests the PRD rules, including boundaries and abuse cases.
 4. **security-reviewer** reviews read-only, before the milestone is committed.
+5. **architecture-diagram** updates the draw.io diagrams in `docs/architecture/` after the security review, before product-owner review.
 
 The main session coordinates: it hands tasks to agents, checks their reports, and asks the product owner for review before the next milestone. AI-specialist and DevOps agents will be added when AI scoring (M4) and deployment work begin.
