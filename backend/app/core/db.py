@@ -1,6 +1,6 @@
 from collections.abc import AsyncIterator
 
-from sqlalchemy import MetaData
+from sqlalchemy import MetaData, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -27,3 +27,12 @@ async def get_session() -> AsyncIterator[AsyncSession]:
     """FastAPI dependency: one session per request."""
     async with SessionLocal() as session:
         yield session
+
+
+async def advisory_xact_lock(session: AsyncSession, *parts: str) -> None:
+    """Take a Postgres advisory lock held until the current transaction ends.
+
+    ``parts`` are joined into one key (e.g. ``("same_act", doer_id)``) and hashed to 64 bits.
+    """
+    key = ":".join(parts)
+    await session.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:k, 0))"), {"k": key})

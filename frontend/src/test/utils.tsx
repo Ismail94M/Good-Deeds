@@ -105,6 +105,7 @@ export function makeQr(overrides: Partial<QrCode> = {}): QrCode {
     scan_url: 'http://localhost:5173/scan/7K3M9Q0.123.abc',
     expires_at: '2026-11-11T12:00:00Z',
     refresh_after_seconds: 30,
+    manual_code: '482913',
     ...overrides,
   }
 }

@@ -8,7 +8,7 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from app.core import audit, events, ratelimit  # noqa: F401  (register core tables)
+from app.core import audit, events, ratelimit, runtime_config  # noqa: F401  (register core tables)
 from app.core.config import get_settings
 from app.core.db import Base
 from app.modules.registry import load_modules

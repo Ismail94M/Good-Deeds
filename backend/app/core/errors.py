@@ -29,6 +29,10 @@ class Forbidden(AppError):
     status_code = 403
 
 
+class Gone(AppError):
+    status_code = 410
+
+
 class TooManyRequests(AppError):
     status_code = 429
 

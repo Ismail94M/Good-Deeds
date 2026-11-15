@@ -75,6 +75,8 @@ export type QrCode = {
   scan_url: string
   expires_at: string
   refresh_after_seconds: number
+  /** 6-digit code typed with the ID for manual verification (M2). Same window as `token`. */
+  manual_code: string
 }
 
 export type OAuthProvider = 'google' | 'facebook'
