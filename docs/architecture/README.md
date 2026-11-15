@@ -2,6 +2,8 @@
 
 **Synced to commit `4b05a3a` (`m2-deeds`) on 2026-11-15.** The implemented baseline is M0 + M1 + the M2 backend. The M2 screens are not built yet (they wait for the product owner's Figma designs), so they are drawn as planned. M3–M8 are not built.
 
+> **Update 2026-11-16 (design Revision 4, commit `12964e0`):** invites are built but **switched off by config** (`deeds.invites_enabled = false`, decision D17); the invite parts of the diagrams show the code as built, not as live. Two rules were added that the diagrams don't draw yet: at most 15 reports per reporter per IST month (D16, `reporter_month` advisory lock taken before the scan or invite row), and the profile's Verified Deeds counts only counted reports (D15). See `docs/M2-DESIGN.md` §0.2.
+
 These diagrams are drawn from the repository (code, migrations, `docker-compose.yml`, CI, PRD and ROADMAP), not from assumptions. Every shape stores its evidence: open a diagram, select a shape, and choose **Edit → Edit Data** to see its `status`, `milestone`, `source` (repo paths) and `note`.
 
 ## How to open
