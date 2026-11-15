@@ -1,10 +1,10 @@
 <mxfile host="drawio" agent="architecture-diagram">
   <diagram id="containers" name="High-level architecture">
-    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" page="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" page="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="containers-title" value="&lt;b&gt;02 High-level architecture (C4 container)&lt;/b&gt;&lt;br&gt;Synced to c6395cf (branch m1-identity)" style="text;html=1;align=left;verticalAlign=top;fontSize=16;" vertex="1" parent="1">
+        <mxCell id="containers-title" value="&lt;b&gt;02 High-level architecture (C4 container)&lt;/b&gt;&lt;br&gt;Synced to 4b05a3a (branch m2-deeds), 2026-11-15" style="text;html=1;align=left;verticalAlign=top;fontSize=16;" vertex="1" parent="1">
           <mxGeometry x="20" y="20" width="700" height="50" as="geometry" />
         </mxCell>
         <mxCell id="containers-legend" value="&lt;b&gt;Legend&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;align=left;verticalAlign=top;spacingLeft=6;" vertex="1" parent="1">
@@ -23,7 +23,7 @@
           <mxGeometry x="1445" y="92" width="125" height="32" as="geometry" />
         </mxCell>
         <mxCell id="containers-boundary" value="Good Deeds (modular monolith, one repo)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;dashed=1;strokeColor=#6c8ebf;align=left;verticalAlign=bottom;spacingLeft=8;spacingBottom=4;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="320" y="265" width="840" height="720" as="geometry" />
+          <mxGeometry x="320" y="265" width="840" height="900" as="geometry" />
         </mxCell>
         <object id="gis" label="&lt;b&gt;Google Identity Services&lt;/b&gt;&lt;br&gt;gsi/client script" status="implemented" milestone="M1" source="frontend/src/features/auth/social/google.ts; docker-compose.yml#GD_GOOGLE_CLIENT_ID" details="Browser side of Google sign-in. Enabled when GD_GOOGLE_CLIENT_ID is set.">
           <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
@@ -45,29 +45,30 @@
             <mxGeometry x="20" y="390" width="210" height="60" as="geometry" />
           </mxCell>
         </object>
-        <object id="spa" label="&lt;b&gt;Web SPA&lt;/b&gt;&lt;br&gt;[React 19, TypeScript, Vite, Tailwind, TanStack Query]&lt;br&gt;/, /signup, /login, /onboarding, /profile, /me/qr,&lt;br&gt;/u/:handle, /scan/:token, /terms, /privacy" status="implemented" milestone="M1" source="frontend/src/app/routes.tsx; frontend/src/lib/api.ts; frontend/vite.config.ts" details="/scan/:token is a placeholder until M2.">
+        <object id="spa" label="&lt;b&gt;Web SPA&lt;/b&gt;&lt;br&gt;[React 19, TypeScript, Vite, Tailwind, TanStack Query]&lt;br&gt;/, /signup, /login, /onboarding, /profile, /me/qr,&lt;br&gt;/u/:handle, /scan/:token, /terms, /privacy" status="implemented" milestone="M1" source="frontend/src/app/routes.tsx; frontend/src/lib/api.ts; frontend/vite.config.ts" details="/scan/:token is still a placeholder. features/deeds/deedsApi.ts and lib/geolocation.ts (M2 task F1) are built and tested but no screen uses them yet.">
           <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
             <mxGeometry x="340" y="290" width="340" height="160" as="geometry" />
           </mxCell>
         </object>
+        <object id="screens" label="&lt;b&gt;M2 deed screens&lt;/b&gt; (M2)&lt;br&gt;report hub, scan + ID/code, deed form, invite, invite accept, my deeds (edit, withdraw), self-logs, profile counts" status="planned" milestone="M2" source="docs/M2-DESIGN.md#5-ui-flows-frontend-developer; frontend/src/features/deeds/deedsApi.ts" details="Wait for the product owner's Figma designs (M2 tasks F2-F6)."><mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1"><mxGeometry x="340" y="760" width="340" height="100" as="geometry"/></mxCell></object>
         <object id="auth" label="&lt;b&gt;Auth mechanism&lt;/b&gt;&lt;br&gt;Access JWT (15 min) in memory, sent as Bearer&lt;br&gt;Refresh token: rotating httpOnly cookie gd_refresh,&lt;br&gt;path /api/auth, SameSite=Lax, stored hashed&lt;br&gt;30-day refresh, 90-day absolute session,&lt;br&gt;token_version revocation; X-Device-Id header" status="implemented" milestone="M1" source="frontend/src/lib/api.ts; backend/app/modules/identity/router.py#_set_refresh_cookie; backend/app/core/security.py; backend/app/core/config.py">
           <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
             <mxGeometry x="340" y="520" width="340" height="190" as="geometry" />
           </mxCell>
         </object>
-        <object id="api" label="&lt;b&gt;API&lt;/b&gt;&lt;br&gt;[Python 3.12, FastAPI, SQLAlchemy 2 async]&lt;br&gt;&lt;br&gt;/api/health&lt;br&gt;/api/auth/: config, signup, login,&lt;br&gt;oauth/{provider}, refresh, logout&lt;br&gt;/api/users/me (+ age-consent, phone/start,&lt;br&gt;phone/verify, qr, qr/rotate)&lt;br&gt;/api/users/{handle}&lt;br&gt;&lt;br&gt;Postgres rate limits, outbox emit, audit log" status="implemented" milestone="M1" source="backend/app/main.py; backend/app/modules/registry.py; backend/app/modules/identity/router.py; backend/app/core/health.py; backend/app/core/ratelimit.py">
+        <object id="api" label="&lt;b&gt;API&lt;/b&gt;&lt;br&gt;[Python 3.12, FastAPI, SQLAlchemy 2 async]&lt;br&gt;modules: identity, deeds&lt;br&gt;&lt;br&gt;/api/health&lt;br&gt;/api/auth/: config, signup, login,&lt;br&gt;oauth/{provider}, refresh, logout&lt;br&gt;/api/users/me (+ age-consent, phone/start,&lt;br&gt;phone/verify, qr, qr/rotate)&lt;br&gt;/api/users/{handle} (+ /deed-counts)&lt;br&gt;&lt;br&gt;&lt;i&gt;M2 deeds:&lt;/i&gt;&lt;br&gt;/api/scans, /api/deeds (+ options, {id},&lt;br&gt;PATCH, withdraw)&lt;br&gt;/api/invites/by-token/{token} (+ accept),&lt;br&gt;/api/invites/{id}/reissue&lt;br&gt;/api/me/deeds, /api/me/invites, /api/me/self-logs&lt;br&gt;&lt;br&gt;Postgres rate limits, limits from config rows,&lt;br&gt;outbox emit, audit log" status="implemented" milestone="M2" source="backend/app/main.py; backend/app/modules/registry.py; backend/app/modules/identity/router.py; backend/app/modules/deeds/router.py; backend/app/core/health.py; backend/app/core/ratelimit.py; backend/app/core/runtime_config.py">
           <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
-            <mxGeometry x="840" y="270" width="300" height="260" as="geometry" />
+            <mxGeometry x="840" y="270" width="300" height="420" as="geometry" />
           </mxCell>
         </object>
-        <object id="db" label="&lt;b&gt;PostgreSQL 16 + PostGIS 3.4&lt;/b&gt;&lt;br&gt;core: outbox_events, processed_events,&lt;br&gt;audit_log, rate_limits&lt;br&gt;identity: users, consents, doer_codes,&lt;br&gt;oauth_accounts, phone_otps, refresh_tokens,&lt;br&gt;user_devices, phone_history&lt;br&gt;+ Procrastinate job schema" status="implemented" milestone="M1" source="backend/alembic/versions/2026_11_11_0000-0001_foundation.py; backend/alembic/versions/2026_11_11_1200-0002_identity.py; backend/alembic/versions/2026_11_11_1217-0003_identity_hardening.py" details="audit_log and phone_history are append-only (forbid_modification trigger). PostGIS installed but no spatial columns yet.">
+        <object id="db" label="&lt;b&gt;PostgreSQL 16 + PostGIS 3.4&lt;/b&gt;&lt;br&gt;core: outbox_events, processed_events,&lt;br&gt;audit_log, rate_limits, config_versions&lt;br&gt;identity: users, consents, doer_codes,&lt;br&gt;oauth_accounts, phone_otps, refresh_tokens,&lt;br&gt;user_devices, phone_history&lt;br&gt;deeds: qr_scans, same_act_groups, deeds,&lt;br&gt;invites, verification_events,&lt;br&gt;deed_revisions, self_logs&lt;br&gt;+ Procrastinate job schema" status="implemented" milestone="M2" source="backend/alembic/versions/2026_11_11_0000-0001_foundation.py; backend/alembic/versions/2026_11_11_1200-0002_identity.py; backend/alembic/versions/2026_11_11_1217-0003_identity_hardening.py; backend/alembic/versions/2026_11_13_0000-0004_runtime_config.py; backend/alembic/versions/2026_11_13_0100-0005_deeds.py; backend/alembic/versions/2026_11_15_0000-0006_identity_config.py" details="20 application tables. Append-only (forbid_modification trigger): audit_log, phone_history, config_versions, verification_events, deed_revisions. Deed, scan and group locations are geography(Point, 4326). config_versions holds the qr, deeds and identity namespaces.">
           <mxCell style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
-            <mxGeometry x="840" y="600" width="265" height="180" as="geometry" />
+            <mxGeometry x="840" y="740" width="265" height="220" as="geometry" />
           </mxCell>
         </object>
-        <object id="worker" label="&lt;b&gt;Worker&lt;/b&gt; [Procrastinate]&lt;br&gt;core.dispatch_outbox (every 5 s)&lt;br&gt;core.handle_event (8 retries)&lt;br&gt;identity.purge_expired_records (03:17)" status="implemented" milestone="M1" source="backend/app/core/jobs.py; backend/app/modules/identity/jobs.py; docker-compose.yml#worker" details="Events UserRegistered and PhoneVerified are emitted; no module subscribes to them yet.">
+        <object id="worker" label="&lt;b&gt;Worker&lt;/b&gt; [Procrastinate]&lt;br&gt;core.dispatch_outbox (every 5 s)&lt;br&gt;core.handle_event (8 retries)&lt;br&gt;identity.purge_expired_records (03:17)&lt;br&gt;deeds.expire_invites (every 15 min)&lt;br&gt;deeds.purge_unconsumed_scans (03:37)" status="implemented" milestone="M2" source="backend/app/core/jobs.py; backend/app/modules/identity/jobs.py; backend/app/modules/deeds/jobs.py; docker-compose.yml#worker" details="Identity and deeds events are emitted; no module subscribes to them yet.">
           <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
-            <mxGeometry x="840" y="840" width="265" height="120" as="geometry" />
+            <mxGeometry x="840" y="1010" width="265" height="120" as="geometry" />
           </mxCell>
         </object>
         <object id="jwks" label="&lt;b&gt;Google OAuth certs&lt;/b&gt;&lt;br&gt;googleapis.com JWKS" status="implemented" milestone="M1" source="backend/app/modules/identity/_oauth.py; docker-compose.yml#GD_GOOGLE_CLIENT_ID" details="Server side of Google sign-in: ID token signature check.">
@@ -109,12 +110,12 @@
         </object>
         <object id="ai" label="&lt;b&gt;AI impact evaluator&lt;/b&gt;&lt;br&gt;ImpactEvaluator, shadow mode (M4)" status="planned" milestone="M4" source="docs/ROADMAP.md#M4; docs/PRD.md#14">
           <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1">
-            <mxGeometry x="1280" y="840" width="300" height="50" as="geometry" />
+            <mxGeometry x="1280" y="1010" width="300" height="50" as="geometry" />
           </mxCell>
         </object>
         <object id="notify" label="&lt;b&gt;Notifications&lt;/b&gt;&lt;br&gt;in-app + email delivery (M6)" status="planned" milestone="M6" source="docs/ROADMAP.md#M6; docs/PRD.md#6">
           <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1">
-            <mxGeometry x="1280" y="910" width="300" height="50" as="geometry" />
+            <mxGeometry x="1280" y="1080" width="300" height="50" as="geometry" />
           </mxCell>
         </object>
         <mxCell id="containers-e5" value="HTTP :5173" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.8125;entryDx=0;entryDy=0;" edge="1" parent="1" source="member" target="spa">
