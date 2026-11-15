@@ -38,32 +38,39 @@ This document is the source of truth for v1 product behaviour. Sections 14–15 
 | Consent    | The doer shares a QR code / unique ID and the witness scans it. With no QR/ID, the deed is posted as pending until the doer accepts the invite link within 7 days.                                                                                                                                                                  |
 | Rewards    | Badges and appreciation for everyone. Monthly cash prizes for top leaderboard positions. Prizes are funded by a fixed launch budget, then by sponsors and a fixed share of monthly revenue, so payouts never exceed income. Only prize-eligible users can win (section 12), and every winner is reviewed by a human before payment. |
 | Engagement | Social feed of reported good deeds with likes, comments, shares and follows. "You were recognized" notifications. Monthly kindness challenges.                                                                                                                                                                                      |
-| North Star | Unique verified reports per month in the launch city. Each reporter counts at most once per act, and only reports within the same-act cap of 3 count.                                                                                                                                                                               |
+| North Star | Unique verified reports per month in the launch city. Each reporter counts at most once per act, and only reports within the same-act cap of 5 count.                                                                                                                                                                               |
 | AI         | AI impact score (0–100) for verified deeds only. It never decides whether a deed is genuine. Runs in shadow mode first (section 12).                                                                                                                                                                                                |
 
 ## 5. Verification
 
 A deed is verified in one of two ways:
 
-- **a) QR scan:** a witness scans the doer's QR/ID, and time and location are plausible. Verified instantly.
+- **a) QR scan or ID + code:** a witness scans the doer's rotating QR code, or types the doer's unique ID together with the 6-digit code shown under it, and time and location are plausible. Verified instantly. A QR token or code is accepted for 30–60 seconds after it is shown. The static ID alone never verifies anyone.
 - **b) Invite link:** if the doer is not on the app, the reporter posts the deed and sends a single-use invite link (for example over WhatsApp). The deed stays pending and is not shown with the doer's name. It becomes verified when the doer signs up through the link and accepts it. Links expire after 7 days and the deed then stays unverified.
 
 **Invite link safeguards:**
 
-- The reporter's location and time are recorded when the deed is posted, and must be plausible.
-- The invited doer must verify a phone number that is different from the reporter's. The same phone number, device or payout account can never be both reporter and doer.
+- The reporter gives the time of the deed (up to 7 days ago) and, optionally, its location. A location, if given, must be accurate enough and inside the service area.
+- The invited doer must verify a phone number that is different from the reporter's. The same phone number or payout account can never be both reporter and doer. A shared device is allowed, but at most 15 invites per month can be accepted between the same reporter–doer pair on a shared device.
+- Existing members can accept an invite as well as new users.
 - A reporter can send at most 5 invites per day.
 - An invite-verified deed earns points, but counts toward prize rank only after a second independent report of the same act or a human review.
 
 A user can never verify their own deed.
 
-**Self-logged deeds:** users can log their own good deeds (e.g. planting, beach cleaning) on their own profile only. Self-logged deeds never appear in the feed and do not count toward points, impact score, leaderboard, prizes or the North Star, unless another user later verifies the deed by QR/ID scan, in which case it becomes a normal reported deed.
+**Self-logged deeds:** users can log their own good deeds (e.g. planting, beach cleaning) with a category, description, date/time and optional location. Self-logs are private: only the owner sees the details. They never appear in the feed and never count toward points, impact score, leaderboard, prizes or the North Star. A self-log can't be converted into a verified deed; a witness who saw the deed reports it separately through the normal QR or ID + code flow. The owner can edit and delete self-logs.
+
+**Profile counts:** every profile shows two public counts, like followers/following: *Self-log Deeds* and *Verified Deeds*. Verified Deeds counts verified reports about the user (5 witnesses of one act count as 5). Self-logs are never included in it.
+
+**Edit and withdraw:** a reporter can edit a deed's category, description and number of people helped (every edit is kept in an append-only history), and can withdraw a deed. Time, location, doer and verification method can't be edited. When a counted report in a same-act group is withdrawn, the oldest uncounted report in the group (from a reporter not already counted) is promoted to count. A withdrawal doesn't free the reporter–doer pair's daily slot.
+
+**Account deletion:** deleting an account anonymises the user's deeds instead of deleting them.
 
 **Anti-collusion measures:**
 
 - Diminishing points when the same reporter–doer pair repeats.
 - Daily cap: at most 10 verified deeds per doer per day earn points. Deeds beyond that still appear on the profile.
-- Same-act cap: at most 3 reports of the same act (same doer, within 200 metres and 2 hours) earn the doer points.
+- Same-act cap: at most 5 reports of the same act (same doer, within 200 metres and 2 hours) earn the doer points.
 - Reciprocal verification (A verifies B and B verifies A within a short period) is flagged.
 - Ring detection: small groups who mostly verify each other (for example A→B→C→A) are flagged.
 - Reporter concentration: no single reporter can provide more than 30% of a doer's prize-rank points in a period.
@@ -73,9 +80,9 @@ A user can never verify their own deed.
 ## 6. MVP (v1) features
 
 1. **Sign-up and profile:** email, Google or Facebook login, plus phone number verification.
-2. **Personal QR code and unique ID:** generated at sign-up and always one tap away in the app. Witnesses scan it with their phone's browser camera or type the ID manually.
+2. **Personal QR code and unique ID:** generated at sign-up and always one tap away in the app. Witnesses scan it with their phone's browser camera, or type the ID together with the 6-digit code shown under the QR code.
 3. **Report a deed about someone else:** scan their QR/ID to verify instantly, or, if the doer is not on the app, post the deed as pending and send a single-use invite link. Add text, optional photo or short video, category, location and count of people helped.
-4. **Multiple reports of the same act:** reports about the same doer made within 200 metres and 2 hours of each other are treated as the same act. The first 3 verified reports each count as a deed and earn the doer points. Further reports are saved and shown as extra witnesses but earn the doer no more points. Reporters within the cap earn normal reporter points; reporters beyond the cap earn a very small number of reporter points.
+4. **Multiple reports of the same act:** reports about the same doer made within 200 metres and 2 hours of each other are treated as the same act. The first 5 verified reports each count as a deed and earn the doer points. Further reports are saved and shown as extra witnesses but earn the doer no more points, unless a counted report is withdrawn and the next one is promoted (section 5). Reporters within the cap earn normal reporter points; reporters beyond the cap earn a very small number of reporter points.
 5. **Kindness feed:**
    - Scrollable feed of photo, short video and text posts of good deeds reported by others, like Instagram/Facebook.
    - Like, comment, share (inside the app and out to WhatsApp, Instagram and other apps), follow people, and save posts.
@@ -84,7 +91,7 @@ A user can never verify their own deed.
    - Self-logged deeds never appear in the feed.
    - Likes, comments, shares and follower counts never affect impact score, points, leaderboard rank or prizes.
    - Faces of people being helped are blurred by default. Posts showing vulnerable people need their consent or must hide their identity.
-6. **Self-log on profile:** users can log their own deeds on their profile only (see section 5).
+6. **Self-log on profile:** users can log their own deeds privately, and the profile shows public Self-log Deeds and Verified Deeds counts (see section 5).
 7. **Notifications:** "You were recognized", "Your deed was verified", likes and comments, challenge and prize updates.
 8. **Monthly kindness challenges**, which can be sponsored.
 9. **Impact scoring:** rule-based scoring at launch and AI impact evaluation in shadow mode (section 12), with admin overrides and recorded reasons.
@@ -99,7 +106,7 @@ A user can never verify their own deed.
     - Unique doers (users with at least one verified deed)
     - People helped (anonymous total count)
     - Verification funnel (submitted → pending → verified → unverified/expired), split by QR scan and invite link
-    - Same-act groups: number of groups, reports per group, reports beyond the cap of 3
+    - Same-act groups: number of groups, reports per group, reports beyond the cap of 5
     - Flagged cases: reciprocal, ring, reporter concentration, invite-link anomalies
     - Daily and monthly active users, time spent in feed, likes/comments/shares per post
     - Ad impressions and revenue, sponsor revenue
@@ -118,11 +125,12 @@ A user can never verify their own deed.
 
 - **User:** id, display name, city/area, verified phone, device fingerprint, account created_at, roles (member, moderator, admin), prize_eligible flag, status
 - **DoerCode:** user_id, rotating QR token, created/revoked timestamps
-- **Deed:** id, doer_user_id (empty until accepted), reporter_user_id, category, description, media (people helped are blurred or excluded), location (coordinates, shown publicly as coarse area), occurred_at, reported_at, beneficiaries_count (anonymous), status (pending / verified / unverified / rejected / removed), verification_method (qr_scan / invite_accept), same_act_group_id, counts_for_points (true for the first 3 in a group, false after), prize_rank_eligible
+- **Deed:** id, doer_user_id (empty until accepted), reporter_user_id, category, description, media (people helped are blurred or excluded), location (coordinates, shown publicly as coarse area), occurred_at, reported_at, beneficiaries_count (anonymous), status (pending / verified / unverified / rejected / removed), verification_method (qr_scan / invite_accept), same_act_group_id, counts_for_points (true for the first 5 in a group, false after, unless promoted after a withdrawal), prize_rank_eligible, withdrawn_at
 - **SameActGroup:** id, doer_user_id, centre location, time window, report_count
 - **VerificationEvent:** deed_id, method (qr_scan / invite_accept / moderator), actor_id, location/time evidence, result, timestamp
 - **Invite:** id, deed_id, reporter_user_id, single-use token, sent_via, expires_at, accepted_by, accepted_phone, accepted_at
-- **SelfLog:** id, user_id, description, media, category, created_at. Profile only, never in the feed.
+- **SelfLog:** id, user_id, category, description, occurred_at, optional location, created_at. Private to the owner; only the count is public. Never in the feed.
+- **DeedRevision:** deed_id, changed fields (old and new values), editor, timestamp. Append-only.
 - **Post:** id, deed_id, media, caption, status (verified / pending), created_at
 - **Like:** post_id, user_id, created_at
 - **Comment:** post_id, user_id, content, created_at
@@ -183,8 +191,8 @@ The "people helped" count used for scoring is capped per category, and counts ab
 - Feed popularity is never used for impact score, points, rank or prizes.
 - Every verified deed gets a minimum score, and scoring is calibrated with sample deeds that include small everyday acts.
 - Low-confidence or flagged scores go to a review queue (handling is parked; see section 12).
-- Same-act cap: reports about the same doer within 200 metres and 2 hours count as one act. Only the first 3 verified reports earn the doer points. The act is scored once and the other reports reuse that score.
-- Self-logged deeds are never scored unless another user verifies them.
+- Same-act cap: reports about the same doer within 200 metres and 2 hours count as one act. Only the first 5 verified reports earn the doer points. The act is scored once and the other reports reuse that score.
+- Self-logged deeds are never scored. A witness reports the deed separately if it should count.
 
 ### Contribution points
 
@@ -220,7 +228,7 @@ Deed count, points, badges, likes and prize history are shown separately on the 
 **V1**
 
 - Public web application, mobile-responsive so it works well on phones.
-- QR scanning through the phone's browser camera, with manual entry of the unique ID as fallback.
+- QR scanning through the phone's browser camera, with manual entry of the unique ID plus its rotating 6-digit code as fallback.
 - Web-based administrator dashboard for moderation, prize review and analytics.
 
 **Future**
@@ -232,9 +240,8 @@ Deed count, points, badges, likes and prize history are shown separately on the 
 
 | Module                            | Responsibility                                                                     | Emits / consumes                           |
 | --------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------ |
-| Identity & Profiles               | users, roles, QR codes, phone verification, self-logs                              | —                                          |
-| Deed Submission                   | create, edit, same-act grouping                                                    | emits DeedSubmitted                        |
-| Verification                      | QR scans, invite links, acceptance, expiry                                         | emits DeedVerified / DeedRejected          |
+| Identity & Profiles               | users, roles, QR codes and manual codes, phone verification                        | emits UserRegistered, PhoneVerified        |
+| Deeds & Verification              | QR scans, deed create/edit/withdraw, same-act grouping, invite links, acceptance, expiry, self-logs | emits DeedSubmitted, DeedVerified, DeedRejected, DeedEdited, DeedWithdrawn, DeedPrizeRankChanged, DeedCountsForPointsChanged |
 | Scoring                           | rule-based points (live), AI impact evaluation (shadow, later live), evidence caps | consumes DeedVerified, emits DeedEvaluated |
 | Fraud Checks                      | reciprocal, ring, concentration and invite-anomaly detection                       | consumes DeedVerified, emits FlagRaised    |
 | Review & Audit                    | flag queue, overrides, append-only audit log                                       | consumes FlagRaised                        |
@@ -258,6 +265,8 @@ Deed count, points, badges, likes and prize history are shown separately on the 
 4. North Star: unique verified reports per month (see section 4).
 5. Self-logged deeds: profile only, never in the feed.
 6. Reports beyond the same-act cap: reporters still earn very small points.
+7. Deed submission and verification are one module (Deeds & Verification), because verification, grouping and acceptance must change a deed in one transaction. It can be split later along its events.
+8. Rate limits apply per account and per IP address on every limited action, plus a per-ID limit on typed ID + code entry.
 
 **Prize eligibility (proposed defaults)**
 
@@ -274,9 +283,12 @@ A user can win a cash prize only if all of these are true:
 | Limit                                                     | Default                            |
 | --------------------------------------------------------- | ---------------------------------- |
 | Verified deeds per doer per day that earn points          | 10                                 |
-| Same-act cap                                              | 3 reports within 200 m and 2 hours |
+| Same-act cap                                              | 5 reports within 200 m and 2 hours |
 | Invite link expiry                                        | 7 days                             |
 | Invites per reporter per day                              | 5                                  |
+| Invite deed: how far back it can have happened            | 7 days                             |
+| Accepted invites per reporter–doer pair on a shared device | 15 per month                      |
+| QR token / manual code accepted for                       | 30 s window + 1 earlier window     |
 | Max share of a doer's prize-rank points from one reporter | 30%                                |
 | Evidence caps on impact score                             | 40 / 70 / 100                      |
 | Minimum account age for prizes                            | 30 days                            |
@@ -285,8 +297,8 @@ A user can win a cash prize only if all of these are true:
 
 **Open (parked)**
 
-7. Flagged cases: who reviews them and how they are resolved. For v1, flagged deeds are held out of prize rank until this is decided.
-8. Cash prizes: confirm tax and compliance requirements with a chartered accountant before the first payout.
+9. Flagged cases: who reviews them and how they are resolved. For v1, flagged deeds are held out of prize rank until this is decided.
+10. Cash prizes: confirm tax and compliance requirements with a chartered accountant before the first payout.
 
 ## 13. Revenue model (v1)
 

@@ -47,9 +47,12 @@ Each milestone is built, tested and reviewed by the product owner before the nex
   - Treat device hashes as a weak signal only; compare reporter and doer against **all** numbers in `phone_history`.
 - Report flow: QR scan → instant verify (with time and location plausibility checks), or create an invite (single-use token, 5/day limit, 7-day expiry job).
 - Invite acceptance: sign up through the link, phone must differ from the reporter's.
-- Same-act grouping (PostGIS, 200 m / 2 h, cap of 3 → `counts_for_points`).
-- Self-logs on the profile.
-- Events: `DeedSubmitted` and `DeedVerified`.
+- Same-act grouping (PostGIS, 200 m / 2 h, cap of 5 → `counts_for_points`; a withdrawn counted report promotes the next one).
+- Private self-logs, with public Self-log Deeds and Verified Deeds counts on the profile.
+- Reporters can edit and withdraw deeds.
+- Limits live in versioned config rows (`config_versions`).
+- Events: `DeedSubmitted`, `DeedVerified`, `DeedRejected`, `DeedEdited`, `DeedWithdrawn`, `DeedPrizeRankChanged`, `DeedCountsForPointsChanged`.
+- Full decisions: `docs/M2-DESIGN.md`.
 
 **M3 Feed & Social**
 - Posts with presigned photo/video upload and a face-blur job.
