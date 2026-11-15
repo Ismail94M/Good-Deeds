@@ -1,9 +1,9 @@
 """The QR path of ``POST /api/deeds`` (§3.2 #3): turn a fresh scan into a verified deed.
 
-In one transaction: consume the scan (conditional UPDATE, so two submits of one scan create one
-deed), check the time, group the deed (§3.4), insert it ``verified``, write the
-``verification_events`` row, emit ``DeedSubmitted`` + ``DeedVerified``, and run the prize-rank
-upgrade for invite deeds in the group.
+In one transaction: check the monthly reporting limit (D16), consume the scan (conditional
+UPDATE, so two submits of one scan create one deed), check the time, group the deed (§3.4),
+insert it ``verified``, write the ``verification_events`` row, emit ``DeedSubmitted`` +
+``DeedVerified``, and run the prize-rank upgrade for invite deeds in the group.
 """
 
 import uuid
@@ -19,6 +19,7 @@ from app.modules.deeds import _plausibility as plaus
 from app.modules.deeds._common import constraint_name, ist_day, lat_lng, point_ewkt, utcnow
 from app.modules.deeds._grouping import assign_group, upgrade_prize_rank
 from app.modules.deeds._limits import DeedLimits
+from app.modules.deeds._reporter_limit import ensure_under_monthly_limit
 from app.modules.deeds._scans import scan_evidence, scan_expired, scan_not_found
 from app.modules.deeds._views import deed_out
 from app.modules.deeds.events import DeedSubmitted, DeedVerified
@@ -99,6 +100,9 @@ async def create_qr_deed(
     description = validate_content(
         limits, data.category, data.description, data.beneficiaries_count
     )
+    # D16: before the scan is consumed, so the scan row lock is always taken after the
+    # ``reporter_month`` lock and a refused report leaves the scan unused.
+    await ensure_under_monthly_limit(session, reporter_id, limits, now)
     scan = await _consume_scan(session, reporter_id, data.scan_id, now)
 
     occurred_at = data.occurred_at or scan.scanned_at

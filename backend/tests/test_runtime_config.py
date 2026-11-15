@@ -27,10 +27,12 @@ class _Category(BaseModel):
 
 
 class DeedsTestConfig(RuntimeConfig):
-    """Mirrors the seeded ``deeds`` keys (docs/M2-DESIGN.md §2.1). The real model is
+    """Mirrors the seeded ``deeds`` v2 keys (docs/M2-DESIGN.md §2.1). The real model is
     ``deeds._limits.DeedLimits`` (task B3)."""
 
     namespace = "deeds"
+    reporter_monthly_limit: int
+    invites_enabled: bool
     invites_per_day: int
     invite_expiry_hours: int
     same_act_radius_m: int
@@ -80,10 +82,14 @@ async def test_seeded_qr_row_validates(session: AsyncSession) -> None:
 
 
 async def test_seeded_deeds_row_validates(session: AsyncSession) -> None:
-    row = await session.get(ConfigVersion, ("deeds", 1))
-    assert row is not None
-    assert row.created_by is None
+    v1 = await session.get(ConfigVersion, ("deeds", 1))
+    row = await session.get(ConfigVersion, ("deeds", 2))
+    assert v1 is not None and row is not None
+    assert v1.created_by is None and row.created_by is None
+    assert set(row.values) - set(v1.values) == {"reporter_monthly_limit", "invites_enabled"}
     deeds = DeedsTestConfig.model_validate(row.values)
+    assert deeds.reporter_monthly_limit == 15
+    assert deeds.invites_enabled is False
     assert deeds.same_act_cap == 5
     assert deeds.invites_per_day == 5
     assert deeds.same_act_radius_m == 200

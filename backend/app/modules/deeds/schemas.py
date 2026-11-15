@@ -210,7 +210,7 @@ class SelfLogPage(BaseModel):
 
 
 class DeedCountsOut(BaseModel):
-    """Public profile counts (D4). ``verified`` counts reports, not acts (D12)."""
+    """Public profile counts (D4). ``verified`` counts counted verified reports (D15)."""
 
     self_logged: int
     verified: int
@@ -236,8 +236,10 @@ class CategoryOut(BaseModel):
 
 class DeedOptions(BaseModel):
     categories: list[CategoryOut]
+    invites_enabled: bool
     invites_remaining_today: int
     invite_expiry_hours: int
+    reports_remaining_this_month: int
     description_min: int
     description_max: int
     scan_submit_minutes: int

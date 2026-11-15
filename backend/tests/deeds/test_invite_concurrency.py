@@ -123,8 +123,9 @@ async def test_six_concurrent_invite_creates_allow_five(
 ) -> None:
     reporter = await committed_b6.member()
     at = datetime(2026, 11, 10, 6, 0, tzinfo=UTC)
-    # All six pass validation and wait at the advisory lock together.
-    _meet(monkeypatch, _invites, "advisory_xact_lock", 6, after=False)
+    # All six pass validation and wait together before their first lock (D16's
+    # ``reporter_month``, then ``invites``).
+    _meet(monkeypatch, _invites, "ensure_under_monthly_limit", 6, after=False)
 
     async def create(s: AsyncSession) -> uuid.UUID:
         out, _ = await create_invite(s, reporter, at=at)
@@ -178,13 +179,19 @@ async def test_two_shared_device_accepts_at_fourteen_of_fifteen(
         await s.commit()
     oct_1 = datetime(2026, 10, 1, 6, 0, tzinfo=UTC)
     async with SessionLocal() as s:
-        for i in range(14):
+        # The reporter may create only 15 deeds an IST month (D16), so 6 of the 14 accepted
+        # invites were created on 25-30 September and accepted on 1 October: the shared-device
+        # limit counts by accept month, the reporting limit by report month.
+        for i in range(6, 0, -1):
+            _, token = await create_invite(s, reporter, at=oct_1 - timedelta(days=i))
+            await accept(s, token, doer, at=oct_1 + timedelta(minutes=i))
+        for i in range(1, 9):
             day = oct_1 + timedelta(days=i)
             _, token = await create_invite(s, reporter, at=day)
             await accept(s, token, doer, at=day + timedelta(minutes=1))
         await s.commit()
-    pending = [await _commit_invite(reporter, at=oct_1 + timedelta(days=d)) for d in (14, 15)]
-    at = oct_1 + timedelta(days=16)
+    pending = [await _commit_invite(reporter, at=oct_1 + timedelta(days=d)) for d in (10, 11)]
+    at = oct_1 + timedelta(days=12)
     # Both find a shared device and wait at the pair lock together.
     _meet_before(monkeypatch, _invites, "advisory_xact_lock")
 

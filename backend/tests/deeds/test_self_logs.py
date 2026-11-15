@@ -1,4 +1,4 @@
-"""Self-logs and the public profile counts (docs/M2-DESIGN.md D3, D4, D12, §3.2 #11, #13, §7)."""
+"""Self-logs and the public profile counts (docs/M2-DESIGN.md D3, D4, D15, §3.2 #11, #13, §7)."""
 
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -280,10 +280,10 @@ async def test_counts_are_public_and_count_self_logs(
     assert (await _counts(client, owner.handle))["self_logged"] == 1
 
 
-async def test_verified_counts_reports_not_acts(client: AsyncClient, session: AsyncSession) -> None:
+async def test_verified_counts_counted_reports(client: AsyncClient, session: AsyncSession) -> None:
     doer = await make_member(session)
-    witnesses = await members(session, 5)
-    # Five witnesses of one act (D12): five.
+    witnesses = await members(session, 6)
+    # Six witnesses of one act (D15): only the cap of 5 counts.
     for i, w in enumerate(witnesses):
         out = await scan_and_report(session, w, doer, east_m=i * 10)
         assert out.same_act is not None

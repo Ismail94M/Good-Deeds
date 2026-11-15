@@ -71,6 +71,7 @@ async def _reports(
 # --------------------------------------------------- pending deeds
 
 
+@pytest.mark.usefixtures("invites_on")
 async def test_withdrawing_pending_deed_cancels_invite(
     client: AsyncClient, session: AsyncSession
 ) -> None:

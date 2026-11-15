@@ -1,6 +1,6 @@
 """Small helpers shared by the deeds module's private files."""
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from geoalchemy2 import Geometry
@@ -18,6 +18,14 @@ def utcnow() -> datetime:
 def ist_day(at: datetime) -> date:
     """The launch-city (IST) calendar day of ``at``, used for every per-day rule."""
     return at.astimezone(LAUNCH_TZ).date()
+
+
+def ist_month(at: datetime) -> tuple[datetime, datetime]:
+    """Start (inclusive) and end (exclusive) of the IST calendar month containing ``at``."""
+    local = at.astimezone(LAUNCH_TZ)
+    start = local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    end = (start + timedelta(days=32)).replace(day=1)
+    return start, end
 
 
 def point_ewkt(lat: float, lng: float) -> str:

@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
 from app.main import app
+from tests.deeds.helpers import publish_limits
 
 
 @pytest.fixture
@@ -32,3 +33,10 @@ async def other_ip(client: AsyncClient) -> AsyncIterator[AsyncClient]:
     transport = ASGITransport(app=app, client=("203.0.113.9", 4321))
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
+
+
+@pytest.fixture
+async def invites_on(session: AsyncSession) -> None:
+    """Invites are switched off by default (D17); tests of the invite endpoints turn them on
+    by publishing ``invites_enabled=True`` (rolled back with the test)."""
+    await publish_limits(session, invites_enabled=True)

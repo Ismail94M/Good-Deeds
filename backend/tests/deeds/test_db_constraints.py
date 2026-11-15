@@ -610,8 +610,22 @@ async def test_location_columns_are_geography_points(session: AsyncSession) -> N
 
 
 async def test_verified_count_index_is_partial(session: AsyncSession) -> None:
+    """D15: the profile count reads only counted verified reports."""
     indexdef = await session.scalar(
-        text("SELECT indexdef FROM pg_indexes WHERE indexname = 'ix_deeds_doer_verified'")
+        text("SELECT indexdef FROM pg_indexes WHERE indexname = 'ix_deeds_doer_counted'")
     )
     assert indexdef is not None
-    assert "WHERE" in indexdef and "verified" in indexdef
+    assert "WHERE" in indexdef and "verified" in indexdef and "counts_for_points" in indexdef
+    old = await session.scalar(
+        text("SELECT indexdef FROM pg_indexes WHERE indexname = 'ix_deeds_doer_verified'")
+    )
+    assert old is None
+
+
+async def test_monthly_limit_count_has_an_index(session: AsyncSession) -> None:
+    """D16 counts a reporter's deeds by ``reported_at``."""
+    indexdef = await session.scalar(
+        text("SELECT indexdef FROM pg_indexes WHERE indexname = 'ix_deeds_reporter_reported_at'")
+    )
+    assert indexdef is not None
+    assert "(reporter_user_id, reported_at DESC)" in indexdef

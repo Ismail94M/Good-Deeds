@@ -8,6 +8,7 @@ import asyncio
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -114,7 +115,9 @@ async def test_two_submits_of_one_scan_create_one_deed(
     async with SessionLocal() as s:
         scanned = await scan(s, witness, doer)
         await s.commit()
-    _meet_before(monkeypatch, _qr_deeds, "_consume_scan")
+    # Both wait together before their first lock (the D16 ``reporter_month`` lock, which is
+    # taken before the scan row), then race to consume the one scan.
+    _meet_before(monkeypatch, _qr_deeds, "ensure_under_monthly_limit")
 
     results = await asyncio.gather(
         _in_own_session(lambda s: report(s, witness, scanned.scan_id)),
@@ -190,3 +193,41 @@ async def test_concurrent_scans_of_one_window_record_one(
             .where(QrScan.witness_user_id == witness.user_id)
         )
     assert scans == 1
+
+
+async def test_two_reports_at_fourteen_of_fifteen_allow_one(
+    committed: Committed, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D16: two simultaneous submits by a reporter at 14/15 this month, about different doers:
+    the ``reporter_month`` advisory lock lets exactly one become the 15th."""
+    witness = await committed.member()
+    doers = [await committed.member() for _ in range(16)]
+    t0 = datetime(2026, 9, 10, 6, 0, tzinfo=UTC)
+    async with SessionLocal() as s:
+        for i, d in enumerate(doers[:14]):
+            await scan_and_report(s, witness, d, at=t0 + timedelta(minutes=10 * i))
+        at = t0 + timedelta(hours=3)
+        s1, s2 = [await scan(s, witness, d, at=at) for d in doers[14:]]
+        await s.commit()
+    # Both wait together, then race for the lock and the count.
+    _meet_before(monkeypatch, _qr_deeds, "ensure_under_monthly_limit")
+
+    submit = timedelta(minutes=1)
+    results = await asyncio.gather(
+        _in_own_session(lambda s: report(s, witness, s1.scan_id, at=at + submit)),
+        _in_own_session(lambda s: report(s, witness, s2.scan_id, at=at + submit)),
+    )
+    errors = [r for r in results if isinstance(r, AppError)]
+    assert len(errors) == 1, results
+    assert errors[0].code == "monthly_report_limit" and errors[0].status_code == 429
+    async with SessionLocal() as s:
+        reported = await s.scalar(
+            select(func.count()).select_from(Deed).where(Deed.reporter_user_id == witness.user_id)
+        )
+        unused = await s.scalar(
+            select(func.count())
+            .select_from(QrScan)
+            .where(QrScan.witness_user_id == witness.user_id, QrScan.consumed_at.is_(None))
+        )
+    assert reported == 15
+    assert unused == 1  # the refused report's scan was not consumed

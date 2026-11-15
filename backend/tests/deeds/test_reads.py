@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import sha256_hex
 from app.modules.deeds import service
-from app.modules.deeds._common import ist_day
+from app.modules.deeds._common import ist_day, ist_month
 from app.modules.deeds.models import (
     Deed,
     DeedStatus,
@@ -259,22 +259,31 @@ async def test_options_reflect_config_and_todays_invites(
     client: AsyncClient, session: AsyncSession
 ) -> None:
     me = await make_member(session)
-    await publish_limits(session, invites_per_day=3)
+    await publish_limits(session, invites_per_day=3, reporter_monthly_limit=10)
     now = datetime.now(UTC)
+    yesterday = now - timedelta(days=1, hours=1)
     # Every invite created today counts, whatever its status; yesterday's don't.
     await _pending_deed(session, me, at=now)
     await _pending_deed(session, me, invite_status=InviteStatus.EXPIRED, at=now)
-    await _pending_deed(session, me, at=now - timedelta(days=1, hours=1))
+    await _pending_deed(session, me, at=yesterday)
     await session.commit()
+    # The monthly limit (D16) counts every deed this IST month, including yesterday's if it
+    # falls in the same month.
+    month_start, _ = ist_month(now)
+    reported = 2 + (1 if yesterday >= month_start else 0)
 
     response = await client.get("/api/deeds/options", headers=me.headers)
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["invites_remaining_today"] == 1
+    assert body["reports_remaining_this_month"] == 10 - reported
+    assert body["invites_enabled"] is False  # D17 default
     assert {"slug": "animals", "label": "Animals"} in body["categories"]
     assert set(body) == {
         "categories",
+        "invites_enabled",
         "invites_remaining_today",
+        "reports_remaining_this_month",
         "invite_expiry_hours",
         "description_min",
         "description_max",

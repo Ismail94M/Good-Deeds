@@ -85,6 +85,7 @@ async def create_deed(
     version, limits = await load_limits(session)
     if isinstance(data, InviteDeedCreate):
         await _invites.limit_create(limiter, limits, client_ip(request))
+        _invites.ensure_enabled(limits)
         out = await _invites.create_invite_deed(
             session, user.id, data, limits=limits, limits_version=version
         )
@@ -97,6 +98,8 @@ async def create_deed(
 
 
 # --------------------------------------------------- invites (B6)
+# Switched off by config while ``invites_enabled`` is false (D17): create, preview, accept and
+# reissue return 403 ``invites_disabled`` after their rate limits. ``/me/invites`` still lists.
 
 # The raw token is in the URL: keep it out of caches and Referer headers.
 _TOKEN_HEADERS = {"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"}
@@ -109,6 +112,7 @@ async def preview_invite(
     try:
         _, limits = await load_limits(session)
         await _invites.limit_preview(limiter, limits, client_ip(request))
+        _invites.ensure_enabled(limits)
         out = await _invites.preview(session, token)
     except AppError as exc:
         body = {"detail": exc.detail} | ({"code": exc.code} if exc.code else {})
@@ -129,6 +133,7 @@ async def accept_invite(
 ) -> DeedOut:
     version, limits = await load_limits(session)
     await _invites.limit_accept(limiter, limits, user.id, client_ip(request))
+    _invites.ensure_enabled(limits)
     out = await _invites.accept(
         session,
         token,
@@ -153,6 +158,7 @@ async def reissue_invite(
 ) -> InviteOut:
     _, limits = await load_limits(session)
     await _invites.limit_reissue(limiter, limits, user.id, client_ip(request))
+    _invites.ensure_enabled(limits)
     out = await _invites.reissue(session, user.id, invite_id)
     await session.commit()
     return out

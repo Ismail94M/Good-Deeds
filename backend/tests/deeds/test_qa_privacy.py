@@ -10,6 +10,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import pytest
 from httpx import AsyncClient, Response
 from sqlalchemy import String, cast, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -85,6 +86,7 @@ class Recorder:
         return response.json() if response.content else None
 
 
+@pytest.mark.usefixtures("invites_on")
 async def test_no_coordinates_phone_device_or_ip_anywhere(
     client: AsyncClient, other_ip: AsyncClient, session: AsyncSession
 ) -> None:
@@ -318,6 +320,7 @@ async def test_self_log_content_never_leaks_through_public_or_other_endpoints(
 # --------------------------------------------------- pending deeds never reveal a doer
 
 
+@pytest.mark.usefixtures("invites_on")
 async def test_failed_accept_leaves_no_trace_of_the_would_be_doer(
     client: AsyncClient, session: AsyncSession
 ) -> None:
@@ -365,6 +368,7 @@ async def test_failed_accept_leaves_no_trace_of_the_would_be_doer(
     assert counts["verified"] == 1
 
 
+@pytest.mark.usefixtures("invites_on")
 async def test_pending_doer_is_null_in_every_reporter_view(
     client: AsyncClient, session: AsyncSession
 ) -> None:

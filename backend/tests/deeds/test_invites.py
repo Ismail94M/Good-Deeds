@@ -45,6 +45,9 @@ from tests.deeds.invite_helpers import (
     token_of,
 )
 
+# Invites are switched off by default (D17); these tests exercise the built invite code.
+pytestmark = pytest.mark.usefixtures("invites_on")
+
 
 async def _post(client: AsyncClient, who: Member, body: dict[str, Any]) -> Any:
     return await client.post("/api/deeds", json=body, headers=who.headers)
@@ -444,6 +447,9 @@ async def _accept_on_day(
 
 
 async def test_shared_device_allowed_fifteen_times_a_month(session: AsyncSession) -> None:
+    # Isolate D6 from the reporter's own monthly limit (D16, 15), which would refuse the 16th
+    # invite before it could be accepted.
+    await publish_limits(session, reporter_monthly_limit=100)
     reporter, doer, other_reporter = await members(session, 3)
     await share_device(session, reporter, doer, other_reporter)
     oct_1 = datetime(2026, 10, 1, 6, 0, tzinfo=UTC)
@@ -670,7 +676,7 @@ async def test_expiry_job_works_in_batches(session: AsyncSession) -> None:
     assert (await _deed(session, second.id)).status == DeedStatus.UNVERIFIED
 
 
-def test_expiry_job_is_registered_every_fifteen_minutes() -> None:
+async def test_expiry_job_is_registered_every_fifteen_minutes() -> None:
     assert "deeds.expire_invites" in job_app.tasks
     periodic = {key[0]: task.cron for key, task in job_app.periodic_registry.periodic_tasks.items()}
     assert periodic["deeds.expire_invites"] == "*/15 * * * *"

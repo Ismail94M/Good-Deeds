@@ -25,6 +25,7 @@ from app.modules.deeds._common import (
     utcnow,
 )
 from app.modules.deeds._limits import DeedLimits
+from app.modules.deeds._reporter_limit import precheck_monthly_limit
 from app.modules.deeds.models import Deed, QrScan, ScanMethod
 from app.modules.deeds.schemas import ScanCreate, ScanDetail, ScanOut, UserRef
 from app.modules.identity import service as identity
@@ -187,6 +188,9 @@ async def create_scan(
     """Check and record a scan. Rate limits are the caller's job (they come first)."""
     now = now or utcnow()
     today = ist_day(now)
+    # D16 early warning: a scan at the monthly limit could never become a deed, and it would
+    # still use up the pair's IST day. The locked check runs again on deed create.
+    await precheck_monthly_limit(session, witness_id, limits, now)
     doer = await _resolve(session, data, now)
 
     # Independence: never the same account, and never two accounts that ever shared a number.

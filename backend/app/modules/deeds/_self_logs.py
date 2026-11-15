@@ -1,4 +1,4 @@
-"""Self-logs (D3, §2.7, §3.2 #11) and the public profile counts (D4, D12, §3.2 #13).
+"""Self-logs (D3, §2.7, §3.2 #11) and the public profile counts (D4, D15, §3.2 #13).
 
 A self-log is a private record of the owner's own deed. It has no link to deeds, scans or
 same-act groups, emits no events and is never read by grouping, scoring or prize code. Every
@@ -172,8 +172,9 @@ async def delete_log(session: AsyncSession, owner_id: uuid.UUID, log_id: uuid.UU
 
 
 async def deed_counts(session: AsyncSession, handle: str) -> DeedCountsOut:
-    """Both public profile counts. ``verified`` counts reports, not acts (D12): five witnesses
-    of one act count five. Self-logs never contribute to it."""
+    """Both public profile counts. ``verified`` counts **counted** verified reports (D15), so it
+    equals the leaderboard figure: twenty witnesses of one act count as the cap (5). Self-logs
+    never contribute to it."""
     user = await identity.get_user_by_handle(session, handle)
     if user is None or user.status != "active":
         raise NotFound("We couldn't find that person.", code="user_not_found")
@@ -183,6 +184,10 @@ async def deed_counts(session: AsyncSession, handle: str) -> DeedCountsOut:
     verified = await session.scalar(
         select(func.count())
         .select_from(Deed)
-        .where(Deed.doer_user_id == user.id, Deed.status == DeedStatus.VERIFIED)
+        .where(
+            Deed.doer_user_id == user.id,
+            Deed.status == DeedStatus.VERIFIED,
+            Deed.counts_for_points.is_(True),
+        )
     )
     return DeedCountsOut(self_logged=int(self_logged or 0), verified=int(verified or 0))

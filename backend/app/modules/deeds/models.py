@@ -242,11 +242,11 @@ class Deed(Base):
         Index("ix_deeds_location", "location", postgresql_using="gist"),
         Index("ix_deeds_doer_occurred_at", "doer_user_id", "occurred_at"),
         Index("ix_deeds_same_act_group_id", "same_act_group_id"),
-        # Profile "Verified Deeds" count (D4, D12: counts reports, not acts).
+        # Profile "Verified Deeds" count (D4, D15: counted reports only).
         Index(
-            "ix_deeds_doer_verified",
+            "ix_deeds_doer_counted",
             "doer_user_id",
-            postgresql_where=text("status = 'verified'"),
+            postgresql_where=text("status = 'verified' AND counts_for_points"),
         ),
     )
 
@@ -290,7 +290,7 @@ class Deed(Base):
     )
 
 
-# A reporter's own deeds, newest first.
+# A reporter's own deeds, newest first; also the monthly reporting limit's count (D16).
 Index("ix_deeds_reporter_reported_at", Deed.reporter_user_id, Deed.reported_at.desc())
 
 

@@ -40,6 +40,7 @@ def _same_404(a: Response, b: Response) -> None:
     assert a.json() == b.json()
 
 
+@pytest.mark.usefixtures("invites_on")
 async def test_every_owned_resource_gives_the_same_404_to_others_as_to_unknown_ids(
     client: AsyncClient, session: AsyncSession
 ) -> None:
@@ -133,6 +134,7 @@ async def test_removed_deeds_cannot_be_edited_or_withdrawn(
 # --------------------------------------------------- replays
 
 
+@pytest.mark.usefixtures("invites_on")
 async def test_old_invite_token_after_reissue_cannot_be_accepted(
     client: AsyncClient, session: AsyncSession
 ) -> None:
@@ -153,6 +155,7 @@ async def test_old_invite_token_after_reissue_cannot_be_accepted(
     assert fresh.status_code == 200, fresh.text
 
 
+@pytest.mark.usefixtures("invites_on")
 async def test_accepted_invite_cannot_be_taken_over_by_another_member(
     client: AsyncClient, session: AsyncSession
 ) -> None:
@@ -268,6 +271,7 @@ async def test_invite_create_rejects_server_controlled_fields(
     assert response.status_code == 422, response.text
 
 
+@pytest.mark.usefixtures("invites_on")
 async def test_scan_and_accept_ignore_a_client_supplied_doer(
     client: AsyncClient, session: AsyncSession
 ) -> None:

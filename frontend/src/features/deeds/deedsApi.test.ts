@@ -195,7 +195,9 @@ describe('deedsApi: deeds', () => {
   it('loads deed options', async () => {
     const options = {
       categories: [{ slug: 'animals', label: 'Animals' }],
+      invites_enabled: false,
       invites_remaining_today: 3,
+      reports_remaining_this_month: 12,
       invite_expiry_hours: 168,
       description_min: 10,
       description_max: 1000,

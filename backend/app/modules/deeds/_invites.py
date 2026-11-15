@@ -10,6 +10,10 @@ reissue only.
 
 Lock order: invite row, then deed row (still pending, so grouping code never touches it), then
 the per-doer ``same_act`` advisory lock. Withdrawal (``_edits``) also takes the invite row first.
+Create takes ``reporter_month`` (D16), then ``invites``.
+
+Invites are switched off by config (D17, ``invites_enabled``): the router calls
+``ensure_enabled`` on create, preview, accept and reissue. The expiry job keeps running.
 """
 
 import uuid
@@ -27,10 +31,18 @@ from app.core.events import emit
 from app.core.ratelimit import RateLimiter
 from app.core.security import new_opaque_token, sha256_hex
 from app.modules.deeds import _plausibility as plaus
-from app.modules.deeds._common import constraint_name, ist_day, lat_lng, point_ewkt, utcnow
+from app.modules.deeds._common import (
+    constraint_name,
+    ist_day,
+    ist_month,
+    lat_lng,
+    point_ewkt,
+    utcnow,
+)
 from app.modules.deeds._grouping import assign_group, upgrade_prize_rank
 from app.modules.deeds._limits import DeedLimits
 from app.modules.deeds._qr_deeds import validate_content
+from app.modules.deeds._reporter_limit import ensure_under_monthly_limit
 from app.modules.deeds._views import deed_out
 from app.modules.deeds.events import DeedRejected, DeedSubmitted, DeedVerified
 from app.modules.deeds.models import (
@@ -113,12 +125,15 @@ def _ensure_usable(invite: Invite, now: datetime) -> None:
         raise _invite_expired()
 
 
-def _ist_month(now: datetime) -> tuple[datetime, datetime]:
-    """Start and end of the IST calendar month containing ``now``."""
-    local = now.astimezone(identity.LAUNCH_TZ)
-    start = local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    end = (start + timedelta(days=32)).replace(day=1)
-    return start, end
+def ensure_enabled(limits: DeedLimits) -> None:
+    """D17: invites are switched off by config. Checked after the rate limits and before any
+    lookup on create, preview, accept and reissue."""
+    if not limits.invites_enabled:
+        raise Forbidden(
+            "Invites are switched off for now. Ask the person to show you their QR code "
+            "or ID and code instead.",
+            code="invites_disabled",
+        )
 
 
 # --------------------------------------------------- rate limits
@@ -186,6 +201,8 @@ async def create_invite_deed(
         )
         location = point_ewkt(loc.lat, loc.lng)
 
+    # D16: the monthly limit across both paths (takes the ``reporter_month`` lock first).
+    await ensure_under_monthly_limit(session, reporter_id, limits, now)
     # Serialise this reporter's creates so concurrent requests can't all pass the count.
     await advisory_xact_lock(session, "invites", str(reporter_id))
     if await _count_today(session, reporter_id, now) >= limits.invites_per_day:
@@ -279,7 +296,7 @@ async def preview(
 async def _shared_device_accepts(
     session: AsyncSession, reporter_id: uuid.UUID, accepter_id: uuid.UUID, now: datetime
 ) -> int:
-    start, end = _ist_month(now)
+    start, end = ist_month(now)
     stmt = select(func.count()).where(
         Invite.reporter_user_id == reporter_id,
         Invite.accepted_by == accepter_id,

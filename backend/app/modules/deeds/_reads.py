@@ -18,6 +18,7 @@ from app.modules.deeds import _cursor
 from app.modules.deeds._common import ist_day, utcnow
 from app.modules.deeds._invites import invite_out
 from app.modules.deeds._limits import DeedLimits
+from app.modules.deeds._reporter_limit import reported_this_month
 from app.modules.deeds._views import deed_out
 from app.modules.deeds.models import Deed, Invite, InviteStatus, SameActGroup
 from app.modules.deeds.schemas import (
@@ -142,7 +143,9 @@ async def options(
     now: datetime | None = None,
 ) -> DeedOptions:
     """Values the deed forms need. Every invite created today counts, whatever its status."""
-    today = ist_day(now or utcnow())
+    now = now or utcnow()
+    today = ist_day(now)
+    reported = await reported_this_month(session, user_id, now)
     used = await session.scalar(
         select(func.count())
         .select_from(Invite)
@@ -150,8 +153,10 @@ async def options(
     )
     return DeedOptions(
         categories=[CategoryOut(slug=c.slug, label=c.label) for c in limits.categories],
+        invites_enabled=limits.invites_enabled,
         invites_remaining_today=max(0, limits.invites_per_day - int(used or 0)),
         invite_expiry_hours=limits.invite_expiry_hours,
+        reports_remaining_this_month=max(0, limits.reporter_monthly_limit - reported),
         description_min=limits.description_min,
         description_max=limits.description_max,
         scan_submit_minutes=limits.scan_submit_minutes,

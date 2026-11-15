@@ -119,6 +119,7 @@ All new deeds tables live in `backend/app/modules/deeds/models.py`. `config_vers
 |---|---|
 | `2026_11_13_0000-0004_runtime_config.py` | `config_versions` table, append-only trigger, seed rows |
 | `2026_11_13_0100-0005_deeds.py` | All deeds tables |
+| `2026_11_16_0000-0007_deeds_v2.py` | Revision 4: publishes `deeds` v2 (D16, D17) and replaces the Verified Deeds count index (D15) |
 
 ### 2.1 `config_versions` (core, append-only)
 
@@ -187,6 +188,15 @@ All new deeds tables live in `backend/app/modules/deeds/models.py`. `config_vers
   "unconsumed_scan_retention_days": 7
 }
 ```
+**`deeds` v2** (migration 0007, revision 4; `created_by` NULL, reason citing D16/D17): v1's values plus
+```json
+{ "reporter_monthly_limit": 15, "invites_enabled": false }
+```
+- `reporter_monthly_limit` (D16): deeds a reporter may create per IST calendar month, both paths, all statuses.
+- `invites_enabled` (D17): while false, invite create, preview, accept and reissue return 403 `invites_disabled`.
+
+v2 is inserted only if it doesn't exist yet, so the migration is safe to re-run; its downgrade deletes only v2 (trigger disabled for that one statement, as in 0006). `DeedLimits` has both keys with no defaults, so v1 alone no longer validates.
+
 The category list is the default from Q1. Every limited action has an account counter and an IP counter (D1). Invite creation's account limit is `invites_per_day`; profile counts are public, so they have only an IP counter. The IP values are generous on purpose, because Indian mobile carriers put many users behind one IP; they can be tuned with a new config version.
 
 ### 2.2 `qr_scans` (one row per **accepted** scan)
@@ -279,9 +289,9 @@ The parameters are copied onto the group so that a later config change never res
 - `uq_deeds_pair_day UNIQUE (doer_user_id, reporter_user_id, report_day) WHERE doer_user_id IS NOT NULL`. This covers the invite path's `(doer, witness, day)` rule.
 - GiST `(location)`
 - `(doer_user_id, occurred_at)`
-- `(reporter_user_id, reported_at DESC)`
+- `(reporter_user_id, reported_at DESC)`, also used by the monthly reporting limit's count (D16)
 - `(same_act_group_id)`
-- `(doer_user_id) WHERE status = 'verified'` for the Verified Deeds count
+- `ix_deeds_doer_counted (doer_user_id) WHERE status = 'verified' AND counts_for_points` for the Verified Deeds count (D15; replaces `ix_deeds_doer_verified` in migration 0007)
 
 ### 2.5 `invites`
 
@@ -407,6 +417,7 @@ Request (exactly one identity form):
 
 Order of checks:
 1. Rate limits: account and IP. For manual entry, the manual account, IP and target (`short_id`) limits.
+1b. Monthly reporting limit pre-check (D16, unlocked): a witness already at `reporter_monthly_limit` gets 429 `monthly_report_limit` before a scan is recorded, because a recorded scan uses up the pair's IST day even if no deed follows. The locked check on deed create is the authoritative one.
 2. Resolve the doer: `resolve_qr_token` or `resolve_manual_code`.
 3. Self-check (same account).
 4. Phone check (D10): `phone_hashes(witness)` must not intersect `phone_hashes(doer)`.
@@ -426,6 +437,7 @@ Order of checks:
 | 400 | `location_too_imprecise`, `outside_service_area`, `implausible_travel` | |
 | 422 | (validation) | Missing location, or both or neither identity forms |
 | 429 | `rate_limited` | |
+| 429 | `monthly_report_limit` | The witness already has `reporter_monthly_limit` deeds this IST month (D16) |
 
 **2. `GET /api/scans/{scan_id}`**: Onboarded, witness only. Returns the same shape as the `POST`, plus `consumed: bool`, so the deed form survives a page reload.
 - 404 `scan_not_found` if the scan isn't the caller's.
@@ -439,6 +451,7 @@ QR request:
   "beneficiaries_count": 1, "occurred_at": "optional; default = scan.scanned_at" }
 ```
 - `occurred_at` must fall within `[scanned_at - qr_occurred_max_age_minutes, scanned_at + 60 s]`.
+- **Monthly reporting limit (D16), both paths:** before any `deeds` row is created, take `advisory_xact_lock("reporter_month", reporter_id)`, then count the reporter's `deeds` with `reported_at` in the current IST calendar month (boundaries from `identity.service.LAUNCH_TZ`), whatever their status. At or above `reporter_monthly_limit`, return 429 `monthly_report_limit`. On the QR path this runs **before** the scan is consumed (lock order: `reporter_month`, then the scan row, then `same_act`), so a refused report leaves the scan unused; on the invite path it runs before the `invites` lock.
 - The scan is consumed atomically:
   ```sql
   UPDATE qr_scans SET consumed_at=now()
@@ -469,7 +482,10 @@ Invite request:
 | 409 | `scan_used` | |
 | 409 | `already_recognized_today` | `uq_deeds_pair_day` |
 | 400 | `invalid_category`, `implausible_time`, plus the location codes above | |
-| 429 | `invite_daily_limit`, `rate_limited` | |
+| 403 | `invites_disabled` | Invite request while `invites_enabled` is false (D17), after the invite IP rate limit |
+| 429 | `invite_daily_limit`, `monthly_report_limit`, `rate_limited` | |
+
+**D17, all invite endpoints (#3 invite request, #7, #8, #9):** while `deeds.invites_enabled` is false, each returns 403 `invites_disabled` with a friendly message. The check runs after the endpoint's rate limits and before any lookup, so a real and an unknown token get the same answer. `GET /api/me/invites` (#6) still lists the user's existing invites, and the expiry job keeps running.
 
 **4. `GET /api/deeds/{id}`**: authenticated; reporter or doer only. Anyone else gets 404 `deed_not_found`. Returns `DeedOut`.
 
@@ -842,6 +858,7 @@ Agents: **DB** = database-specialist, **BE** = backend-developer, **FE** = front
 - UPDATE or DELETE on `config_versions` raises an error.
 - A missing namespace fails closed.
 - Changing a limit through `publish` inside a test changes behaviour without a code change. Test at least: invites/day, cap, radius and grace.
+- `deeds` v2 equals v1 plus `reporter_monthly_limit: 15` and `invites_enabled: false`, with `created_by` NULL; `DeedLimits` rejects a snapshot missing either key.
 
 ### QR and manual code
 - A token is accepted in its own window and 1 earlier window, and rejected at 2 earlier windows and for future windows. Grace comes from config.
@@ -913,7 +930,27 @@ Also:
 - Create, list, edit and delete are owner-only; another user's log gives 404 on every call.
 - A self-log with no location, and one dated months ago, are both accepted; one dated more than 5 min in the future is rejected.
 - Self-logs emit no events and never touch `deeds`, `same_act_groups` or `qr_scans` (assert row counts unchanged).
-- `deed-counts`: `self_logged` counts existing self-logs (drops after a delete); `verified` counts verified reports about the user. 5 reports of one act → 5. Pending, unverified, withdrawn deeds → 0. Self-logs never change `verified`.
+- `deed-counts`: `self_logged` counts existing self-logs (drops after a delete); `verified` counts **counted** verified reports about the user (D15). 6 or 7 reports of one act → 5; 20 reports of one act → 5; reports in separate windows → each counts; the same reporter twice in one act (across midnight) → 1. A promotion after a withdrawal keeps the count consistent with the group's `counted_count`. Pending, unverified, withdrawn deeds → 0. Self-logs never change `verified`.
+- The count's partial index is `ix_deeds_doer_counted` (`status = 'verified' AND counts_for_points`).
+
+### Monthly reporting limit (D16)
+- The 15th report in an IST month succeeds; the 16th gets 429 `monthly_report_limit`.
+- Reports to different doers, and QR and invite deeds, share the limit; the invite path is refused the same way.
+- Withdrawn deeds still count. A failed submission (e.g. an expired scan) creates no row and doesn't count. Self-logs don't count.
+- A refused QR report leaves its scan unconsumed (the check runs before the scan is consumed).
+- `POST /api/scans` at the limit returns 429 `monthly_report_limit` and records no scan.
+- The limit resets at 00:00 IST on the 1st, not 00:00 UTC: 23:59 IST on the last day is refused; 00:00 IST on the 1st (still the previous UTC month) is allowed; reports from 00:00 IST on the 1st fill the new month.
+- The limit comes from config (publishing 2, 3 and 0 changes behaviour).
+- Two concurrent submits at 14/15 → exactly one succeeds (advisory lock `reporter_month`); the refused report's scan stays unused.
+
+### Invites switched off (D17)
+- With the seeded config, invite create, preview, accept and reissue all return 403 `invites_disabled`; preview keeps `no-store` / `no-referrer`.
+- A real token gets the same 403 as an unknown one (check before lookup); the invite row is unchanged; `GET /api/me/invites` still lists it.
+- Rate limits still run first (preview's IP limit trips to 429 while disabled).
+- The expiry job still expires pending invites.
+- The QR path of `POST /api/deeds` is unaffected.
+- Publishing `invites_enabled=True` turns every endpoint back on (create, reissue, preview, accept); publishing false turns them off again.
+- The existing invite tests run with invites on (the `invites_on` fixture in `tests/deeds/conftest.py`).
 - `deed-counts` works without auth, returns no self-log content, 404s for an unknown handle, and is IP rate-limited.
 
 ### Edit and withdraw

@@ -144,7 +144,9 @@ export type MyInvitesParams = {
 
 export type DeedOptions = {
   categories: Category[]
+  invites_enabled: boolean
   invites_remaining_today: number
+  reports_remaining_this_month: number
   invite_expiry_hours: number
   description_min: number
   description_max: number

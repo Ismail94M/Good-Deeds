@@ -1,6 +1,7 @@
-"""QA1: the Verified Deeds count (D12) and withdraw-then-promote loops (D13).
+"""QA1: the Verified Deeds count (D15) and withdraw-then-promote loops (D13).
 
-D12: ``verified`` counts reports, not acts, and not ``counts_for_points``; self-logs never count.
+D15 (replaces D12): ``verified`` counts counted verified reports (``counts_for_points``), so it
+equals the leaderboard figure; self-logs never count.
 D13: however withdrawals and new reports are interleaved, a same-act group never has more than
 ``cap`` counted verified reports, never two counted reports by one reporter, and its counters
 always match its rows.
@@ -79,14 +80,13 @@ async def assert_group_invariants(session: AsyncSession, group_id: uuid.UUID) ->
     return group
 
 
-# --------------------------------------------------- D12: Verified Deeds counts reports
+# --------------------------------------------------- D15: Verified Deeds counts counted reports
 
 
-async def test_verified_counts_every_report_including_uncounted_ones(
+async def test_verified_counts_only_counted_reports(
     client: AsyncClient, session: AsyncSession
 ) -> None:
-    """The developer test uses exactly 5 reports (= the cap), which can't tell "reports" from
-    "counted reports". Seven witnesses of one act: 7, although only 5 count for points."""
+    """Seven witnesses of one act: only 5 count for points, so the profile shows 5 (D15)."""
     doer = await make_member(session)
     witnesses = await members(session, 7)
     t0 = datetime.now(UTC) - timedelta(hours=3)
@@ -96,10 +96,35 @@ async def test_verified_counts_every_report_including_uncounted_ones(
     ]
     await session.commit()
     assert sum(1 for d in deeds if d.same_act and d.same_act.counts_for_points) == 5
-    assert await _verified_count(client, doer) == 7
+    assert await _verified_count(client, doer) == 5
 
 
-async def test_same_reporter_twice_across_midnight_counts_twice(
+async def test_twenty_reports_of_one_act_count_as_five(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    doer = await make_member(session)
+    witnesses = await members(session, 20)
+    t0 = datetime.now(UTC) - timedelta(hours=3)
+    for i, w in enumerate(witnesses):
+        await scan_and_report(session, w, doer, at=t0 + timedelta(minutes=i), east_m=i * 5)
+    await session.commit()
+    assert await _verified_count(client, doer) == 5
+
+
+async def test_reports_in_separate_windows_each_count(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """Separate same-act windows (more than 2 h apart) are separate acts: each report counts."""
+    doer = await make_member(session)
+    witnesses = await members(session, 6)
+    t0 = datetime.now(UTC) - timedelta(days=2)
+    for i, w in enumerate(witnesses):
+        await scan_and_report(session, w, doer, at=t0 + timedelta(hours=3 * i))
+    await session.commit()
+    assert await _verified_count(client, doer) == 6
+
+
+async def test_same_reporter_twice_across_midnight_counts_once(
     client: AsyncClient, session: AsyncSession
 ) -> None:
     doer, witness = await members(session, 2)
@@ -113,7 +138,7 @@ async def test_same_reporter_twice_across_midnight_counts_twice(
     await session.commit()
     assert second.same_act is not None and second.same_act.counts_for_points is False
     assert (await _group_of(session, first.id)).id == (await _group_of(session, second.id)).id
-    assert await _verified_count(client, doer) == 2
+    assert await _verified_count(client, doer) == 1
 
 
 async def test_invite_deeds_count_only_once_accepted(
@@ -155,7 +180,7 @@ async def test_closed_statuses_do_not_count(
     assert await _verified_count(client, doer) == 1
 
 
-async def test_promotion_does_not_change_the_verified_count(
+async def test_promotion_after_withdrawal_keeps_the_count_consistent(
     client: AsyncClient, session: AsyncSession
 ) -> None:
     await publish_limits(session, same_act_cap=1)
@@ -164,10 +189,12 @@ async def test_promotion_does_not_change_the_verified_count(
     first = await scan_and_report(session, a, doer, at=t0)
     await scan_and_report(session, b, doer, at=t0 + timedelta(minutes=1), east_m=10)
     await session.commit()
-    assert await _verified_count(client, doer) == 2
+    assert await _verified_count(client, doer) == 1  # cap 1: only a counts
     await withdraw(session, a, first.id)  # b is promoted
     await session.commit()
-    assert await _verified_count(client, doer) == 1
+    assert await _verified_count(client, doer) == 1  # b now counts; a no longer does
+    group = await assert_group_invariants(session, (await _group_of(session, first.id)).id)
+    assert group.counted_count == 1
     # Self-logs by the doer never move it.
     for _ in range(3):
         response = await client.post(
