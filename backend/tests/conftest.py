@@ -1,6 +1,7 @@
 import asyncio
 import os
 import sys
+import time
 from collections.abc import AsyncIterator, Callable, Iterator
 from pathlib import Path
 
@@ -85,8 +86,12 @@ async def client(session: AsyncSession) -> AsyncIterator[AsyncClient]:
 
 @pytest.fixture(autouse=True)
 def rate_limiter() -> Iterator[InMemoryRateLimiter]:
-    """Each test gets fresh, in-memory rate limits (the Postgres limiter has its own test)."""
-    limiter = InMemoryRateLimiter()
+    """Each test gets fresh, in-memory rate limits (the Postgres limiter has its own test).
+
+    The clock is frozen at the current time so a test can't straddle a window boundary and
+    see its counters reset halfway through."""
+    frozen = time.time()
+    limiter = InMemoryRateLimiter(clock=lambda: frozen)
     app.dependency_overrides[get_rate_limiter] = lambda: limiter
     yield limiter
     app.dependency_overrides.pop(get_rate_limiter, None)

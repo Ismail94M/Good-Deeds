@@ -5,7 +5,9 @@ deed is never revealed, not even to the reporter.
 """
 
 import uuid
+from collections.abc import Mapping
 
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.deeds.models import Deed, DeedStatus, SameActGroup
@@ -22,12 +24,16 @@ async def deed_out(
     *,
     group: SameActGroup | None = None,
     invite: InviteOut | None = None,
+    summaries: Mapping[uuid.UUID, BaseModel] | None = None,
 ) -> DeedOut:
+    """``summaries`` lets a caller building a page of deeds prefetch every name in one query;
+    it must contain the reporter and (unless pending) the doer."""
     show_doer = deed.doer_user_id is not None and deed.status != DeedStatus.PENDING
-    ids = [deed.reporter_user_id]
-    if show_doer and deed.doer_user_id is not None:
-        ids.append(deed.doer_user_id)
-    summaries = await identity.public_summaries(session, ids)
+    if summaries is None:
+        ids = [deed.reporter_user_id]
+        if show_doer and deed.doer_user_id is not None:
+            ids.append(deed.doer_user_id)
+        summaries = await identity.public_summaries(session, ids)
 
     def ref(user_id: uuid.UUID | None) -> UserRef | None:
         summary = summaries.get(user_id) if user_id is not None else None

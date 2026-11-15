@@ -2,7 +2,8 @@
 
 In one transaction: consume the scan (conditional UPDATE, so two submits of one scan create one
 deed), check the time, group the deed (§3.4), insert it ``verified``, write the
-``verification_events`` row and emit ``DeedSubmitted`` + ``DeedVerified``.
+``verification_events`` row, emit ``DeedSubmitted`` + ``DeedVerified``, and run the prize-rank
+upgrade for invite deeds in the group.
 """
 
 import uuid
@@ -16,7 +17,7 @@ from app.core.errors import AppError, Conflict
 from app.core.events import emit
 from app.modules.deeds import _plausibility as plaus
 from app.modules.deeds._common import constraint_name, ist_day, lat_lng, point_ewkt, utcnow
-from app.modules.deeds._grouping import assign_group
+from app.modules.deeds._grouping import assign_group, upgrade_prize_rank
 from app.modules.deeds._limits import DeedLimits
 from app.modules.deeds._scans import scan_evidence, scan_expired, scan_not_found
 from app.modules.deeds._views import deed_out
@@ -190,4 +191,6 @@ async def create_qr_deed(
         ),
     )
     await session.flush()
+    # A second independent report makes the group's invite deeds prize-rank eligible (§3.4).
+    await upgrade_prize_rank(session, assignment.group)
     return await deed_out(session, deed, reporter_id, group=assignment.group)

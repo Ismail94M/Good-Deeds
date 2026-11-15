@@ -7,8 +7,11 @@ first report) form one act. The first ``cap`` verified reports, one per reporter
 Runs when a deed becomes verified, inside the caller's transaction, under the per-doer
 ``same_act`` advisory lock so two verifications can never both take the last counted slot.
 
-Not here yet (B6): step 7, the prize-rank upgrade of invite deeds when a group reaches two
-distinct reporters. Only QR deeds exist before B6, and they are prize-rank eligible already.
+Step 7 (``upgrade_prize_rank``): once a group has two distinct reporters, its verified invite
+deeds become prize-rank eligible (a second independent report). ``withdraw_from_group`` is the
+reverse path (§3.4b): it releases a withdrawn deed's slot, promotes the next eligible report
+(D13) and revokes the invite deeds' eligibility when fewer than two reporters remain. Every flip
+is audited and emitted.
 """
 
 import uuid
@@ -18,10 +21,14 @@ from datetime import datetime
 from geoalchemy2 import Geography
 from sqlalchemy import DateTime, exists, func, literal, select, type_coerce
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
+from app.core.audit import record_audit
 from app.core.db import advisory_xact_lock
+from app.core.events import emit
 from app.modules.deeds._limits import DeedLimits
-from app.modules.deeds.models import Deed, DeedStatus, SameActGroup
+from app.modules.deeds.events import DeedCountsForPointsChanged, DeedPrizeRankChanged
+from app.modules.deeds.models import Deed, DeedStatus, SameActGroup, VerificationMethod
 
 _POINT = Geography(geometry_type="POINT", srid=4326, spatial_index=False)
 
@@ -135,3 +142,158 @@ async def assign_group(
     group.distinct_reporters += int(not already)
     await session.flush()
     return GroupAssignment(group=group, counts_for_points=counts, reporter_already_in_group=already)
+
+
+# --------------------------------------------------- prize rank (§3.4 step 7, §3.4b step 4)
+
+PRIZE_GRANTED_REASON = "second_independent_report"
+PRIZE_REVOKED_REASON = "second_report_withdrawn"
+PROMOTED_REASON = "promoted_after_withdrawal"
+
+
+async def _verified_invite_deeds(
+    session: AsyncSession, group_id: uuid.UUID, *, eligible: bool
+) -> list[Deed]:
+    stmt = (
+        select(Deed)
+        .where(
+            Deed.same_act_group_id == group_id,
+            Deed.status == DeedStatus.VERIFIED,
+            Deed.verification_method == VerificationMethod.INVITE_ACCEPT,
+            Deed.prize_rank_eligible.is_(eligible),
+        )
+        .order_by(Deed.verified_at, Deed.id)
+        .execution_options(populate_existing=True)
+    )
+    return list(await session.scalars(stmt))
+
+
+def _flip_prize_rank(session: AsyncSession, deed: Deed, eligible: bool, reason: str) -> None:
+    assert deed.doer_user_id is not None
+    deed.prize_rank_eligible = eligible
+    record_audit(
+        session,
+        entity_type="deed",
+        entity_id=str(deed.id),
+        action="prize_rank_eligible.granted" if eligible else "prize_rank_eligible.revoked",
+        actor_id=None,
+        old_value={"prize_rank_eligible": not eligible},
+        new_value={"prize_rank_eligible": eligible},
+        reason=reason,
+    )
+    emit(
+        session,
+        DeedPrizeRankChanged(
+            deed_id=deed.id,
+            doer_id=deed.doer_user_id,
+            prize_rank_eligible=eligible,
+            reason=reason,
+        ),
+    )
+
+
+async def upgrade_prize_rank(session: AsyncSession, group: SameActGroup) -> list[uuid.UUID]:
+    """Step 7: with two or more distinct reporters, every verified invite deed in the group that
+    isn't prize-rank eligible yet becomes eligible. Call under the ``same_act`` lock, after the
+    newly verified deed is flushed. Returns the IDs of the deeds that flipped."""
+    if group.distinct_reporters < 2:
+        return []
+    deeds = await _verified_invite_deeds(session, group.id, eligible=False)
+    for deed in deeds:
+        _flip_prize_rank(session, deed, True, PRIZE_GRANTED_REASON)
+    await session.flush()
+    return [d.id for d in deeds]
+
+
+# --------------------------------------------------- withdrawal (§3.4b)
+
+
+async def _promotion_candidate(session: AsyncSession, group_id: uuid.UUID) -> Deed | None:
+    """The oldest still-verified uncounted report whose reporter has no counted verified deed
+    in the group (D13)."""
+    other = aliased(Deed)
+    reporter_counted = exists().where(
+        other.same_act_group_id == group_id,
+        other.reporter_user_id == Deed.reporter_user_id,
+        other.status == DeedStatus.VERIFIED,
+        other.counts_for_points.is_(True),
+    )
+    stmt = (
+        select(Deed)
+        .where(
+            Deed.same_act_group_id == group_id,
+            Deed.status == DeedStatus.VERIFIED,
+            Deed.counts_for_points.is_(False),
+            ~reporter_counted,
+        )
+        .order_by(Deed.verified_at, Deed.id)
+        .limit(1)
+        .execution_options(populate_existing=True)
+    )
+    return (await session.scalars(stmt)).first()
+
+
+async def withdraw_from_group(session: AsyncSession, deed: Deed) -> SameActGroup:
+    """Release a withdrawn deed's place in its group (§3.4b). The caller holds the per-doer
+    ``same_act`` lock (taken before the deed's row lock, see ``_edits``) and has already set the
+    deed's status to ``withdrawn``; its ``counts_for_points`` is kept for history."""
+    assert deed.doer_user_id is not None and deed.same_act_group_id is not None
+    await session.flush()
+    group = (
+        await session.scalars(
+            select(SameActGroup)
+            .where(SameActGroup.id == deed.same_act_group_id)
+            .execution_options(populate_existing=True)
+        )
+    ).one()
+    # Recount first (the deed is already flushed as withdrawn), then change all counters in
+    # one UPDATE so the counter CHECK constraints hold at every step.
+    distinct = int(
+        await session.scalar(
+            select(func.count(func.distinct(Deed.reporter_user_id))).where(
+                Deed.same_act_group_id == group.id, Deed.status == DeedStatus.VERIFIED
+            )
+        )
+        or 0
+    )
+    group.verified_count -= 1
+    if deed.counts_for_points:
+        group.counted_count -= 1
+    group.distinct_reporters = distinct
+    await session.flush()
+
+    # D13: at most one promotion, and only into the slot this deed gave up.
+    if deed.counts_for_points and group.counted_count < group.cap:
+        promoted = await _promotion_candidate(session, group.id)
+        if promoted is not None:
+            assert promoted.doer_user_id is not None
+            promoted.counts_for_points = True
+            group.counted_count += 1
+            record_audit(
+                session,
+                entity_type="deed",
+                entity_id=str(promoted.id),
+                action="counts_for_points.granted",
+                actor_id=None,
+                old_value={"counts_for_points": False},
+                new_value={"counts_for_points": True},
+                reason=PROMOTED_REASON,
+            )
+            emit(
+                session,
+                DeedCountsForPointsChanged(
+                    deed_id=promoted.id,
+                    doer_id=promoted.doer_user_id,
+                    reporter_id=promoted.reporter_user_id,
+                    same_act_group_id=group.id,
+                    counts_for_points=True,
+                    reason=PROMOTED_REASON,
+                ),
+            )
+
+    # In M2 an invite deed's eligibility only ever comes from the second-report rule.
+    if group.distinct_reporters < 2:
+        for revoked in await _verified_invite_deeds(session, group.id, eligible=True):
+            _flip_prize_rank(session, revoked, False, PRIZE_REVOKED_REASON)
+    await session.flush()
+    return group

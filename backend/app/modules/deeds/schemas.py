@@ -7,7 +7,7 @@ beneficiaries) are checked by the service against the ``deeds`` config (400).
 
 import uuid
 from datetime import datetime
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
@@ -90,9 +90,17 @@ class QrDeedCreate(_DeedContent):
     occurred_at: AwareDatetime | None = None
 
 
-# B6 adds ``InviteDeedCreate`` (method="invite") and turns this into a discriminated union:
-#   DeedCreate = Annotated[QrDeedCreate | InviteDeedCreate, Field(discriminator="method")]
-DeedCreate = QrDeedCreate
+class InviteDeedCreate(_DeedContent):
+    """A pending deed plus an invite link for a doer who isn't at hand (D5: up to 7 days ago,
+    optional location that need not be the reporter's current position)."""
+
+    method: Literal["invite"]
+    occurred_at: AwareDatetime
+    location: Location | None = None
+    sent_via: InviteSentVia
+
+
+DeedCreate = Annotated[QrDeedCreate | InviteDeedCreate, Field(discriminator="method")]
 
 
 # --------------------------------------------------- deed responses (§3.3)
@@ -141,8 +149,116 @@ class DeedOut(BaseModel):
 
 # --------------------------------------------------- invites (B6)
 
+
+class InvitePreview(BaseModel):
+    """Public preview of a usable invite (§3.2 #8). Never the doer or a location."""
+
+    status: Literal["pending"]
+    reporter: UserRef
+    category: str
+    description: str
+    occurred_at: datetime
+    expires_at: datetime
+
+
 # --------------------------------------------------- self-logs and profile counts (B7)
+
+
+class SelfLogCreate(BaseModel):
+    """A private self-log (D3). Any past date; the service rejects more than 5 min ahead."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    category: str = Field(min_length=1, max_length=40)
+    description: str = Field(min_length=1, max_length=1000)
+    occurred_at: AwareDatetime
+    location: Location | None = None
+
+
+class SelfLogUpdate(BaseModel):
+    """Any subset of the create fields. ``location: null`` removes the stored location; the
+    other fields can't be null."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    category: str | None = Field(default=None, min_length=1, max_length=40)
+    description: str | None = Field(default=None, min_length=1, max_length=1000)
+    occurred_at: AwareDatetime | None = None
+    location: Location | None = None
+
+    @model_validator(mode="after")
+    def _no_null_content(self) -> Self:
+        for name in ("category", "description", "occurred_at"):
+            if name in self.model_fields_set and getattr(self, name) is None:
+                raise ValueError(f"{name} can't be empty")
+        return self
+
+
+class SelfLogOut(BaseModel):
+    id: uuid.UUID
+    category: str
+    description: str
+    occurred_at: datetime
+    has_location: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class SelfLogPage(BaseModel):
+    items: list[SelfLogOut]
+    next_cursor: str | None
+
+
+class DeedCountsOut(BaseModel):
+    """Public profile counts (D4). ``verified`` counts reports, not acts (D12)."""
+
+    self_logged: int
+    verified: int
+
 
 # --------------------------------------------------- read endpoints and options (B8)
 
+
+class DeedPage(BaseModel):
+    items: list[DeedOut]
+    next_cursor: str | None
+
+
+class InvitePage(BaseModel):
+    items: list[InviteOut]
+    next_cursor: str | None
+
+
+class CategoryOut(BaseModel):
+    slug: str
+    label: str
+
+
+class DeedOptions(BaseModel):
+    categories: list[CategoryOut]
+    invites_remaining_today: int
+    invite_expiry_hours: int
+    description_min: int
+    description_max: int
+    scan_submit_minutes: int
+
+
 # --------------------------------------------------- edit and withdraw (B11)
+
+
+class DeedEdit(BaseModel):
+    """Reporter edit (§3.2 #14). Only the content fields; anything else (``occurred_at``,
+    location, status, doer, ...) is rejected with 422. ``beneficiaries_count: null`` clears it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    category: str | None = Field(default=None, min_length=1, max_length=40)
+    description: str | None = Field(default=None, min_length=1, max_length=1000)
+    beneficiaries_count: int | None = Field(default=None, ge=1, le=10_000)
+
+    @model_validator(mode="after")
+    def _no_null_content(self) -> Self:
+        for name in ("category", "description"):
+            if name in self.model_fields_set and getattr(self, name) is None:
+                raise ValueError(f"{name} can't be empty")
+        return self

@@ -6,6 +6,7 @@ transaction so that requests which fail later still count.
 
 import time
 from collections import defaultdict
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Protocol
 
@@ -76,12 +77,13 @@ class PostgresRateLimiter:
 class InMemoryRateLimiter:
     """For tests: same semantics, no database."""
 
-    def __init__(self) -> None:
+    def __init__(self, clock: Callable[[], float] = time.time) -> None:
         self.counts: dict[tuple[str, int], int] = defaultdict(int)
+        self._clock = clock
 
     async def hit(self, key: str, spec: str) -> None:
         limit, seconds = parse_rate(spec)
-        window = int(time.time() // seconds)
+        window = int(self._clock() // seconds)
         self.counts[(key, window)] += 1
         if self.counts[(key, window)] > limit:
             raise TooManyRequests(_MESSAGE, code="rate_limited")
