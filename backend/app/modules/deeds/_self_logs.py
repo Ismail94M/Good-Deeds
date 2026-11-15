@@ -129,16 +129,26 @@ async def update(
 ) -> SelfLogOut:
     now = now or utcnow()
     log = await _owned(session, owner_id, log_id)
-    sent = data.model_fields_set
-    category = data.category if data.category is not None else log.category
-    description = data.description if data.description is not None else log.description
-    if "category" in sent or "description" in sent:
-        log.description = validate_content(limits, category, description, None)
-        log.category = category
+    # Only changed fields are checked against the config, so retiring a category later doesn't
+    # stop the owner from editing an old log's other fields (same rule as deed edits).
+    if data.category is not None and data.category != log.category:
+        if not limits.has_category(data.category):
+            raise AppError("Please choose a category from the list.", code="invalid_category")
+        log.category = data.category
+    if data.description is not None:
+        text = data.description.strip()
+        if text != log.description:
+            if not limits.description_min <= len(text) <= limits.description_max:
+                raise AppError(
+                    f"Please describe the deed in {limits.description_min} to "
+                    f"{limits.description_max} characters.",
+                    code="invalid_description",
+                )
+            log.description = text
     if data.occurred_at is not None:
         _check_occurred_at(data.occurred_at, now)
         log.occurred_at = data.occurred_at
-    if "location" in sent:
+    if "location" in data.model_fields_set:
         loc = data.location
         log.location = None if loc is None else point_ewkt(loc.lat, loc.lng)  # type: ignore[assignment]
     if session.is_modified(log):
