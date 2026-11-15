@@ -9,16 +9,18 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import ratelimit
-from app.core.config import get_settings, parse_rate
+from app.core.config import parse_rate
 from app.core.errors import TooManyRequests
 from app.core.ratelimit import InMemoryRateLimiter, RateLimitCounter
 from app.core.sms import ConsoleSmsProvider
 from app.main import app
+from app.modules.identity._limits import load_limits
 from tests.identity.helpers import (
     PASSWORD,
     FakeOAuth,
     login,
     otp_from,
+    publish_limits,
     refresh,
     signup,
     signup_payload,
@@ -26,10 +28,6 @@ from tests.identity.helpers import (
     valid_phone,
     verify_phone,
 )
-
-
-def _limit(monkeypatch: pytest.MonkeyPatch, name: str, spec: str) -> None:
-    monkeypatch.setattr(get_settings(), name, spec)
 
 
 def _limited(response: Response) -> bool:
@@ -45,11 +43,11 @@ async def other_ip(client: AsyncClient) -> AsyncIterator[AsyncClient]:
 
 
 async def test_login_limited_per_ip(
-    client: AsyncClient, other_ip: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    client: AsyncClient, other_ip: AsyncClient, session: AsyncSession
 ) -> None:
     s = await signup(client)
     assert s.email is not None
-    _limit(monkeypatch, "rate_login_ip", "3/900")
+    await publish_limits(session, rate_login_ip="3/900")
     for i in range(3):
         response = await login(client, f"nobody{i}@example.com")
         assert response.status_code == 401
@@ -62,11 +60,11 @@ async def test_login_limited_per_ip(
 async def test_login_limited_per_email(
     client: AsyncClient,
     other_ip: AsyncClient,
-    monkeypatch: pytest.MonkeyPatch,
+    session: AsyncSession,
     rate_limiter: InMemoryRateLimiter,
 ) -> None:
     s = await signup(client, email="target@example.com")
-    _limit(monkeypatch, "rate_login_email", "2/900")
+    await publish_limits(session, rate_login_email="2/900")
     assert (await login(client, "target@example.com", "wrong-password")).status_code == 401
     assert (await login(other_ip, "TARGET@example.com", "wrong-password")).status_code == 401
     # Third try on the same address (any case, any IP) is refused, even with the password.
@@ -80,9 +78,9 @@ async def test_login_limited_per_email(
 
 
 async def test_signup_limited_per_ip(
-    client: AsyncClient, other_ip: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    client: AsyncClient, other_ip: AsyncClient, session: AsyncSession
 ) -> None:
-    _limit(monkeypatch, "rate_signup_ip", "2/3600")
+    await publish_limits(session, rate_signup_ip="2/3600")
     for _ in range(2):
         assert (await client.post("/api/auth/signup", json=signup_payload())).status_code == 201
     assert _limited(await client.post("/api/auth/signup", json=signup_payload()))
@@ -91,9 +89,9 @@ async def test_signup_limited_per_ip(
 
 
 async def test_oauth_limited_per_ip(
-    client: AsyncClient, oauth: FakeOAuth, monkeypatch: pytest.MonkeyPatch
+    client: AsyncClient, oauth: FakeOAuth, session: AsyncSession
 ) -> None:
-    _limit(monkeypatch, "rate_oauth_ip", "2/900")
+    await publish_limits(session, rate_oauth_ip="2/900")
     assert (
         await client.post("/api/auth/oauth/google", json={"token": "bad-token-1"})
     ).status_code == 401
@@ -105,10 +103,10 @@ async def test_oauth_limited_per_ip(
 
 
 async def test_refresh_limited_per_ip(
-    client: AsyncClient, other_ip: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    client: AsyncClient, other_ip: AsyncClient, session: AsyncSession
 ) -> None:
     s = await signup(client)
-    _limit(monkeypatch, "rate_refresh_ip", "2/900")
+    await publish_limits(session, rate_refresh_ip="2/900")
     assert (await refresh(client, "garbage-1")).status_code == 401
     assert (await refresh(client, "garbage-2")).status_code == 401
     assert _limited(await refresh(client, s.refresh))
@@ -117,9 +115,9 @@ async def test_refresh_limited_per_ip(
 
 
 async def test_phone_start_limited_per_ip(
-    client: AsyncClient, other_ip: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    client: AsyncClient, other_ip: AsyncClient, session: AsyncSession
 ) -> None:
-    _limit(monkeypatch, "rate_phone_start_ip", "2/3600")
+    await publish_limits(session, rate_phone_start_ip="2/3600")
     users = [await signup(client) for _ in range(3)]
     assert (await start_phone(client, users[0], valid_phone(80))).status_code == 200
     assert (await start_phone(client, users[1], valid_phone(81))).status_code == 200
@@ -131,9 +129,9 @@ async def test_global_sms_budget(
     client: AsyncClient,
     other_ip: AsyncClient,
     sms: ConsoleSmsProvider,
-    monkeypatch: pytest.MonkeyPatch,
+    session: AsyncSession,
 ) -> None:
-    _limit(monkeypatch, "rate_sms_global", "2/3600")
+    await publish_limits(session, rate_sms_global="2/3600")
     users = [await signup(client) for _ in range(3)]
     assert (await start_phone(client, users[0], valid_phone(83))).status_code == 200
     assert (await start_phone(other_ip, users[1], valid_phone(84))).status_code == 200
@@ -143,9 +141,9 @@ async def test_global_sms_budget(
 
 
 async def test_phone_verify_limited_per_user(
-    client: AsyncClient, sms: ConsoleSmsProvider, monkeypatch: pytest.MonkeyPatch
+    client: AsyncClient, sms: ConsoleSmsProvider, session: AsyncSession
 ) -> None:
-    _limit(monkeypatch, "rate_phone_verify_user", "2/3600")
+    await publish_limits(session, rate_phone_verify_user="2/3600")
     s = await signup(client)
     other = await signup(client)
     phone = valid_phone(86)
@@ -162,9 +160,9 @@ async def test_phone_verify_limited_per_user(
     assert ok.status_code == 200
 
 
-def test_parse_rate() -> None:
+async def test_parse_rate(session: AsyncSession) -> None:
     assert parse_rate("20/900") == (20, 900)
-    settings = get_settings()
+    limits = await load_limits(session)
     for name in (
         "rate_login_ip",
         "rate_login_email",
@@ -175,7 +173,7 @@ def test_parse_rate() -> None:
         "rate_refresh_ip",
         "rate_oauth_ip",
     ):
-        count, seconds = parse_rate(getattr(settings, name))
+        count, seconds = parse_rate(getattr(limits, name))
         assert count > 0 and seconds > 0
 
 

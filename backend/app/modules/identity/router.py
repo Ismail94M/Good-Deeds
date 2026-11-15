@@ -10,6 +10,7 @@ from app.core.errors import AppError, NotFound, Unauthorized
 from app.core.ratelimit import Limiter, client_ip
 from app.core.sms import SmsProvider, get_sms_provider
 from app.modules.identity import service
+from app.modules.identity._limits import load_limits
 from app.modules.identity._oauth import OAuthError, OAuthVerifier, get_oauth_verifiers
 from app.modules.identity.models import User, UserStatus
 from app.modules.identity.schemas import (
@@ -91,7 +92,8 @@ async def signup(
     device_id: DeviceId,
     limiter: Limiter,
 ) -> TokenResponse:
-    await limiter.hit(f"signup:ip:{client_ip(request)}", get_settings().rate_signup_ip)
+    limits = await load_limits(session)
+    await limiter.hit(f"signup:ip:{client_ip(request)}", limits.rate_signup_ip)
     user = await service.register_with_password(session, data)
     return await _start_session(session, response, user, device_id)
 
@@ -105,9 +107,9 @@ async def login(
     device_id: DeviceId,
     limiter: Limiter,
 ) -> TokenResponse:
-    settings = get_settings()
-    await limiter.hit(f"login:ip:{client_ip(request)}", settings.rate_login_ip)
-    await limiter.hit(f"login:email:{data.email.lower()}", settings.rate_login_email)
+    limits = await load_limits(session)
+    await limiter.hit(f"login:ip:{client_ip(request)}", limits.rate_login_ip)
+    await limiter.hit(f"login:email:{data.email.lower()}", limits.rate_login_email)
     user = await service.authenticate_password(session, data.email, data.password)
     return await _start_session(session, response, user, device_id)
 
@@ -123,7 +125,8 @@ async def oauth_login(
     limiter: Limiter,
     verifiers: Annotated[dict[str, OAuthVerifier], Depends(get_oauth_verifiers)],
 ) -> TokenResponse:
-    await limiter.hit(f"oauth:ip:{client_ip(request)}", get_settings().rate_oauth_ip)
+    limits = await load_limits(session)
+    await limiter.hit(f"oauth:ip:{client_ip(request)}", limits.rate_oauth_ip)
     verifier = verifiers.get(provider)
     if verifier is None:
         raise AppError("Unknown sign-in provider.", code="unknown_provider")
@@ -146,7 +149,8 @@ async def refresh(
     limiter: Limiter,
     gd_refresh: Annotated[str | None, Cookie()] = None,
 ) -> TokenResponse | JSONResponse:
-    await limiter.hit(f"refresh:ip:{client_ip(request)}", get_settings().rate_refresh_ip)
+    limits = await load_limits(session)
+    await limiter.hit(f"refresh:ip:{client_ip(request)}", limits.rate_refresh_ip)
     try:
         if not gd_refresh:
             raise Unauthorized("Please log in.", code="not_authenticated")
@@ -215,9 +219,9 @@ async def phone_start(
     limiter: Limiter,
     sms: Annotated[SmsProvider, Depends(get_sms_provider)],
 ) -> PhoneStartResponse:
-    settings = get_settings()
-    await limiter.hit(f"phone_start:ip:{client_ip(request)}", settings.rate_phone_start_ip)
-    await limiter.hit("sms:global", settings.rate_sms_global)
+    limits = await load_limits(session)
+    await limiter.hit(f"phone_start:ip:{client_ip(request)}", limits.rate_phone_start_ip)
+    await limiter.hit("sms:global", limits.rate_sms_global)
     result = await service.start_phone_verification(session, user, data.phone, sms)
     await session.commit()
     return result
@@ -227,7 +231,8 @@ async def phone_start(
 async def phone_verify(
     data: PhoneVerifyRequest, user: CurrentUser, session: Session, limiter: Limiter
 ) -> Me:
-    await limiter.hit(f"phone_verify:user:{user.id}", get_settings().rate_phone_verify_user)
+    limits = await load_limits(session)
+    await limiter.hit(f"phone_verify:user:{user.id}", limits.rate_phone_verify_user)
     await service.confirm_phone(session, user, data.phone, data.code)
     result = await service.me(session, user)
     await session.commit()

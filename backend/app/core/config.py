@@ -10,6 +10,9 @@ _LOCAL_ENVS = frozenset({"development", "test"})
 class Settings(BaseSettings):
     """Runtime configuration, read from environment variables prefixed with GD_.
 
+    Only deployment settings live here (secrets, URLs, token lifetimes, cookie flag, providers).
+    Product limits are versioned config rows (app.core.runtime_config).
+
     Defaults are production-safe: running locally needs GD_ENV=development (set in
     docker-compose.yml and .env.example), and production refuses to start with dev values.
     """
@@ -35,20 +38,8 @@ class Settings(BaseSettings):
     # Phone verification (Indian mobile numbers only in v1)
     default_phone_region: str = "IN"
     sms_provider: str = "console"
-    otp_ttl_minutes: int = 10
-    otp_max_attempts: int = 5
-    otp_resend_seconds: int = 30
-    otp_max_per_hour: int = 5
-
-    # Rate limits: "<count>/<seconds>"
-    rate_login_ip: str = "20/900"
-    rate_login_email: str = "10/900"
-    rate_signup_ip: str = "10/3600"
-    rate_phone_start_ip: str = "10/3600"
-    rate_sms_global: str = "500/3600"
-    rate_phone_verify_user: str = "20/3600"
-    rate_refresh_ip: str = "120/900"
-    rate_oauth_ip: str = "30/900"
+    # Product limits (OTP and rate limits) are not here: they live in versioned config rows
+    # (app.core.runtime_config), e.g. the ``identity`` namespace.
 
     # OAuth (sign-in buttons are hidden when these are empty)
     google_client_id: str = ""

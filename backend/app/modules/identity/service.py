@@ -42,6 +42,7 @@ from app.core.security import (
 )
 from app.core.sms import SmsProvider
 from app.modules.identity import _qr
+from app.modules.identity._limits import load_limits
 from app.modules.identity._oauth import OAuthIdentity
 from app.modules.identity.events import PhoneVerified, UserRegistered
 from app.modules.identity.models import (
@@ -595,7 +596,7 @@ async def start_phone_verification(
 ) -> PhoneStartResponse:
     """Send a code. The response is identical whether or not the number is already in use,
     so this can't be used to find out who is on Good Deeds."""
-    settings = get_settings()
+    limits = await load_limits(session)
     if user.phone_verified_at is not None:
         raise Conflict(
             "Your number is already verified. Contact support to change it.",
@@ -616,11 +617,11 @@ async def start_phone_verification(
     per_phone = await session.scalar(
         select(func.count()).where(PhoneOtp.phone_e164 == phone, PhoneOtp.created_at > hour_ago)
     )
-    if count >= settings.otp_max_per_hour or (per_phone or 0) >= settings.otp_max_per_hour:
+    if count >= limits.otp_max_per_hour or (per_phone or 0) >= limits.otp_max_per_hour:
         raise TooManyRequests(
             "Too many codes requested. Please try again in an hour.", code="otp_rate_limited"
         )
-    if latest is not None and (now - latest).total_seconds() < settings.otp_resend_seconds:
+    if latest is not None and (now - latest).total_seconds() < limits.otp_resend_seconds:
         raise TooManyRequests(
             "Please wait a few seconds before requesting another code.",
             code="otp_resend_too_soon",
@@ -633,7 +634,7 @@ async def start_phone_verification(
         id=uuid.uuid4(),
         user_id=user.id,
         phone_e164=phone,
-        expires_at=now + timedelta(minutes=settings.otp_ttl_minutes),
+        expires_at=now + timedelta(minutes=limits.otp_ttl_minutes),
         # A taken number gets a row (so limits still apply) whose hash matches no code.
         code_hash=new_opaque_token() if taken else "",
     )
@@ -650,18 +651,18 @@ async def start_phone_verification(
     else:
         await sms.send(
             phone,
-            f"Your Good Deeds code is {code}. It expires in {settings.otp_ttl_minutes} "
+            f"Your Good Deeds code is {code}. It expires in {limits.otp_ttl_minutes} "
             "minutes. Never share this code.",
         )
     return PhoneStartResponse(
         phone_e164=phone,
         expires_at=otp.expires_at,
-        resend_after_seconds=settings.otp_resend_seconds,
+        resend_after_seconds=limits.otp_resend_seconds,
     )
 
 
 async def confirm_phone(session: AsyncSession, user: User, raw_phone: str, code: str) -> None:
-    settings = get_settings()
+    limits = await load_limits(session)
     if user.phone_verified_at is not None:
         raise Conflict(
             "Your number is already verified. Contact support to change it.",
@@ -682,7 +683,7 @@ async def confirm_phone(session: AsyncSession, user: User, raw_phone: str, code:
     )
     if otp is None:
         raise AppError("This code has expired. Please request a new one.", code="otp_expired")
-    if otp.attempts >= settings.otp_max_attempts:
+    if otp.attempts >= limits.otp_max_attempts:
         raise TooManyRequests(
             "Too many wrong attempts. Please request a new code.", code="otp_locked"
         )

@@ -40,7 +40,8 @@ npm run lint && npm run typecheck && npm run format:check
 
 **Backend: modular monolith** (`backend/app`).
 - `core/`: shared infrastructure:
-  - `config` (env vars prefixed `GD_`)
+  - `config` (env vars prefixed `GD_`): deployment settings only (secrets, URLs, token lifetimes, cookie flag, providers)
+  - `runtime_config` (versioned, append-only `config_versions` rows; one namespace per area, typed by a `RuntimeConfig` subclass with no defaults, read with `load()`, changed with `publish()`). All product limits live here, including M1's OTP and rate limits
   - `db` (async SQLAlchemy over psycopg 3)
   - `events` (transactional outbox)
   - `jobs` (Procrastinate queue in Postgres)
@@ -52,7 +53,7 @@ npm run lint && npm run typecheck && npm run format:check
 - `modules/<name>/`: feature modules. Each must be listed in `modules/registry.py`. Its `router.py`, `models.py`, `handlers.py` and `jobs.py` are imported automatically. Private helpers are `_name.py`.
 - **Module boundary rule:** a module may import only `app.core` and another module's `service.py`. Cross-module side effects go through domain events, never direct calls. `tests/test_architecture.py` enforces this.
 - **identity** (M1): accounts, sessions, phone OTP, consent, QR codes.
-  - Other modules use its `service.py`: `CurrentUser`, `OnboardedUser` (adult + consents + verified phone), `require_role`, `resolve_qr_token` and `resolve_manual_code` (both return a `ResolvedDoer` with the token window; the static short ID alone never resolves), `phone_hashes`, `device_hash`, `device_hashes`, `public_summaries`. QR window and grace come from the `qr` config namespace (`_qr.QrConfig`).
+  - Other modules use its `service.py`: `CurrentUser`, `OnboardedUser` (adult + consents + verified phone), `require_role`, `resolve_qr_token` and `resolve_manual_code` (both return a `ResolvedDoer` with the token window; the static short ID alone never resolves), `phone_hashes`, `device_hash`, `device_hashes`, `public_summaries`. QR window and grace come from the `qr` config namespace (`_qr.QrConfig`); OTP and auth rate limits from the `identity` namespace (`_limits.IdentityLimits`).
   - **Auth model:** short-lived JWT access token held in browser memory. A rotating refresh token in an httpOnly cookie on `/api/auth`, stored hashed. `users.token_version` in the JWT lets `revoke_all_sessions` kill access tokens too.
 
 **Event flow:**
@@ -68,7 +69,7 @@ npm run lint && npm run typecheck && npm run format:check
 **Tests:**
 - The `session` fixture wraps each test in a transaction that is rolled back (`join_transaction_mode="create_savepoint"`), so code under test may commit. The `client` fixture overrides `get_session` with that session.
 - `tests/identity/conftest.py` has a stricter `client` that rolls back a failed request's work, as the real app does. Commit any setup data before calling the API.
-- Rate limits use a fresh in-memory limiter per test (autouse `rate_limiter` fixture).
+- Rate limits use a fresh in-memory limiter per test (autouse `rate_limiter` fixture). To change a limit in a test, publish a config version (`publish_limits` in `tests/identity/helpers.py` and `tests/deeds/helpers.py`); never patch settings.
 - SMS and OAuth are faked through dependency overrides. Read OTP codes from `ConsoleSmsProvider.sent`.
 
 **Frontend:**

@@ -10,9 +10,12 @@ from zoneinfo import ZoneInfo
 
 import phonenumbers
 from httpx import AsyncClient, Response
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.runtime_config import publish
 from app.core.security import decode_access_token
 from app.core.sms import ConsoleSmsProvider
+from app.modules.identity._limits import IdentityLimits, load_limits
 from app.modules.identity._oauth import OAuthError, OAuthIdentity, OAuthVerifier
 
 PASSWORD = "correct-horse-battery"
@@ -20,6 +23,16 @@ REFRESH_COOKIE = "gd_refresh"
 
 
 IST = ZoneInfo("Asia/Kolkata")
+
+
+async def publish_limits(session: AsyncSession, **changes: Any) -> IdentityLimits:
+    """Publish a new ``identity`` config version with ``changes`` applied, and commit it
+    (the test's outer transaction still rolls it back)."""
+    current = await load_limits(session)
+    new = IdentityLimits.model_validate({**current.model_dump(), **changes})
+    await publish(session, new, actor_id=None, reason="test")
+    await session.commit()
+    return new
 
 
 def ist_today() -> date:

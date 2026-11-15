@@ -7,11 +7,11 @@ from sqlalchemy import func, select, text, update
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import get_settings
 from app.core.events import OutboxEvent
 from app.core.security import keyed_hash
 from app.core.sms import ConsoleSmsProvider
 from app.modules.identity import service
+from app.modules.identity._limits import load_limits
 from app.modules.identity.models import PhoneHistory, PhoneOtp, User
 from tests.identity.helpers import (
     Session,
@@ -86,7 +86,7 @@ async def test_start_and_verify_happy_path(
     assert started.status_code == 200, started.text
     body = started.json()
     assert body["phone_e164"] == "+919876543210"
-    assert body["resend_after_seconds"] == get_settings().otp_resend_seconds
+    assert body["resend_after_seconds"] == (await load_limits(session)).otp_resend_seconds
 
     otp = await _latest_otp(session, s)
     code = otp_from(sms, "+919876543210")
@@ -136,7 +136,7 @@ async def test_lockout_after_max_attempts(
     phone = valid_phone(11)
     await start_phone(client, s, phone)
     code = otp_from(sms, phone)
-    max_attempts = get_settings().otp_max_attempts
+    max_attempts = (await load_limits(session)).otp_max_attempts
 
     for _ in range(max_attempts):
         response = await verify_phone(client, s, phone, _wrong(code))
@@ -156,13 +156,13 @@ async def test_lockout_after_max_attempts(
 
 
 async def test_right_code_on_last_allowed_attempt_succeeds(
-    client: AsyncClient, sms: ConsoleSmsProvider
+    client: AsyncClient, session: AsyncSession, sms: ConsoleSmsProvider
 ) -> None:
     s = await signup(client)
     phone = valid_phone(12)
     await start_phone(client, s, phone)
     code = otp_from(sms, phone)
-    for _ in range(get_settings().otp_max_attempts - 1):
+    for _ in range((await load_limits(session)).otp_max_attempts - 1):
         await verify_phone(client, s, phone, _wrong(code))
     assert (await verify_phone(client, s, phone, code)).status_code == 200
 
@@ -220,7 +220,7 @@ async def test_resend_too_soon_429(client: AsyncClient, session: AsyncSession) -
 
 async def test_hourly_limit_per_user(client: AsyncClient, session: AsyncSession) -> None:
     s = await signup(client)
-    limit = get_settings().otp_max_per_hour
+    limit = (await load_limits(session)).otp_max_per_hour
     for i in range(limit):
         response = await start_phone(client, s, valid_phone(20 + i))
         assert response.status_code == 200, (i, response.text)
@@ -239,7 +239,7 @@ async def test_hourly_limit_per_phone_across_accounts(
     client: AsyncClient, session: AsyncSession
 ) -> None:
     phone = valid_phone(40)
-    for _ in range(get_settings().otp_max_per_hour):
+    for _ in range((await load_limits(session)).otp_max_per_hour):
         s = await signup(client)
         assert (await start_phone(client, s, phone)).status_code == 200
 
@@ -289,13 +289,13 @@ async def test_number_on_another_account_looks_like_success_but_sends_no_code(
 
 
 async def test_taken_number_still_counts_toward_per_phone_limit(
-    client: AsyncClient, sms: ConsoleSmsProvider
+    client: AsyncClient, session: AsyncSession, sms: ConsoleSmsProvider
 ) -> None:
     owner = await signup(client)
     phone = valid_phone(48)
     await onboard_phone(client, sms, owner, phone)
     # The owner's own verification used one of the hourly slots for this number.
-    for _ in range(get_settings().otp_max_per_hour - 1):
+    for _ in range((await load_limits(session)).otp_max_per_hour - 1):
         s = await signup(client)
         assert (await start_phone(client, s, phone)).status_code == 200
     blocked = await start_phone(client, await signup(client), phone)
