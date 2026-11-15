@@ -1,0 +1,80 @@
+"""Typed values of the ``deeds`` config namespace (docs/M2-DESIGN.md §2.1).
+
+Every key is required and has no default: the ``config_versions`` row (seeded as ``deeds`` v1 by
+migration 0004) is the only source of these values. Change them by publishing a new version.
+"""
+
+from pydantic import BaseModel, ConfigDict
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.runtime_config import RuntimeConfig, load
+
+
+class ServiceArea(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    lat: float
+    lng: float
+    radius_km: float
+
+
+class Category(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    slug: str
+    label: str
+
+
+class DeedLimits(RuntimeConfig):
+    """Config namespace ``deeds``."""
+
+    namespace = "deeds"
+
+    # Invites (B6)
+    invites_per_day: int
+    invite_expiry_hours: int
+    invite_occurred_max_age_days: int
+    shared_device_pair_monthly_limit: int
+    # Same-act grouping
+    same_act_radius_m: int
+    same_act_window_minutes: int
+    same_act_cap: int
+    # QR scans and plausibility
+    scan_submit_minutes: int
+    qr_occurred_max_age_minutes: int
+    max_location_accuracy_m: int
+    max_travel_speed_kmh: int
+    travel_slack_m: int
+    service_area: ServiceArea
+    # Deed content
+    description_min: int
+    description_max: int
+    beneficiaries_max: int
+    categories: tuple[Category, ...]
+    # Rate limits ("<count>/<seconds>"), an account key and an IP key per action (D1)
+    rate_scan_witness: str
+    rate_scan_ip: str
+    rate_manual_witness: str
+    rate_manual_ip: str
+    rate_manual_target: str
+    rate_invite_create_ip: str
+    rate_invite_preview_ip: str
+    rate_invite_accept_user: str
+    rate_invite_accept_ip: str
+    rate_invite_reissue_user: str
+    rate_invite_reissue_ip: str
+    rate_deed_edit_user: str
+    rate_deed_edit_ip: str
+    rate_self_log_user: str
+    rate_self_log_ip: str
+    rate_profile_counts_ip: str
+    # Retention (B9)
+    unconsumed_scan_retention_days: int
+
+    def has_category(self, slug: str) -> bool:
+        return any(c.slug == slug for c in self.categories)
+
+
+async def load_limits(session: AsyncSession) -> tuple[int, DeedLimits]:
+    """``(version, limits)`` of the active ``deeds`` config. Fails closed if it is missing."""
+    return await load(session, DeedLimits)

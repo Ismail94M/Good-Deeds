@@ -16,7 +16,7 @@ from fastapi import APIRouter
 
 MODULES: list[str] = [
     "identity",
-    "deeds",  # D2: models only for now; router, events and jobs arrive in B3+
+    "deeds",  # M2: deeds, scans, same-act groups, invites, self-logs
 ]
 
 _OPTIONAL_PARTS = ("models", "handlers", "jobs")

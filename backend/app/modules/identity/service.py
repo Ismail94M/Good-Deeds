@@ -804,6 +804,13 @@ async def resolve_qr_token(
     return _resolved(found[0], found[1], parsed.window)
 
 
+def normalize_short_id(raw: str) -> str | None:
+    """Canonical form of a user-typed short ID ('gd-7k3m 9q0' -> '7K3M9Q0'), or None if it is
+    malformed. Pure: it never looks anything up, so callers may use it for rate-limit keys
+    before any lookup."""
+    return _qr.normalize_short_id(raw)
+
+
 # Compared against when a typed ID is unknown, so the hashing work (and timing) is the same.
 _DUMMY_SHORT_ID = "0" * _qr.SHORT_ID_LENGTH
 
