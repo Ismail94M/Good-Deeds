@@ -60,7 +60,11 @@ A user can never verify their own deed.
 
 **Self-logged deeds:** users can log their own good deeds (e.g. planting, beach cleaning) with a category, description, date/time and optional location. Self-logs are private: only the owner sees the details. They never appear in the feed and never count toward points, impact score, leaderboard, prizes or the North Star. A self-log can't be converted into a verified deed; a witness who saw the deed reports it separately through the normal QR or ID + code flow. The owner can edit and delete self-logs.
 
-**Profile counts:** every profile shows two public counts, like followers/following: *Self-log Deeds* and *Verified Deeds*. Verified Deeds counts verified reports about the user (5 witnesses of one act count as 5). Self-logs are never included in it.
+**Profile counts:** every profile shows two public counts, like followers/following: *Self-log Deeds* and *Verified Deeds*. Verified Deeds counts the user's **counted** verified reports, the same figure the leaderboard uses: 20 witnesses of one act count as 5 (the same-act cap), while 100 reports in separate places or times count as 100. Self-logs are never included in it.
+
+**Monthly reporting limit:** a reporter can submit at most 15 reports per calendar month (India time, resetting on the 1st), across all doers. Withdrawn reports still use up a slot; failed submissions don't.
+
+**Invites are switched off for now** (2026-11-16). Only QR / ID + code reporting is live. The invite rules below apply when invites are switched back on; when they return, an invite-verified deed earns points but needs human review or another independent verification before it counts for prizes.
 
 **Edit and withdraw:** a reporter can edit a deed's category, description and number of people helped (every edit is kept in an append-only history), and can withdraw a deed. Time, location, doer and verification method can't be edited. When a counted report in a same-act group is withdrawn, the oldest uncounted report in the group (from a reporter not already counted) is promoted to count. A withdrawal doesn't free the reporter–doer pair's daily slot.
 
@@ -285,6 +289,7 @@ A user can win a cash prize only if all of these are true:
 | Verified deeds per doer per day that earn points          | 10                                 |
 | Same-act cap                                              | 5 reports within 200 m and 2 hours |
 | Invite link expiry                                        | 7 days                             |
+| Reports per reporter per calendar month                   | 15                                 |
 | Invites per reporter per day                              | 5                                  |
 | Invite deed: how far back it can have happened            | 7 days                             |
 | Accepted invites per reporter–doer pair on a shared device | 15 per month                      |

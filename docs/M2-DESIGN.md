@@ -1,6 +1,6 @@
 # M2 Deeds & Verification: design
 
-**Status:** Revision 3 (2026-11-15). **Approved by the PO for build** with Q14–Q17 answered (D11–D14). Frontend screens wait for the PO's Figma designs.
+**Status:** Revision 4 (2026-11-16). Revision 3 was approved and built. Revision 4 adds D15–D18 from the PO's business-logic review (§0.2); the PO approved them for build on 2026-11-16. Frontend screens wait for the PO's Figma designs.
 **Baseline:** branch `m2-deeds` (M0 + M1 + architecture docs).
 **Sources used:** PRD §4, §5, §6.3, §6.4, §6.6, §8, §9 (same-act), §10.1–10.2, §11, §12; ROADMAP M2; `docs/architecture/README.md` discrepancies #2, #3, #4, #6, #7.
 
@@ -32,9 +32,22 @@
 | D9 | Existing members can accept invites (Q5); PRD doc updates approved (Q9); QR-verified deeds count for prizes immediately (Q13). Q1, Q6, Q8, Q10 and Q12 take their defaults. | §9. |
 | D10 | The phone-history check also runs on the QR path, not only on invite acceptance (recommended in review, accepted with "everything else looks fine"). | §3.2 #1. |
 | D11 | **Keep the per-target limit** on typed ID + code (Q14). | §3.1. |
-| D12 | **Verified Deeds counts reports**, not acts (Q15): 5 witnesses of one act = 5. | §2.4 index, §3.2 #13, §7. |
+| D12 | ~~Verified Deeds counts reports~~ **Superseded by D15.** | §2.4 index, §3.2 #13, §7. |
 | D13 | **Promote the next report** when a counted report is withdrawn (Q16). | §3.4b, §4 (`DeedCountsForPointsChanged`), §7, §8. |
 | D14 | Doer-hide is **not in M2**; revisit with moderation in M7 (Q17). | §9. |
+
+### 0.2 Business-logic review (2026-11-16)
+
+The PO walked through the core rules with worked examples. Confirmed unchanged: a doer can never report themselves; self-logs never count; in any 200 m / 2 h window at most 5 reports count, **whatever their category**; separate windows count separately; one report per reporter–doer pair per IST day; no monthly cap on how many deeds a doer gets. The PO's prize metric ("unique person count") is the doer's number of **counted** reports (`counts_for_points = true`, `status = 'verified'`) in the month; the leaderboard itself is M4.
+
+| # | Decision | Where it changes the design |
+|---|---|---|
+| D15 | **Verified Deeds on the profile counts counted reports**, so it always equals the leaderboard figure: 20 witnesses of one act show 5; 100 reports in separate windows show 100. **Replaces D12** (Q15 reversed). | §3.2 deed-counts, §2.4 index, §7. |
+| D16 | **Monthly reporting limit: at most 15 reports per reporter per IST calendar month**, across all doers and both methods. Every `deeds` row the reporter created that month counts, whatever its status now (withdrawn, pending, expired and rejected included), so withdrawing can't free a slot. A failed submission creates no row, so it doesn't count. Self-logs don't count. An invite counts when it is created. Enforced on the server under `advisory_xact_lock("reporter_month", reporter_id)` so concurrent submits can't exceed it. New config key `deeds.reporter_monthly_limit = 15`; error 429 `monthly_report_limit`. | §2.1 seed (v2), §3.2 deed create, §7. |
+| D17 | **Invites are switched off** for now. New config key `deeds.invites_enabled = false`. While off, invite create, preview, accept and reissue return 403 `invites_disabled`; the built code and tests stay, and the expiry job keeps running so any existing pending invite still expires. The invite prize rule and naming the doer by @handle are on hold until invites return. | §3.2 invite endpoints, §7. |
+| D18 | **Reporters abroad are on hold:** phone numbers stay India-only. | None. |
+
+Still open, to be decided later: QR witness and doer sharing a device (security review M2); the small security fixes L1, L4, L7, L8; the prize tie-break (M4). Invite-specific security finding M1 is on hold with invites.
 
 ### Config rows: current state
 
@@ -520,7 +533,7 @@ Returns 200 `DeedOut`.
 { "self_logged": 25, "verified": 12 }
 ```
 - `self_logged`: the number of the user's self-logs that exist (deleted ones don't count).
-- `verified`: the number of verified reports where the user is the doer, i.e. `COUNT(*)` over the user's `verified` deeds. Five witnesses reporting the same act count as **5** (D12). This is a display count only; points still follow `counts_for_points` and the same-act cap. Pending, unverified, rejected, removed and withdrawn deeds don't count. Self-logs are never included.
+- `verified`: the number of **counted** verified reports where the user is the doer, i.e. `COUNT(*)` over the user's deeds with `status = 'verified' AND counts_for_points` (D15). It equals the leaderboard figure: 20 witnesses of one act count as 5. Pending, unverified, rejected, removed and withdrawn deeds don't count. Self-logs are never included.
 - Neither number reveals any self-log detail. The own-profile page uses the same endpoint with the user's own handle.
 
 **14. `PATCH /api/deeds/{id}`** (D7): Onboarded, reporter only; rate limits `deed:edit:u` + `deed:edit:ip`.
@@ -1026,6 +1039,6 @@ Each new limiter key trips at its configured count (InMemoryRateLimiter fixture)
 | # | Question | Answer |
 |---|---|---|
 | Q14 | Per-target limit on typed ID + code? | **Keep** (D11). |
-| Q15 | Verified Deeds: count acts or reports? | **Count reports** (D12). |
+| Q15 | Verified Deeds: count acts or reports? | Count reports (D12), **reversed 2026-11-16: count counted reports (D15).** |
 | Q16 | Promote an uncounted report after a counted one is withdrawn? | **Promote** (D13). |
 | Q17 | Can the doer hide a deed about them? | **Not in M2**; revisit in M7 (D14). |

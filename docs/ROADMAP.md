@@ -51,6 +51,7 @@ Each milestone is built, tested and reviewed by the product owner before the nex
 - Private self-logs, with public Self-log Deeds and Verified Deeds counts on the profile.
 - Reporters can edit and withdraw deeds.
 - Limits live in versioned config rows (`config_versions`).
+- At most 15 reports per reporter per calendar month. Invites are built but switched off by config (PO decision 2026-11-16).
 - Events: `DeedSubmitted`, `DeedVerified`, `DeedRejected`, `DeedEdited`, `DeedWithdrawn`, `DeedPrizeRankChanged`, `DeedCountsForPointsChanged`.
 - Full decisions: `docs/M2-DESIGN.md`.
 
