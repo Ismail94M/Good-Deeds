@@ -1,8 +1,11 @@
-"""Short IDs and rotating, signed QR tokens.
+"""Short IDs, rotating signed QR tokens and the 6-digit manual codes.
 
 Token format: ``<short_id>.<window>.<signature>``, where ``window`` is the current
-time bucket (qr_window_seconds long). A token is accepted for its own window and a
-few earlier ones, so a screenshot stops working within about a minute and a half.
+time bucket (``window_seconds`` long). A token, and the manual code for the same window,
+is accepted for its own window and ``grace_windows`` earlier ones.
+
+Everything here is pure: the window length and grace come from the ``qr`` config
+namespace (:class:`QrConfig`), which the caller loads and passes in.
 """
 
 import re
@@ -10,8 +13,17 @@ import secrets
 import time
 from dataclasses import dataclass
 
-from app.core.config import get_settings
+from app.core.runtime_config import RuntimeConfig
 from app.core.security import constant_time_equal, keyed_hash
+
+
+class QrConfig(RuntimeConfig):
+    """Config namespace ``qr`` (seeded by migration 0004)."""
+
+    namespace = "qr"
+    window_seconds: int
+    grace_windows: int
+
 
 # Crockford base32: no I, L, O, U, so IDs are easy to read aloud and type.
 _ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
@@ -37,8 +49,8 @@ def normalize_short_id(raw: str) -> str | None:
     return value
 
 
-def current_window(now: float | None = None) -> int:
-    return int((time.time() if now is None else now) // get_settings().qr_window_seconds)
+def current_window(window_seconds: int, now: float | None = None) -> int:
+    return int((time.time() if now is None else now) // window_seconds)
 
 
 def _signature(short_id: str, key_version: int, window: int) -> str:
@@ -49,10 +61,22 @@ def make_token(short_id: str, key_version: int, window: int) -> str:
     return f"{short_id}.{window}.{_signature(short_id, key_version, window)}"
 
 
-def window_expiry(window: int) -> float:
-    """Unix time when a token minted in `window` stops being accepted."""
-    settings = get_settings()
-    return float((window + 1 + settings.qr_grace_windows) * settings.qr_window_seconds)
+def manual_code(short_id: str, key_version: int, window: int) -> str:
+    """The 6-digit code shown under the QR code. The ``qr-code`` purpose keeps it
+    domain-separated from the token signature; rotating ``key_version`` changes it too."""
+    digest = keyed_hash("qr-code", short_id, str(key_version), str(window))
+    return f"{int(digest[:12], 16) % 1_000_000:06d}"
+
+
+def accepted_windows(window_seconds: int, grace_windows: int, now: float | None = None) -> range:
+    """The windows accepted at ``now``: the current one and ``grace_windows`` earlier ones."""
+    now_window = current_window(window_seconds, now)
+    return range(now_window - grace_windows, now_window + 1)
+
+
+def window_expiry(window: int, window_seconds: int, grace_windows: int) -> float:
+    """Unix time when a token (or code) minted in `window` stops being accepted."""
+    return float((window + 1 + grace_windows) * window_seconds)
 
 
 @dataclass(frozen=True)
@@ -76,9 +100,14 @@ def parse_token(token: str) -> ParsedToken | None:
     return ParsedToken(short_id=match[1], window=int(match[2]), signature=match[3])
 
 
-def signature_valid(parsed: ParsedToken, key_version: int, now: float | None = None) -> bool:
-    now_window = current_window(now)
-    if not (now_window - get_settings().qr_grace_windows <= parsed.window <= now_window):
+def signature_valid(
+    parsed: ParsedToken,
+    key_version: int,
+    window_seconds: int,
+    grace_windows: int,
+    now: float | None = None,
+) -> bool:
+    if parsed.window not in accepted_windows(window_seconds, grace_windows, now):
         return False
     expected = _signature(parsed.short_id, key_version, parsed.window)
     return constant_time_equal(expected, parsed.signature)

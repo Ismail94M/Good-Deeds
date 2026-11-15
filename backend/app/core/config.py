@@ -50,10 +50,6 @@ class Settings(BaseSettings):
     rate_refresh_ip: str = "120/900"
     rate_oauth_ip: str = "30/900"
 
-    # Rotating QR codes: a token is valid for its window plus `qr_grace_windows` earlier ones.
-    qr_window_seconds: int = 30
-    qr_grace_windows: int = 2
-
     # OAuth (sign-in buttons are hidden when these are empty)
     google_client_id: str = ""
     facebook_app_id: str = ""

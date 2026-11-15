@@ -52,7 +52,7 @@ npm run lint && npm run typecheck && npm run format:check
 - `modules/<name>/`: feature modules. Each must be listed in `modules/registry.py`. Its `router.py`, `models.py`, `handlers.py` and `jobs.py` are imported automatically. Private helpers are `_name.py`.
 - **Module boundary rule:** a module may import only `app.core` and another module's `service.py`. Cross-module side effects go through domain events, never direct calls. `tests/test_architecture.py` enforces this.
 - **identity** (M1): accounts, sessions, phone OTP, consent, QR codes.
-  - Other modules use its `service.py`: `CurrentUser`, `OnboardedUser` (adult + consents + verified phone), `require_role`, `resolve_qr_token`, `resolve_short_id`, `device_hashes`.
+  - Other modules use its `service.py`: `CurrentUser`, `OnboardedUser` (adult + consents + verified phone), `require_role`, `resolve_qr_token` and `resolve_manual_code` (both return a `ResolvedDoer` with the token window; the static short ID alone never resolves), `phone_hashes`, `device_hash`, `device_hashes`, `public_summaries`. QR window and grace come from the `qr` config namespace (`_qr.QrConfig`).
   - **Auth model:** short-lived JWT access token held in browser memory. A rotating refresh token in an httpOnly cookie on `/api/auth`, stored hashed. `users.token_version` in the JWT lets `revoke_all_sessions` kill access tokens too.
 
 **Event flow:**

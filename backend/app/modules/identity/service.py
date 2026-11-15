@@ -1,12 +1,16 @@
 """Identity public interface. Other modules may import only this file from identity.
 
-Exposes: current_user / require_onboarded dependencies, user lookups, and QR/short-ID
-resolution (used by Verification in M2). Everything else here backs the identity router.
+Exposes: current_user / require_onboarded dependencies, user lookups and summaries,
+fraud signals (phone and device hashes), and resolving a scanned QR token or a typed short ID
+plus 6-digit code to a doer (used by deeds in M2). Everything else here backs the identity
+router.
 """
 
 import secrets
 import time
 import uuid
+from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Annotated
 from zoneinfo import ZoneInfo
@@ -25,6 +29,7 @@ from app.core.config import get_settings
 from app.core.db import get_session
 from app.core.errors import AppError, Conflict, Forbidden, NotFound, TooManyRequests, Unauthorized
 from app.core.events import emit
+from app.core.runtime_config import load
 from app.core.security import (
     constant_time_equal,
     create_access_token,
@@ -60,6 +65,7 @@ from app.modules.identity.schemas import (
     PublicProfile,
     QrCodeResponse,
     SignupRequest,
+    UserSummary,
 )
 
 MIN_AGE_YEARS = 18
@@ -92,8 +98,34 @@ async def device_hashes(session: AsyncSession, user_id: uuid.UUID) -> set[str]:
     return set(rows)
 
 
+def device_hash(device_id: str) -> str:
+    """Keyed hash of a client device ID. The only place that defines this convention."""
+    return keyed_hash("device", device_id)
+
+
 def phone_hash(phone_e164: str) -> str:
     return keyed_hash("phone", phone_e164)
+
+
+async def phone_hashes(session: AsyncSession, user_id: uuid.UUID) -> set[str]:
+    """Hashes of every number this user has ever verified (from phone_history)."""
+    rows = await session.scalars(
+        select(PhoneHistory.phone_hash).where(PhoneHistory.user_id == user_id)
+    )
+    return set(rows)
+
+
+async def public_summaries(
+    session: AsyncSession, user_ids: Iterable[uuid.UUID]
+) -> dict[uuid.UUID, UserSummary]:
+    """Handle and display name for each user found, in one query. Unknown IDs are left out."""
+    ids = set(user_ids)
+    if not ids:
+        return {}
+    result = await session.execute(
+        select(User.id, User.handle, User.display_name).where(User.id.in_(ids))
+    )
+    return {row.id: UserSummary(handle=row.handle, display_name=row.display_name) for row in result}
 
 
 def public_profile(user: User) -> PublicProfile:
@@ -329,15 +361,15 @@ async def record_device(
     """Record the device (keyed hash only), but only after the privacy notice is accepted."""
     if not device_id or not await _has_current_consents(session, user_id):
         return None
-    device_hash = keyed_hash("device", device_id)
+    hashed = device_hash(device_id)
     await session.execute(
         insert(UserDevice)
-        .values(user_id=user_id, device_hash=device_hash)
+        .values(user_id=user_id, device_hash=hashed)
         .on_conflict_do_update(
             index_elements=["user_id", "device_hash"], set_={"last_seen_at": func.now()}
         )
     )
-    return device_hash
+    return hashed
 
 
 async def issue_session(
@@ -347,14 +379,14 @@ async def issue_session(
     session_started_at: datetime | None = None,
 ) -> tuple[str, datetime, str]:
     """Return (access_token, access_expires_at, raw_refresh_token)."""
-    device_hash = await record_device(session, user.id, device_id)
+    hashed_device = await record_device(session, user.id, device_id)
     now = _now()
     raw = new_opaque_token()
     session.add(
         RefreshToken(
             user_id=user.id,
             token_hash=sha256_hex(raw),
-            device_hash=device_hash,
+            device_hash=hashed_device,
             session_started_at=session_started_at or now,
             token_version=user.token_version,
             expires_at=now + timedelta(days=get_settings().refresh_token_days),
@@ -385,7 +417,7 @@ async def rotate_refresh_token(
         same_device = (
             device_id is not None
             and token.device_hash is not None
-            and token.device_hash == keyed_hash("device", device_id)
+            and token.device_hash == device_hash(device_id)
         )
         recently = now - token.revoked_at < timedelta(seconds=settings.refresh_reuse_grace_seconds)
         # Only a token replaced by normal rotation qualifies: never one ended by logout or
@@ -677,8 +709,12 @@ async def confirm_phone(session: AsyncSession, user: User, raw_phone: str, code:
 # --------------------------------------------------- QR codes
 
 
+async def _qr_config(session: AsyncSession) -> _qr.QrConfig:
+    _, config = await load(session, _qr.QrConfig)
+    return config
+
+
 async def qr_code(session: AsyncSession, user: User, now: float | None = None) -> QrCodeResponse:
-    settings = get_settings()
     if not (await onboarding_status(session, user)).complete:
         raise Forbidden(
             "Finish setting up your account to get your QR code.", code="onboarding_required"
@@ -686,25 +722,41 @@ async def qr_code(session: AsyncSession, user: User, now: float | None = None) -
     code = await _ensure_doer_code(session, user)
     if code.revoked_at is not None:
         raise Forbidden("Your QR code is disabled. Contact support.", code="qr_revoked")
+    config = await _qr_config(session)
     now = time.time() if now is None else now
-    window = _qr.current_window(now)
+    window = _qr.current_window(config.window_seconds, now)
     token = _qr.make_token(code.short_id, code.key_version, window)
-    next_window_start = (window + 1) * settings.qr_window_seconds
+    next_window_start = (window + 1) * config.window_seconds
+    expiry = _qr.window_expiry(window, config.window_seconds, config.grace_windows)
     return QrCodeResponse(
         short_id=code.short_id,
         display_id=_qr.SHORT_ID_PREFIX + code.short_id,
         token=token,
-        scan_url=f"{settings.web_base_url.rstrip('/')}/scan/{token}",
-        expires_at=datetime.fromtimestamp(_qr.window_expiry(window), UTC),
+        manual_code=_qr.manual_code(code.short_id, code.key_version, window),
+        scan_url=f"{get_settings().web_base_url.rstrip('/')}/scan/{token}",
+        expires_at=datetime.fromtimestamp(expiry, UTC),
         refresh_after_seconds=max(1, int(next_window_start - now)),
     )
 
 
 async def rotate_qr_key(session: AsyncSession, user: User) -> None:
-    """Invalidate every QR token issued so far (e.g. after a screenshot was shared)."""
+    """Invalidate every QR token and manual code issued so far (e.g. after a screenshot
+    was shared)."""
     code = await _ensure_doer_code(session, user)
     code.key_version += 1
     await session.flush()
+
+
+@dataclass(frozen=True)
+class ResolvedDoer:
+    """The doer behind a QR token or manual code, plus the window the proof was minted in
+    (deeds makes each (doer, window, witness) single-use)."""
+
+    user_id: uuid.UUID
+    handle: str
+    display_name: str
+    window: int
+    short_id: str
 
 
 async def _active_doer(session: AsyncSession, short_id: str) -> tuple[DoerCode, User] | None:
@@ -720,37 +772,65 @@ async def _active_doer(session: AsyncSession, short_id: str) -> tuple[DoerCode, 
     return code, user
 
 
-async def resolve_qr_token(session: AsyncSession, token: str, now: float | None = None) -> User:
-    """The doer behind a scanned QR token. Raises NotFound if invalid or expired.
+def _resolved(code: DoerCode, user: User, window: int) -> ResolvedDoer:
+    return ResolvedDoer(
+        user_id=user.id,
+        handle=user.handle,
+        display_name=user.display_name,
+        window=window,
+        short_id=code.short_id,
+    )
 
-    M2 must also make each (token window, witness) pair single-use and check location
-    and time plausibility (security review L2).
-    """
+
+async def resolve_qr_token(
+    session: AsyncSession, token: str, now: float | None = None
+) -> ResolvedDoer:
+    """The doer behind a scanned QR token. Raises NotFound(code="qr_invalid") if the token
+    is malformed, expired, signed with an old key, or the doer can't be verified."""
+    config = await _qr_config(session)
     parsed = _qr.parse_token(token)
     found = await _active_doer(session, parsed.short_id) if parsed else None
     if (
         parsed is None
         or found is None
-        or not _qr.signature_valid(parsed, found[0].key_version, now)
+        or not _qr.signature_valid(
+            parsed, found[0].key_version, config.window_seconds, config.grace_windows, now
+        )
     ):
         raise NotFound(
             "This QR code is not valid or has expired. Ask them to show it again.",
             code="qr_invalid",
         )
-    return found[1]
+    return _resolved(found[0], found[1], parsed.window)
 
 
-async def resolve_short_id(session: AsyncSession, raw: str) -> User:
-    """The doer behind a manually typed ID. Raises NotFound if unknown.
+# Compared against when a typed ID is unknown, so the hashing work (and timing) is the same.
+_DUMMY_SHORT_ID = "0" * _qr.SHORT_ID_LENGTH
 
-    The short ID never rotates, so it identifies a doer but must NOT count as instant
-    verification on its own. M2 pairs it with a rotating code (security review H3).
+
+async def resolve_manual_code(
+    session: AsyncSession, raw_short_id: str, code: str, now: float | None = None
+) -> ResolvedDoer:
+    """The doer behind a typed short ID plus the 6-digit code shown under their QR code.
+
+    The static short ID alone never resolves (M1 review H3). The code is checked against
+    every accepted window. An unknown ID and a wrong code raise the same
+    NotFound(code="doer_code_invalid").
     """
-    short_id = _qr.normalize_short_id(raw)
+    config = await _qr_config(session)
+    short_id = _qr.normalize_short_id(raw_short_id)
     found = await _active_doer(session, short_id) if short_id else None
-    if found is None:
+    target, key_version = (
+        (found[0].short_id, found[0].key_version) if found else (_DUMMY_SHORT_ID, 1)
+    )
+    typed = code.strip()
+    matched: int | None = None
+    for window in _qr.accepted_windows(config.window_seconds, config.grace_windows, now):
+        if constant_time_equal(_qr.manual_code(target, key_version, window), typed):
+            matched = window
+    if found is None or matched is None:
         raise NotFound(
-            "We couldn't find anyone with that ID. Check it and try again.",
-            code="short_id_unknown",
+            "That ID and code don't match. Check both and try again.",
+            code="doer_code_invalid",
         )
-    return found[1]
+    return _resolved(found[0], found[1], matched)

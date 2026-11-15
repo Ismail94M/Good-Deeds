@@ -109,6 +109,13 @@ class PublicProfile(BaseModel):
     joined_at: datetime
 
 
+class UserSummary(BaseModel):
+    """The public name of a user, for showing a reporter or doer on a deed."""
+
+    handle: str
+    display_name: str
+
+
 class ProfileUpdate(BaseModel):
     display_name: DisplayName | None = None
     handle: Handle | None = None
@@ -134,6 +141,8 @@ class QrCodeResponse(BaseModel):
     short_id: str
     display_id: str
     token: str
+    # 6 digits to type next to the short ID; same window and expiry as the token.
+    manual_code: str
     scan_url: str
     expires_at: datetime
     refresh_after_seconds: int

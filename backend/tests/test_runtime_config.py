@@ -10,14 +10,7 @@ from app.core.audit import AuditLog
 from app.core.db import advisory_xact_lock
 from app.core.errors import AppError, Gone
 from app.core.runtime_config import ConfigVersion, RuntimeConfig, load, publish
-
-
-class QrTestConfig(RuntimeConfig):
-    """Mirrors the seeded ``qr`` keys. The real model arrives with identity (task B2)."""
-
-    namespace = "qr"
-    window_seconds: int
-    grace_windows: int
+from app.modules.identity._qr import QrConfig
 
 
 class _ServiceArea(BaseModel):
@@ -83,9 +76,7 @@ async def test_seeded_qr_row_validates(session: AsyncSession) -> None:
     row = await session.get(ConfigVersion, ("qr", 1))
     assert row is not None
     assert row.created_by is None
-    assert QrTestConfig.model_validate(row.values) == QrTestConfig(
-        window_seconds=30, grace_windows=1
-    )
+    assert QrConfig.model_validate(row.values) == QrConfig(window_seconds=30, grace_windows=1)
 
 
 async def test_seeded_deeds_row_validates(session: AsyncSession) -> None:
@@ -103,30 +94,30 @@ async def test_seeded_deeds_row_validates(session: AsyncSession) -> None:
 
 def test_models_reject_missing_and_extra_keys() -> None:
     with pytest.raises(ValidationError):
-        QrTestConfig.model_validate({"window_seconds": 30})
+        QrConfig.model_validate({"window_seconds": 30})
     with pytest.raises(ValidationError):
-        QrTestConfig.model_validate({"window_seconds": 30, "grace_windows": 1, "extra": 1})
+        QrConfig.model_validate({"window_seconds": 30, "grace_windows": 1, "extra": 1})
 
 
 async def test_load_returns_highest_version(session: AsyncSession) -> None:
-    before, _ = await load(session, QrTestConfig)
+    before, _ = await load(session, QrConfig)
     v1 = await publish(
-        session, QrTestConfig(window_seconds=45, grace_windows=2), actor_id=None, reason="a"
+        session, QrConfig(window_seconds=45, grace_windows=2), actor_id=None, reason="a"
     )
     v2 = await publish(
-        session, QrTestConfig(window_seconds=20, grace_windows=0), actor_id=None, reason="b"
+        session, QrConfig(window_seconds=20, grace_windows=0), actor_id=None, reason="b"
     )
     assert (v1, v2) == (before + 1, before + 2)
 
-    version, qr = await load(session, QrTestConfig)
+    version, qr = await load(session, QrConfig)
     assert version == v2
-    assert qr == QrTestConfig(window_seconds=20, grace_windows=0)
+    assert qr == QrConfig(window_seconds=20, grace_windows=0)
 
 
 async def test_publish_writes_audit_row(session: AsyncSession) -> None:
-    _, old = await load(session, QrTestConfig)
+    _, old = await load(session, QrConfig)
     actor = uuid.uuid4()
-    new = QrTestConfig(window_seconds=old.window_seconds, grace_windows=old.grace_windows + 1)
+    new = QrConfig(window_seconds=old.window_seconds, grace_windows=old.grace_windows + 1)
     version = await publish(session, new, actor_id=actor, reason="Allow one more window")
 
     row = await session.get(ConfigVersion, ("qr", version))
