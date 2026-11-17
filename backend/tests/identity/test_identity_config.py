@@ -41,7 +41,14 @@ PASSWORD_RESET_KEYS = {
     "rate_password_reset_ip": "20/3600",
     "rate_password_reset_phone": "10/3600",
 }
-EXPECTED_LATEST = {**EXPECTED_V1, **PASSWORD_RESET_KEYS}
+EXPECTED_V2 = {**EXPECTED_V1, **PASSWORD_RESET_KEYS}
+# Appended by migration 0012 (forgot password security review: M1, L2).
+RESET_HARDENING_KEYS = {
+    "rate_sms_reset_global": "200/3600",
+    "rate_password_forgot_phone_daily": "10/86400",
+    "rate_password_reset_phone_daily": "15/86400",
+}
+EXPECTED_LATEST = {**EXPECTED_V2, **RESET_HARDENING_KEYS}
 
 
 async def test_seeded_identity_row_matches_model(session: AsyncSession) -> None:
@@ -54,6 +61,15 @@ async def test_seeded_identity_row_matches_model(session: AsyncSession) -> None:
 async def test_migration_0011_appends_password_reset_limits(session: AsyncSession) -> None:
     """0011 publishes the next version = the previous values plus the reset limits."""
     row = await session.get(ConfigVersion, ("identity", 2))
+    assert row is not None
+    assert row.created_by is None
+    assert row.values == EXPECTED_V2
+
+
+async def test_migration_0012_appends_reset_budget_and_daily_limits(session: AsyncSession) -> None:
+    """0012 publishes the next version = the previous values plus the reset SMS budget and the
+    daily per-phone limits."""
+    row = await session.get(ConfigVersion, ("identity", 3))
     assert row is not None
     assert row.created_by is None
     assert row.values == EXPECTED_LATEST

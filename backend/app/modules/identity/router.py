@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, Request, Response, status
@@ -6,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.db import get_session
-from app.core.errors import AppError, NotFound, Unauthorized
-from app.core.ratelimit import Limiter, client_ip
+from app.core.errors import AppError, NotFound, TooManyRequests, Unauthorized
+from app.core.ratelimit import Limiter, RateLimiter, client_ip
 from app.core.sms import SmsProvider, get_sms_provider
 from app.modules.identity import service
 from app.modules.identity._limits import load_limits
@@ -33,6 +34,8 @@ from app.modules.identity.schemas import (
     TokenResponse,
 )
 from app.modules.identity.service import CurrentUser, DeviceId
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 Session = Annotated[AsyncSession, Depends(get_session)]
@@ -201,16 +204,31 @@ async def password_forgot(
     await limiter.hit(f"pw_forgot:ip:{client_ip(request)}", limits.rate_password_forgot_ip)
     phone = service.normalize_phone(data.phone)
     # Keyed by the keyed hash: raw numbers never go into rate-limit keys.
-    await limiter.hit(
-        f"pw_forgot:phone:{service.phone_hash(phone)}", limits.rate_password_forgot_phone
-    )
-    await limiter.hit("sms:global", limits.rate_sms_global)
+    phone_key = service.phone_hash(phone)
+    await limiter.hit(f"pw_forgot:phone:{phone_key}", limits.rate_password_forgot_phone)
+    await limiter.hit(f"pw_forgot:phone_day:{phone_key}", limits.rate_password_forgot_phone_daily)
     outgoing = await service.request_password_reset(session, phone)
     await session.commit()
     if outgoing is not None:
-        # Sent after the response, so a slow SMS provider doesn't reveal that an account exists.
-        background.add_task(sms.send, outgoing.phone_e164, outgoing.message)
+        # Sent after the response, so a slow SMS provider (or the budget check) doesn't
+        # reveal that an account exists.
+        background.add_task(_send_reset_sms, sms, limiter, limits.rate_sms_reset_global, outgoing)
     return PasswordForgotResponse(resend_after_seconds=limits.otp_resend_seconds)
+
+
+async def _send_reset_sms(
+    sms: SmsProvider, limiter: RateLimiter, budget: str, outgoing: service.OutgoingSms
+) -> None:
+    """Charge the reset SMS budget (its own key, so resets and onboarding codes can't starve
+    each other) only for a code that is really going out. Past the budget the code is
+    quietly not sent: the caller has already answered "sent"."""
+    try:
+        await limiter.hit("sms:reset_global", budget)
+    except TooManyRequests:
+        # No phone number or code in the log.
+        logger.warning("Password reset SMS budget exhausted; a reset code was not sent.")
+        return
+    await sms.send(outgoing.phone_e164, outgoing.message)
 
 
 @router.post("/auth/password/reset", response_model=PasswordResetResponse, tags=["auth"])
@@ -221,9 +239,9 @@ async def password_reset(
     limits = await load_limits(session)
     await limiter.hit(f"pw_reset:ip:{client_ip(request)}", limits.rate_password_reset_ip)
     phone = service.normalize_phone(data.phone)
-    await limiter.hit(
-        f"pw_reset:phone:{service.phone_hash(phone)}", limits.rate_password_reset_phone
-    )
+    phone_key = service.phone_hash(phone)
+    await limiter.hit(f"pw_reset:phone:{phone_key}", limits.rate_password_reset_phone)
+    await limiter.hit(f"pw_reset:phone_day:{phone_key}", limits.rate_password_reset_phone_daily)
     await service.reset_password(session, phone, data.code, data.new_password)
     await session.commit()
     return PasswordResetResponse()

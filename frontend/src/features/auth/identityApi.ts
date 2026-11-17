@@ -71,7 +71,7 @@ export type PhoneStartResponse = {
 /** POST /auth/password/forgot always answers this, whether or not the number has an account. */
 export type PasswordForgotResponse = {
   sent: true
-  /** Not in the current contract; used if the API starts sending it. */
+  /** The API sends `identity.otp_resend_seconds`; optional so an older API still works. */
   resend_after_seconds?: number
 }
 

@@ -1,6 +1,6 @@
 # M2 Deeds & Verification: design
 
-**Status:** Revision 5 (2026-11-17), for PO review. Revisions 3 and 4 are approved and built (commit 40a9550). Revision 5 (§0.3, D19–D27) replaces the flat monthly limit with a per-pair limit plus a higher total, and turns the approved Design canvases (F2 My QR, F3 Record a deed, F6 My deeds) into the frontend spec (§5). Decisions marked **needs PO OK** were made by the architect and change something users see.
+**Status:** Revision 5 (2026-11-17), approved by the PO, built and pushed (m2-deeds, commit 1a9fd6d). Added during the PO review: D28 (same-act grouping by server scan time) and Forgot password (identity, migrations 0011 and 0012; see ROADMAP and PRD §6). Revisions 3 and 4 are approved and built (commit 40a9550). Revision 5 (§0.3, D19–D27) replaces the flat monthly limit with a per-pair limit plus a higher total, and turns the approved Design canvases (F2 My QR, F3 Record a deed, F6 My deeds) into the frontend spec (§5). Decisions marked **needs PO OK** were made by the architect and change something users see.
 **Baseline:** branch `m2-deeds` (M0 + M1 + architecture docs).
 **Sources used:** PRD §4, §5, §6.3, §6.4, §6.6, §8, §9 (same-act), §10.1–10.2, §11, §12; ROADMAP M2; `docs/architecture/README.md` discrepancies #2, #3, #4, #6, #7.
 

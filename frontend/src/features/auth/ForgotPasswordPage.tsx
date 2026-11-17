@@ -17,7 +17,7 @@ import {
 
 /**
  * Same wait as phone verification (`identity.otp_resend_seconds`, 30 s by default). The forgot
- * endpoint doesn't return it, so this is the fallback when `resend_after_seconds` is missing.
+ * endpoint returns it as `resend_after_seconds`; this is only the fallback if it is missing.
  */
 const RESEND_SECONDS = 30
 

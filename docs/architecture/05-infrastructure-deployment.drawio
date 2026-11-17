@@ -4,7 +4,7 @@
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="compose-title" value="&lt;b&gt;05 Infrastructure: local Docker Compose (project good-deeds)&lt;/b&gt;&lt;br&gt;Synced to c6395cf (branch m1-identity)" style="text;html=1;align=left;verticalAlign=top;fontSize=16;" vertex="1" parent="1">
+        <mxCell id="compose-title" value="&lt;b&gt;05 Infrastructure: local Docker Compose (project good-deeds)&lt;/b&gt;&lt;br&gt;Synced to 1a9fd6d + forgot-password security fixes (migration 0012), 2026-11-17" style="text;html=1;align=left;verticalAlign=top;fontSize=16;" vertex="1" parent="1">
           <mxGeometry x="20" y="20" width="700" height="50" as="geometry" />
         </mxCell>
         <mxCell id="compose-legend" value="&lt;b&gt;Legend&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;align=left;verticalAlign=top;spacingLeft=6;" vertex="1" parent="1">
@@ -30,19 +30,35 @@
             <mxGeometry x="40" y="235" width="220" height="60" as="geometry" />
           </mxCell>
         </object>
-        <object id="web" label="&lt;b&gt;web&lt;/b&gt;&lt;br&gt;build ./frontend&lt;br&gt;npm run dev -- --host 0.0.0.0&lt;br&gt;port 5173:5173&lt;br&gt;bind ./frontend/src:/app/src&lt;br&gt;VITE_API_PROXY_TARGET=http://api:8000&lt;br&gt;&lt;i&gt;depends_on: api (started)&lt;/i&gt;" status="implemented" milestone="M0" source="docker-compose.yml#web; frontend/vite.config.ts">
-          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
-            <mxGeometry x="335" y="180" width="262" height="170" as="geometry" />
+        <object id="phone" label="&lt;b&gt;Phone browser&lt;/b&gt; (testing)&lt;br&gt;camera and location need HTTPS" status="partial" milestone="M2" source="frontend/vite.config.ts" details="Dev-only path for testing the QR camera and location gate on a real phone.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+            <mxGeometry x="40" y="400" width="220" height="60" as="geometry" />
           </mxCell>
         </object>
-        <object id="api" label="&lt;b&gt;api&lt;/b&gt;&lt;br&gt;build ./backend&lt;br&gt;uvicorn app.main:app --reload&lt;br&gt;port 8000:8000&lt;br&gt;bind ./backend/app:/app/app&lt;br&gt;&lt;i&gt;depends_on: migrate&lt;br&gt;(service_completed_successfully)&lt;/i&gt;" status="implemented" milestone="M0" source="docker-compose.yml#api">
+        <object id="cloudflared" label="&lt;b&gt;cloudflared quick tunnel&lt;/b&gt;&lt;br&gt;optional, started by hand, dev only&lt;br&gt;https://*.trycloudflare.com&lt;br&gt;→ localhost:5173" status="partial" milestone="M2" source="frontend/vite.config.ts" details="Not a compose service and not in the repo beyond Vite's allowedHosts entry and its comment; run on the host, for example 'cloudflared tunnel --url http://localhost:5173'.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+            <mxGeometry x="40" y="510" width="220" height="100" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="compose-e11" value="HTTPS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="phone" target="cloudflared">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="compose-e12" value="HTTP :5173" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.85;entryDx=0;entryDy=0;" edge="1" parent="1" source="cloudflared" target="web">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object id="web" label="&lt;b&gt;web&lt;/b&gt;&lt;br&gt;build ./frontend&lt;br&gt;npm run dev -- --host 0.0.0.0&lt;br&gt;port 5173:5173&lt;br&gt;bind ./frontend/src:/app/src&lt;br&gt;VITE_API_PROXY_TARGET=http://api:8000&lt;br&gt;VITE_USE_POLLING=true (M2)&lt;br&gt;allowedHosts .trycloudflare.com (M2)&lt;br&gt;&lt;i&gt;depends_on: api (started)&lt;/i&gt;" status="implemented" milestone="M2" source="docker-compose.yml#web; frontend/vite.config.ts" details="VITE_USE_POLLING makes Vite poll for file changes every 300 ms, because Docker on Windows doesn't forward file-change events into the container. allowedHosts lets a phone reach the dev server through a cloudflared quick tunnel.">
           <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
-            <mxGeometry x="690" y="180" width="262" height="170" as="geometry" />
+            <mxGeometry x="335" y="180" width="262" height="200" as="geometry"/>
+          </mxCell>
+        </object>
+        <object id="api" label="&lt;b&gt;api&lt;/b&gt;&lt;br&gt;build ./backend&lt;br&gt;uvicorn app.main:app --reload&lt;br&gt;port 8000:8000&lt;br&gt;bind ./backend/app:/app/app&lt;br&gt;access log redacts token paths (M2)&lt;br&gt;&lt;i&gt;depends_on: migrate&lt;br&gt;(service_completed_successfully)&lt;/i&gt;" status="implemented" milestone="M0" source="docker-compose.yml#api; backend/app/core/log_redaction.py">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="690" y="180" width="262" height="200" as="geometry"/>
           </mxCell>
         </object>
         <object id="worker" label="&lt;b&gt;worker&lt;/b&gt;&lt;br&gt;build ./backend&lt;br&gt;procrastinate --app=&lt;br&gt;app.core.jobs.job_app worker&lt;br&gt;bind ./backend/app:/app/app&lt;br&gt;&lt;i&gt;depends_on: migrate&lt;br&gt;(service_completed_successfully)&lt;/i&gt;" status="implemented" milestone="M0" source="docker-compose.yml#worker; backend/app/core/jobs.py">
           <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
-            <mxGeometry x="1030" y="180" width="262" height="170" as="geometry" />
+            <mxGeometry x="1030" y="180" width="262" height="200" as="geometry"/>
           </mxCell>
         </object>
         <object id="frontimg" label="&lt;b&gt;frontend/Dockerfile&lt;/b&gt;&lt;br&gt;node:22-slim, npm ci&lt;br&gt;runs the Vite dev server" status="implemented" milestone="M0" source="frontend/Dockerfile" details="No production web image; the container serves the dev server.">
@@ -65,7 +81,7 @@
             <mxGeometry x="335" y="600" width="262" height="150" as="geometry" />
           </mxCell>
         </object>
-        <object id="migrate" label="&lt;b&gt;migrate&lt;/b&gt; (one-shot)&lt;br&gt;build ./backend&lt;br&gt;alembic upgrade head&lt;br&gt;&lt;i&gt;depends_on: db (service_healthy)&lt;/i&gt;" status="implemented" milestone="M0" source="docker-compose.yml#migrate; backend/alembic/env.py">
+        <object id="migrate" label="&lt;b&gt;migrate&lt;/b&gt; (one-shot)&lt;br&gt;build ./backend&lt;br&gt;alembic upgrade head (0012)&lt;br&gt;&lt;i&gt;depends_on: db (service_healthy)&lt;/i&gt;" status="implemented" milestone="M0" source="docker-compose.yml#migrate; backend/alembic/env.py">
           <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
             <mxGeometry x="690" y="625" width="262" height="100" as="geometry" />
           </mxCell>

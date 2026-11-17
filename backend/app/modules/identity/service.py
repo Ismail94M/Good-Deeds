@@ -432,6 +432,11 @@ async def rotate_refresh_token(
         # Only a token replaced by normal rotation qualifies: never one ended by logout or
         # by "revoke all" (theft detection), and never from before a token_version bump.
         rotated = token.revoked_reason == "rotated" and token.token_version == user.token_version
+        if token.revoked_reason == "revoked_all" or token.token_version < user.token_version:
+            # Already ended by "revoke all" (password reset, theft detection) or from before a
+            # token_version bump: every session it could reach is dead. Revoking again would
+            # only end the sessions the user started since, e.g. right after a reset.
+            raise Unauthorized(_SESSION_ENDED, code="session_expired")
         if same_device and recently and rotated:
             # Two tabs on the same device refreshed at once: not theft. Start a sibling
             # session in the same chain instead of ending every session.
@@ -440,7 +445,8 @@ async def rotate_refresh_token(
                 session, user, device_id, token.session_started_at
             )
             return user, access, expires, new_raw
-        # A revoked token was replayed: assume theft and end every session for this user.
+        # A rotated or logged-out token from the current token_version was replayed: assume
+        # theft and end every session for this user.
         await revoke_all_sessions(session, user)
         await session.commit()
         raise Unauthorized(_SESSION_ENDED, code="session_expired")
@@ -624,12 +630,19 @@ async def start_phone_verification(
     count, latest = (
         await session.execute(
             select(func.count(), func.max(PhoneOtp.created_at)).where(
-                PhoneOtp.user_id == user.id, PhoneOtp.created_at > hour_ago
+                PhoneOtp.user_id == user.id,
+                PhoneOtp.purpose == OtpPurpose.PHONE_VERIFY,
+                PhoneOtp.created_at > hour_ago,
             )
         )
     ).one()
+    # Password reset codes have their own limits (request_password_reset).
     per_phone = await session.scalar(
-        select(func.count()).where(PhoneOtp.phone_e164 == phone, PhoneOtp.created_at > hour_ago)
+        select(func.count()).where(
+            PhoneOtp.phone_e164 == phone,
+            PhoneOtp.purpose == OtpPurpose.PHONE_VERIFY,
+            PhoneOtp.created_at > hour_ago,
+        )
     )
     if count >= limits.otp_max_per_hour or (per_phone or 0) >= limits.otp_max_per_hour:
         raise TooManyRequests(

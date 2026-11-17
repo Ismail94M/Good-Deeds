@@ -5,18 +5,22 @@ POST /api/auth/password/forgot never reveals whether an account exists; POST
 """
 
 import json
+import logging
 import re
 import uuid
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from httpx import AsyncClient, Response
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import AuditLog
-from app.core.ratelimit import InMemoryRateLimiter
+from app.core.ratelimit import InMemoryRateLimiter, get_rate_limiter
 from app.core.security import keyed_hash
 from app.core.sms import ConsoleSmsProvider
+from app.main import app
+from app.modules.identity._limits import load_limits
 from app.modules.identity.models import OtpPurpose, PhoneOtp, User, UserStatus
 from app.modules.identity.service import phone_hash
 from tests.identity.helpers import (
@@ -30,8 +34,10 @@ from tests.identity.helpers import (
     publish_limits,
     refresh,
     session_from,
+    set_cookie,
     signup,
     signup_payload,
+    start_phone,
     valid_phone,
     verify_phone,
 )
@@ -492,3 +498,181 @@ async def test_forgot_response_identical_for_eligible_and_not(
     assert valid_phone(70) in sms.sent and valid_phone(71) not in sms.sent
     assert sent.status_code == unknown.status_code == 200
     assert sent.json() == unknown.json() == {"sent": True, "resend_after_seconds": 45}
+
+
+# --------------------------------------------------- SMS budget (security review M1)
+
+
+async def test_forgot_charges_no_sms_budget_unless_a_code_is_sent(
+    client: AsyncClient, sms: ConsoleSmsProvider, rate_limiter: InMemoryRateLimiter
+) -> None:
+    """Random numbers cost no SMS budget; a real reset code is charged to its own budget,
+    never the onboarding one (sms:global)."""
+    for index in (72, 73, 74):
+        assert (await forgot(client, valid_phone(index))).json() == SENT
+    assert not [key for key, _ in rate_limiter.counts if key.startswith("sms:")]
+
+    phone = valid_phone(75)
+    await eligible(client, sms, 75)
+    onboarding = {k: v for k, v in rate_limiter.counts.items() if k[0] == "sms:global"}
+    assert (await forgot(client, phone)).json() == SENT
+    assert phone in sms.sent
+    assert sum(v for (k, _), v in rate_limiter.counts.items() if k == "sms:reset_global") == 1
+    assert {k: v for k, v in rate_limiter.counts.items() if k[0] == "sms:global"} == onboarding
+
+
+async def test_reset_budget_exhausted_is_silent_and_spares_onboarding(
+    client: AsyncClient,
+    session: AsyncSession,
+    sms: ConsoleSmsProvider,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    await publish_limits(session, rate_sms_reset_global="1/3600", rate_sms_global="10/3600")
+    first, second = valid_phone(76), valid_phone(77)
+    await eligible(client, sms, 76)
+    await eligible(client, sms, 77)
+
+    assert (await forgot(client, first)).json() == SENT
+    code = reset_code(sms, first)
+    logger = logging.getLogger("app.modules.identity.router")
+    # Alembic's fileConfig (run when the test database is migrated) disables existing loggers.
+    was_disabled, logger.disabled = logger.disabled, False
+    try:
+        with caplog.at_level(logging.WARNING, logger=logger.name):
+            over = await forgot(client, second)
+    finally:
+        logger.disabled = was_disabled
+    # Same answer as for any number, but no SMS went out.
+    assert over.status_code == 200 and over.json() == SENT
+    assert second not in sms.sent
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warnings) == 1
+    assert "budget exhausted" in warnings[0].getMessage()
+    for record in caplog.records:
+        text = record.getMessage() + repr(record.args)
+        assert second.removeprefix("+91") not in text
+        assert not re.search(r"\b\d{6}\b", text)
+    # Onboarding codes still go out: the budgets are separate.
+    newcomer = await signup(client)
+    assert (await start_phone(client, newcomer, valid_phone(78))).status_code == 200
+    assert valid_phone(78) in sms.sent
+    # The code that was sent still works.
+    assert (await reset(client, first, code)).status_code == 200
+
+
+# --------------------------------------------------- old refresh tokens after a reset (M2)
+
+
+async def test_old_refresh_token_after_reset_does_not_end_the_new_session(
+    client: AsyncClient, session: AsyncSession, sms: ConsoleSmsProvider
+) -> None:
+    phone = valid_phone(79)
+    s = await eligible(client, sms, 79)
+    assert s.email is not None
+    await forgot(client, phone)
+    assert (await reset(client, phone, reset_code(sms, phone))).status_code == 200
+    fresh = session_from(await login(client, s.email, NEW_PASSWORD))
+    user = await session.get(User, s.user_id)
+    assert user is not None
+    version = user.token_version
+
+    # The old device replays its (revoked-by-reset) refresh token.
+    replay = await refresh(client, s.refresh)
+    assert replay.status_code == 401
+    assert replay.json()["code"] == "session_expired"
+    cookie = set_cookie(replay)
+    assert cookie is not None and (cookie.value == "" or cookie["max-age"] == "0")
+
+    # No second revoke-all: the new session's access and refresh tokens still work.
+    await session.refresh(user)
+    assert user.token_version == version
+    assert (await client.get("/api/users/me", headers=fresh.headers)).status_code == 200
+    rotated = await refresh(client, fresh.refresh)
+    assert rotated.status_code == 200, rotated.text
+
+
+async def test_rotated_token_reuse_after_reset_still_revokes_all(
+    client: AsyncClient, sms: ConsoleSmsProvider
+) -> None:
+    """Theft detection is unchanged: reuse of a rotated token from the current version ends
+    every session, including ones started after the reset."""
+    phone = valid_phone(80)
+    s = await eligible(client, sms, 80)
+    assert s.email is not None
+    await forgot(client, phone)
+    assert (await reset(client, phone, reset_code(sms, phone))).status_code == 200
+    fresh = session_from(await login(client, s.email, NEW_PASSWORD))
+    newer = session_from(await refresh(client, fresh.refresh))
+
+    stolen = await refresh(client, fresh.refresh, "attacker-device")
+    assert stolen.status_code == 401
+    assert (await client.get("/api/users/me", headers=newer.headers)).status_code == 401
+    assert (await refresh(client, newer.refresh)).status_code == 401
+
+
+# --------------------------------------------------- daily per-phone limits (L2)
+
+
+DAY_START = 1_800_000_000 - (1_800_000_000 % 86_400)  # a UTC midnight
+
+
+class MovableClock:
+    def __init__(self) -> None:
+        self.now = float(DAY_START + 1)
+
+    def __call__(self) -> float:
+        return self.now
+
+
+async def test_reset_hardening_defaults(session: AsyncSession) -> None:
+    limits = await load_limits(session)
+    assert limits.rate_password_forgot_phone_daily == "10/86400"
+    assert limits.rate_password_reset_phone_daily == "15/86400"
+    assert limits.rate_sms_reset_global == "200/3600"
+
+
+async def test_forgot_daily_limit_per_phone(client: AsyncClient) -> None:
+    """Hourly 5 (rate_password_forgot_phone), daily 10: two hours use the day up."""
+    clock = MovableClock()
+    limiter = InMemoryRateLimiter(clock=clock)
+    app.dependency_overrides[get_rate_limiter] = lambda: limiter
+    phone = valid_phone(81)  # no account: limits apply all the same
+    for hour in range(2):
+        clock.now = float(DAY_START + 1 + hour * 3600)
+        for _ in range(5):
+            assert (await forgot(client, phone)).json() == SENT
+        assert (await forgot(client, phone)).status_code == 429  # hourly
+    # 10 counted today: a fresh hour is refused by the daily limit ...
+    clock.now = float(DAY_START + 1 + 2 * 3600)
+    blocked = await forgot(client, phone)
+    assert blocked.status_code == 429
+    assert blocked.json()["code"] == "rate_limited"
+    assert (await forgot(client, valid_phone(82))).json() == SENT  # another number is fine
+    keys = [key for key, _ in limiter.counts]
+    assert f"pw_forgot:phone_day:{phone_hash(phone)}" in keys
+    assert not [key for key in keys if phone.removeprefix("+91") in key]
+    # ... until the next day.
+    clock.now = float(DAY_START + 86_400 + 1)
+    assert (await forgot(client, phone)).json() == SENT
+
+
+async def test_reset_daily_limit_per_phone(client: AsyncClient) -> None:
+    """Hourly 10 (rate_password_reset_phone), daily 15."""
+    clock = MovableClock()
+    limiter = InMemoryRateLimiter(clock=clock)
+    app.dependency_overrides[get_rate_limiter] = lambda: limiter
+    phone = valid_phone(83)
+    for _ in range(10):
+        assert_invalid_code(await reset(client, phone, "123456"))
+    assert (await reset(client, phone, "123456")).status_code == 429  # hourly
+    clock.now = float(DAY_START + 1 + 3600)
+    for _ in range(5):
+        assert_invalid_code(await reset(client, phone, "123456"))
+    # The 16th attempt today is refused by the daily limit, with the usual 429.
+    blocked = await reset(client, phone, "123456")
+    assert blocked.status_code == 429
+    assert blocked.json()["code"] == "rate_limited"
+    assert f"pw_reset:phone_day:{phone_hash(phone)}" in [key for key, _ in limiter.counts]
+    assert_invalid_code(await reset(client, valid_phone(84), "123456"))
+    clock.now = float(DAY_START + 86_400 + 1)
+    assert_invalid_code(await reset(client, phone, "123456"))

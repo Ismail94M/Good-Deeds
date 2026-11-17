@@ -36,6 +36,11 @@ class IdentityLimits(RuntimeConfig):
     rate_password_forgot_phone: str
     rate_password_reset_ip: str
     rate_password_reset_phone: str
+    # Security review of forgot password (migration 0012): reset SMS have their own global
+    # budget, charged only when a code is sent; daily per-phone caps on forgot and reset.
+    rate_sms_reset_global: str
+    rate_password_forgot_phone_daily: str
+    rate_password_reset_phone_daily: str
 
 
 async def load_limits(session: AsyncSession) -> IdentityLimits:
