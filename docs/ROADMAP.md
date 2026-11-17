@@ -37,6 +37,7 @@ Each milestone is built, tested and reviewed by the product owner before the nex
 - A support flow for changing a verified phone number (re-authentication + notify the old number).
 - Separate signing keys per purpose (JWT / QR / device / phone hash) with key IDs, so one can be rotated without invalidating the others.
 - A real SMS provider (MSG91 or Twilio, with DLT registration).
+- Recycled numbers and SIM swaps (PO decision 2026-11-17, forgot-password security review M3): email the account owner on every password reset ("Your password was changed. Wasn't you? Tell us"), once an email service exists. Also hold prize claims and payout-detail changes for 7 days after a reset (built with prizes in M8).
 
 **M2 Deeds & Verification**
 - Security requirements from the M1 review:
@@ -90,6 +91,7 @@ Each milestone is built, tested and reviewed by the product owner before the nex
 
 **M8 Rewards, Ads & Analytics**
 - Prize eligibility rules and monthly prize calculation.
+- Hold prize claims and payout-detail changes for 7 days after a password reset (config value; PO decision 2026-11-17).
 - Human winner review and payout records, including the funding source and a check that payouts don't exceed the budget.
 - Ad slots (at most 1 per 8 posts, labelled) and sponsors.
 - Admin analytics dashboard with every metric in PRD §6.14, North Star first.
