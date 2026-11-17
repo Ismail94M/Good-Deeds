@@ -131,6 +131,26 @@ class PhoneVerifyRequest(PhoneStartRequest):
     code: Annotated[str, StringConstraints(pattern=r"^\d{6}$")]
 
 
+class PasswordForgotRequest(PhoneStartRequest):
+    pass
+
+
+class PasswordForgotResponse(BaseModel):
+    """Identical for every valid-format number, whether or not a code went out."""
+
+    sent: Literal[True] = True
+    # identity.otp_resend_seconds, so the "resend" countdown follows config.
+    resend_after_seconds: int
+
+
+class PasswordResetRequest(PhoneVerifyRequest):
+    new_password: Password
+
+
+class PasswordResetResponse(BaseModel):
+    reset: Literal[True] = True
+
+
 class PhoneStartResponse(BaseModel):
     phone_e164: str
     expires_at: datetime
@@ -146,6 +166,9 @@ class QrCodeResponse(BaseModel):
     scan_url: str
     expires_at: datetime
     refresh_after_seconds: int
+    # The ``qr`` namespace's window length, so the countdown bar and "Changes every 30 s" copy
+    # follow config (docs/M2-DESIGN.md §3.2 #12).
+    window_seconds: int
 
 
 class AuthConfig(BaseModel):

@@ -25,6 +25,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.audit import record_audit
 from app.core.config import get_settings
 from app.core.db import get_session
 from app.core.errors import AppError, Conflict, Forbidden, NotFound, TooManyRequests, Unauthorized
@@ -49,6 +50,7 @@ from app.modules.identity.models import (
     Consent,
     DoerCode,
     OAuthAccount,
+    OtpPurpose,
     PhoneHistory,
     PhoneOtp,
     RefreshToken,
@@ -85,6 +87,12 @@ def _now() -> datetime:
 
 async def get_user(session: AsyncSession, user_id: uuid.UUID) -> User | None:
     return await session.get(User, user_id)
+
+
+async def is_active(session: AsyncSession, user_id: uuid.UUID) -> bool:
+    """Whether the account exists and is active (not suspended or blocked)."""
+    status = await session.scalar(select(User.status).where(User.id == user_id))
+    return status == UserStatus.ACTIVE
 
 
 async def get_user_by_handle(session: AsyncSession, handle: str) -> User | None:
@@ -591,6 +599,12 @@ def _otp_hash(otp_id: uuid.UUID, code: str) -> str:
     return keyed_hash("otp", str(otp_id), code)
 
 
+def _reset_otp_hash(otp_id: uuid.UUID, code: str) -> str:
+    # A different hash purpose as well as a different row purpose: a phone-verify code can
+    # never match a reset row, and vice versa.
+    return keyed_hash("otp_password_reset", str(otp_id), code)
+
+
 async def start_phone_verification(
     session: AsyncSession, user: User, raw_phone: str, sms: SmsProvider
 ) -> PhoneStartResponse:
@@ -674,6 +688,7 @@ async def confirm_phone(session: AsyncSession, user: User, raw_phone: str, code:
         .where(
             PhoneOtp.user_id == user.id,
             PhoneOtp.phone_e164 == phone,
+            PhoneOtp.purpose == OtpPurpose.PHONE_VERIFY,
             PhoneOtp.consumed_at.is_(None),
             PhoneOtp.expires_at > _now(),
         )
@@ -707,6 +722,131 @@ async def confirm_phone(session: AsyncSession, user: User, raw_phone: str, code:
         raise Conflict("This number is linked to another account.", code="phone_taken") from exc
 
 
+# --------------------------------------------------- forgot password
+
+
+@dataclass(frozen=True)
+class OutgoingSms:
+    phone_e164: str
+    message: str
+
+
+_RESET_CODE_INVALID = "That code is not correct or has expired. Please request a new one."
+
+
+async def _retire_reset_codes(session: AsyncSession, user_id: uuid.UUID, now: datetime) -> None:
+    await session.execute(
+        update(PhoneOtp)
+        .where(
+            PhoneOtp.user_id == user_id,
+            PhoneOtp.purpose == OtpPurpose.PASSWORD_RESET,
+            PhoneOtp.consumed_at.is_(None),
+        )
+        .values(consumed_at=now)
+    )
+
+
+async def _reset_eligible_user(session: AsyncSession, phone: str) -> User | None:
+    """The account whose current verified phone is ``phone``, if it has a password and is
+    active. Anything else is treated exactly like an unknown number."""
+    user = await session.scalar(select(User).where(User.phone_e164 == phone))
+    if (
+        user is None
+        or user.phone_verified_at is None
+        or user.password_hash is None
+        or user.status != UserStatus.ACTIVE
+    ):
+        return None
+    return user
+
+
+async def request_password_reset(session: AsyncSession, phone: str) -> OutgoingSms | None:
+    """Issue a reset code for ``phone`` (already normalised) and return the SMS to send, or
+    None. The caller answers the same way either way, so this never reveals whether an
+    account exists; the queries run are the same whether or not one does."""
+    limits = await load_limits(session)
+    now = _now()
+    # Quietly skip sending past the per-number SMS budget (the caller still says "sent").
+    count, latest = (
+        await session.execute(
+            select(func.count(), func.max(PhoneOtp.created_at)).where(
+                PhoneOtp.phone_e164 == phone,
+                PhoneOtp.purpose == OtpPurpose.PASSWORD_RESET,
+                PhoneOtp.created_at > now - timedelta(hours=1),
+            )
+        )
+    ).one()
+    user = await _reset_eligible_user(session, phone)
+    too_soon = latest is not None and (now - latest).total_seconds() < limits.otp_resend_seconds
+    if user is None or count >= limits.otp_max_per_hour or too_soon:
+        return None
+
+    # A new code retires any older live one, so only the latest code SMSed can be used.
+    await _retire_reset_codes(session, user.id, now)
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    otp = PhoneOtp(
+        id=uuid.uuid4(),
+        user_id=user.id,
+        purpose=OtpPurpose.PASSWORD_RESET,
+        phone_e164=phone,
+        expires_at=now + timedelta(minutes=limits.otp_ttl_minutes),
+    )
+    otp.code_hash = _reset_otp_hash(otp.id, code)
+    session.add(otp)
+    await session.flush()
+    return OutgoingSms(
+        phone,
+        f"Your Good Deeds password reset code is {code}. It expires in "
+        f"{limits.otp_ttl_minutes} minutes. Never share this code.",
+    )
+
+
+async def reset_password(session: AsyncSession, phone: str, code: str, new_password: str) -> None:
+    """Set a new password with a reset code sent to the account's verified phone.
+
+    Ends every session (refresh tokens revoked, access tokens dead via token_version). A wrong,
+    expired, used or exhausted code and an ineligible number all raise the same error.
+    """
+    limits = await load_limits(session)
+    invalid = AppError(_RESET_CODE_INVALID, code="otp_incorrect")
+    user = await _reset_eligible_user(session, phone)
+    otp = None
+    if user is not None:
+        # At most one live code: requesting a new one retires the older ones.
+        otp = await session.scalar(
+            select(PhoneOtp)
+            .where(
+                PhoneOtp.user_id == user.id,
+                PhoneOtp.phone_e164 == phone,
+                PhoneOtp.purpose == OtpPurpose.PASSWORD_RESET,
+                PhoneOtp.consumed_at.is_(None),
+                PhoneOtp.expires_at > _now(),
+            )
+            .order_by(PhoneOtp.created_at.desc())
+            .limit(1)
+            .with_for_update()
+        )
+    if user is None or otp is None or otp.attempts >= limits.otp_max_attempts:
+        raise invalid
+    otp.attempts += 1
+    if not constant_time_equal(otp.code_hash, _reset_otp_hash(otp.id, code)):
+        await session.commit()  # keep the attempt count even though we reject
+        raise invalid
+
+    await _retire_reset_codes(session, user.id, _now())
+    user.password_hash = await hash_password(new_password)
+    await revoke_all_sessions(session, user)
+    record_audit(
+        session,
+        entity_type="user",
+        entity_id=str(user.id),
+        action="user.password_reset",
+        actor_id=user.id,
+        new_value={"method": "phone_otp", "sessions_revoked": True},
+    )
+    await session.flush()
+
+
 # --------------------------------------------------- QR codes
 
 
@@ -737,6 +877,7 @@ async def qr_code(session: AsyncSession, user: User, now: float | None = None) -
         scan_url=f"{get_settings().web_base_url.rstrip('/')}/scan/{token}",
         expires_at=datetime.fromtimestamp(expiry, UTC),
         refresh_after_seconds=max(1, int(next_window_start - now)),
+        window_seconds=config.window_seconds,
     )
 
 

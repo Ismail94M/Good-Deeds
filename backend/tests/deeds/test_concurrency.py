@@ -19,7 +19,14 @@ from app.core.db import SessionLocal, engine
 from app.core.errors import AppError
 from app.modules.deeds import _qr_deeds, _scans
 from app.modules.deeds.models import Deed, QrScan, SameActGroup
-from tests.deeds.helpers import Member, make_member, report, scan, scan_and_report
+from tests.deeds.helpers import (
+    Member,
+    make_member,
+    report,
+    scan,
+    scan_and_report,
+    seed_deeds,
+)
 
 
 @dataclass
@@ -117,7 +124,7 @@ async def test_two_submits_of_one_scan_create_one_deed(
         await s.commit()
     # Both wait together before their first lock (the D16 ``reporter_month`` lock, which is
     # taken before the scan row), then race to consume the one scan.
-    _meet_before(monkeypatch, _qr_deeds, "ensure_under_monthly_limit")
+    _meet_before(monkeypatch, _qr_deeds, "ensure_under_monthly_limits")
 
     results = await asyncio.gather(
         _in_own_session(lambda s: report(s, witness, scanned.scan_id)),
@@ -195,31 +202,7 @@ async def test_concurrent_scans_of_one_window_record_one(
     assert scans == 1
 
 
-async def test_two_reports_at_fourteen_of_fifteen_allow_one(
-    committed: Committed, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """D16: two simultaneous submits by a reporter at 14/15 this month, about different doers:
-    the ``reporter_month`` advisory lock lets exactly one become the 15th."""
-    witness = await committed.member()
-    doers = [await committed.member() for _ in range(16)]
-    t0 = datetime(2026, 9, 10, 6, 0, tzinfo=UTC)
-    async with SessionLocal() as s:
-        for i, d in enumerate(doers[:14]):
-            await scan_and_report(s, witness, d, at=t0 + timedelta(minutes=10 * i))
-        at = t0 + timedelta(hours=3)
-        s1, s2 = [await scan(s, witness, d, at=at) for d in doers[14:]]
-        await s.commit()
-    # Both wait together, then race for the lock and the count.
-    _meet_before(monkeypatch, _qr_deeds, "ensure_under_monthly_limit")
-
-    submit = timedelta(minutes=1)
-    results = await asyncio.gather(
-        _in_own_session(lambda s: report(s, witness, s1.scan_id, at=at + submit)),
-        _in_own_session(lambda s: report(s, witness, s2.scan_id, at=at + submit)),
-    )
-    errors = [r for r in results if isinstance(r, AppError)]
-    assert len(errors) == 1, results
-    assert errors[0].code == "monthly_report_limit" and errors[0].status_code == 429
+async def _deeds_and_unused_scans(witness: Member) -> tuple[int, int]:
     async with SessionLocal() as s:
         reported = await s.scalar(
             select(func.count()).select_from(Deed).where(Deed.reporter_user_id == witness.user_id)
@@ -229,5 +212,63 @@ async def test_two_reports_at_fourteen_of_fifteen_allow_one(
             .select_from(QrScan)
             .where(QrScan.witness_user_id == witness.user_id, QrScan.consumed_at.is_(None))
         )
-    assert reported == 15
-    assert unused == 1  # the refused report's scan was not consumed
+    return int(reported or 0), int(unused or 0)
+
+
+async def test_two_reports_at_149_of_150_allow_one(
+    committed: Committed, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D19 total: two simultaneous submits by a reporter at 149/150 this month, about different
+    doers: the ``reporter_month`` advisory lock lets exactly one become the 150th."""
+    witness = await committed.member()
+    doers = [await committed.member() for _ in range(2)]
+    t0 = datetime(2026, 9, 10, 6, 0, tzinfo=UTC)
+    async with SessionLocal() as s:
+        await seed_deeds(s, witness, 149, start=t0)
+        at = t0 + timedelta(hours=3)
+        s1, s2 = [await scan(s, witness, d, at=at) for d in doers]
+        await s.commit()
+    # Both wait together, then race for the lock and the count.
+    _meet_before(monkeypatch, _qr_deeds, "ensure_under_monthly_limits")
+
+    submit = timedelta(minutes=1)
+    results = await asyncio.gather(
+        _in_own_session(lambda s: report(s, witness, s1.scan_id, at=at + submit)),
+        _in_own_session(lambda s: report(s, witness, s2.scan_id, at=at + submit)),
+    )
+    errors = [r for r in results if isinstance(r, AppError)]
+    assert len(errors) == 1, results
+    assert errors[0].code == "monthly_report_limit" and errors[0].status_code == 429
+    # 150 deeds; the refused report's scan was not consumed.
+    assert await _deeds_and_unused_scans(witness) == (150, 1)
+
+
+async def test_two_reports_about_one_doer_at_14_of_15_allow_one(
+    committed: Committed, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D19 pair: two simultaneous submits by one reporter about the same doer at 14/15. The pair
+    allows one scan per IST day, so the two live scans straddle IST midnight (23:55 and 00:01
+    IST, both unexpired at 00:02). The locked pair count runs before the insert, so the loser
+    gets ``pair_monthly_limit`` (not ``already_recognized_today`` from ``uq_deeds_pair_day``)
+    and its scan stays unused."""
+    witness, doer = await committed.member(), await committed.member()
+    sept_1 = datetime(2026, 9, 1, 6, 0, tzinfo=UTC)
+    before_midnight = datetime(2026, 9, 20, 18, 25, tzinfo=UTC)  # 23:55 IST, 20 Sept
+    after_midnight = datetime(2026, 9, 20, 18, 31, tzinfo=UTC)  # 00:01 IST, 21 Sept
+    async with SessionLocal() as s:
+        # 14 deeds about the doer on 14 different IST days earlier in September.
+        await seed_deeds(s, witness, 14, start=sept_1, step=timedelta(days=1), doer=doer)
+        s1 = await scan(s, witness, doer, at=before_midnight)
+        s2 = await scan(s, witness, doer, at=after_midnight)
+        await s.commit()
+    _meet_before(monkeypatch, _qr_deeds, "ensure_under_monthly_limits")
+
+    submit = datetime(2026, 9, 20, 18, 32, tzinfo=UTC)
+    results = await asyncio.gather(
+        _in_own_session(lambda s: report(s, witness, s1.scan_id, at=submit)),
+        _in_own_session(lambda s: report(s, witness, s2.scan_id, at=submit)),
+    )
+    errors = [r for r in results if isinstance(r, AppError)]
+    assert len(errors) == 1, results
+    assert errors[0].code == "pair_monthly_limit" and errors[0].status_code == 429
+    assert await _deeds_and_unused_scans(witness) == (15, 1)

@@ -4,6 +4,8 @@ import { errorMessage } from '../../lib/api'
 import { useCountdown } from '../../lib/useCountdown'
 import { useAuth } from '../auth/authContext'
 import { identityApi } from '../auth/identityApi'
+import { PhoneField } from '../auth/PhoneField'
+import { validatePhone } from '../auth/validation'
 
 type Sent = { phone: string; resendAt: number }
 
@@ -38,9 +40,9 @@ export function PhoneStep() {
 
   function handleStart(event: FormEvent) {
     event.preventDefault()
-    const digits = phone.replace(/\D/g, '')
-    if (digits.length < 8) {
-      setError('Please enter your Indian mobile number, for example 98765 43210.')
+    const invalid = validatePhone(phone)
+    if (invalid) {
+      setError(invalid)
       return
     }
     void sendCode(phone.trim())
@@ -78,17 +80,7 @@ export function PhoneStep() {
           This keeps Good Deeds free of fake accounts. We won&apos;t show your number to anyone.
         </p>
         {error && <ErrorAlert>{error}</ErrorAlert>}
-        <TextField
-          label="Indian mobile number"
-          name="phone"
-          type="tel"
-          inputMode="tel"
-          autoComplete="tel"
-          placeholder="+91 98765 43210"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          hint="10 digits. You can leave out +91. Only Indian numbers work for now."
-        />
+        <PhoneField value={phone} onChange={(e) => setPhone(e.target.value)} />
         <Button type="submit" disabled={busy} className="w-full">
           {busy ? 'Sending code…' : 'Send code'}
         </Button>

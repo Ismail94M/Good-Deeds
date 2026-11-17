@@ -1,6 +1,6 @@
 # M2 Deeds & Verification: design
 
-**Status:** Revision 4 (2026-11-16). Revision 3 was approved and built. Revision 4 adds D15–D18 from the PO's business-logic review (§0.2); the PO approved them for build on 2026-11-16. Frontend screens wait for the PO's Figma designs.
+**Status:** Revision 5 (2026-11-17), for PO review. Revisions 3 and 4 are approved and built (commit 40a9550). Revision 5 (§0.3, D19–D27) replaces the flat monthly limit with a per-pair limit plus a higher total, and turns the approved Design canvases (F2 My QR, F3 Record a deed, F6 My deeds) into the frontend spec (§5). Decisions marked **needs PO OK** were made by the architect and change something users see.
 **Baseline:** branch `m2-deeds` (M0 + M1 + architecture docs).
 **Sources used:** PRD §4, §5, §6.3, §6.4, §6.6, §8, §9 (same-act), §10.1–10.2, §11, §12; ROADMAP M2; `docs/architecture/README.md` discrepancies #2, #3, #4, #6, #7.
 
@@ -43,11 +43,28 @@ The PO walked through the core rules with worked examples. Confirmed unchanged: 
 | # | Decision | Where it changes the design |
 |---|---|---|
 | D15 | **Verified Deeds on the profile counts counted reports**, so it always equals the leaderboard figure: 20 witnesses of one act show 5; 100 reports in separate windows show 100. **Replaces D12** (Q15 reversed). | §3.2 deed-counts, §2.4 index, §7. |
-| D16 | **Monthly reporting limit: at most 15 reports per reporter per IST calendar month**, across all doers and both methods. Every `deeds` row the reporter created that month counts, whatever its status now (withdrawn, pending, expired and rejected included), so withdrawing can't free a slot. A failed submission creates no row, so it doesn't count. Self-logs don't count. An invite counts when it is created. Enforced on the server under `advisory_xact_lock("reporter_month", reporter_id)` so concurrent submits can't exceed it. New config key `deeds.reporter_monthly_limit = 15`; error 429 `monthly_report_limit`. | §2.1 seed (v2), §3.2 deed create, §7. |
+| D16 | ~~15 per reporter per month~~ **Superseded by D19** (the counting rules below still apply to both D19 limits). **Monthly reporting limit: at most 15 reports per reporter per IST calendar month**, across all doers and both methods. Every `deeds` row the reporter created that month counts, whatever its status now (withdrawn, pending, expired and rejected included), so withdrawing can't free a slot. A failed submission creates no row, so it doesn't count. Self-logs don't count. An invite counts when it is created. Enforced on the server under `advisory_xact_lock("reporter_month", reporter_id)` so concurrent submits can't exceed it. New config key `deeds.reporter_monthly_limit = 15`; error 429 `monthly_report_limit`. | §2.1 seed (v2), §3.2 deed create, §7. |
 | D17 | **Invites are switched off** for now. New config key `deeds.invites_enabled = false`. While off, invite create, preview, accept and reissue return 403 `invites_disabled`; the built code and tests stay, and the expiry job keeps running so any existing pending invite still expires. The invite prize rule and naming the doer by @handle are on hold until invites return. | §3.2 invite endpoints, §7. |
 | D18 | **Reporters abroad are on hold:** phone numbers stay India-only. | None. |
 
-Still open, to be decided later: QR witness and doer sharing a device (security review M2); the small security fixes L1, L4, L7, L8; the prize tie-break (M4). Invite-specific security finding M1 is on hold with invites.
+Still open, to be decided later: QR witness and doer sharing a device (security review M2); the small security fixes L1, L4, L8 (L7 decided 2026-11-17, see D28); the prize tie-break (M4). Invite-specific security finding M1 is on hold with invites.
+
+### 0.3 Revision 5: limits and approved screens (2026-11-16/17)
+
+Sources: PO decisions of 2026-11-16/17 (PRD §5, §6.5 and §12 were updated on 2026-11-16), and the approved Design canvases F2, F3 and F6 with their behaviour notes. The F7 Feed canvas is M3 and is not specified here (§5.6 lists what M2 must not block).
+
+| # | Decision | Where it changes the design |
+|---|---|---|
+| D19 | **Two monthly limits replace D16.** Per IST calendar month a reporter may create at most **15 reports about the same doer** (`deeds.reporter_doer_monthly_limit = 15`, new) and at most **150 reports in total** across all doers (`deeds.reporter_monthly_limit`, raised from 15 to 150). Both count the same way as D16: every `deeds` row the reporter created that month, whatever its status now; failed submissions and self-logs don't count. Both are checked under the existing `reporter_month` advisory lock, so the lock order doesn't change for QR deeds. Errors: 429 `monthly_report_limit` (total, unchanged) and **429 `pair_monthly_limit`** (new). The pair-day rule (one report per pair per IST day) still applies, so reaching 15 for one doer takes 15 different days. | §2.1 v3, §3.2 #1, #3, #9, §7 |
+| D20 | **Remaining counts come from the server, with the reset time.** `GET /api/deeds/options` returns `reports_remaining_this_month` (already built), the two limits and `month_resets_at` (00:00 IST on the 1st of next month, as an ISO timestamp). `POST /api/scans` and `GET /api/scans/{id}` return `pair_reports_remaining` and `month_resets_at`. The frontend never computes IST month boundaries itself (a phone may not be on IST). Warnings show only when close: total ≤ 10 left (hub), pair ≤ 3 left (deed form); these thresholds are frontend constants because they only decide when a banner shows. | §3.2 #1, #2, #10, §3.3, §5.3 |
+| D21 | **Invite path and the pair limit** (invites are off, D17; this applies when they return). Invite create checks only the total, because the doer is unknown. Acceptance checks the pair limit for the month of the deed's `reported_at` (the month the report already counts in for the total): if the reporter already has `reporter_doer_monthly_limit` deeds about the accepter that month, accept returns 429 `pair_monthly_limit` and the invite stays pending until it expires. To keep the lock order, accept first reads the invite's reporter without a lock, then takes `reporter_month(reporter)`, then the invite row lock. Built now behind the `invites_enabled` flag, so turning invites on can't bypass the pair limit. | §3.2 #9, CLAUDE.md lock order |
+| D22 | **Public-feed notice above Send, from M2.** The deed form shows: "Verified deeds appear in the public feed. You or {doer} can hide it at any time. Only the area name is shown, never your exact location." The feed ships in M3, but M2 deeds will be published then (PRD §6.5), so every reporter is told before sending. No backend flag is stored: every deed sent from the M2+ form has shown it, and no deed exists from before launch. | §5.3 F3 |
+| D23 | **Photos are hidden in M2.** The canvases design up to 4 photos (Take photo / Upload) on the deed form, the self-log form and the edit form, with a 24 h photo-edit window. Photo storage isn't chosen yet (ROADMAP: before M3), so M2 ships **no photo controls and no photo API**. New config key `deeds.photos_enabled = false`, returned by `GET /api/deeds/options`; the frontend renders photo sections only when it is true, so the photo task (M3) can switch them on without a frontend redeploy. The photo limit (4) and edit window (24 h) become config keys in that task. | §2.1 v3, §3.2 #10, §5 |
+| D24 | **The doer sees who recognised them, and only verified deeds.** `DeedOut.reporter` already carries the reporter's public summary (`handle`, `display_name` from `identity.service.public_summaries`, nothing else), so "Priya Sharma recognised you" needs **no** new field. New: the doer's list (`GET /api/me/deeds?role=doer`) returns only `verified` deeds, and `GET /api/deeds/{id}` returns 404 to the doer unless the deed is `verified`. A withdrawn (later: rejected, removed) report disappears from the doer's view instead of showing as "Withdrawn"; the reporter still sees it. **Needs PO OK.** | §3.2 #4, #5 |
+| D25 | **Global header.** A blue "Record a deed" button on every page for signed-in users (→ `/report`); nav Home · My QR · Profile; **Log out moves to Profile** (Account section). The reporting section is called "Record a deed" everywhere (was "Report a deed"). | §5.2, §5.3 |
+| D26 | **No invite screens in M2.** While invites are off (D17), the frontend builds no invite form, share panel, invite acceptance page or Invites tab (old tasks F4, F5 are deferred). The hub shows a guidance line instead: "Doer not on Good Deeds? Ask them to sign up, then show you their QR." The backend invite code stays as built. | §5, §6 |
+| D27 | **Scan-time errors can name the doer.** The canvas copy names the doer ("You've already recognised Ahmed today", "You've recorded Ahmed 15 times this month"), but at scan time the frontend doesn't know who the code belongs to. `AppError` gains an optional `extra` mapping merged into the JSON body; `POST /api/scans` adds `doer: {handle, display_name}` to 409 `already_recognized_today` and 429 `pair_monthly_limit` only. Both are raised only after the code resolved to a valid, current doer and passed the self and phone checks, and in both cases the witness has already recorded that person, so nothing new is revealed. All other errors stay `{detail, code}`. | §3.1, §3.2 #1, §8 |
+| D28 | **Same-act grouping uses server time, not the reporter's "When?" (security L7, PO decision L7-A, 2026-11-17).** `occurred_at` can be backdated ("Earlier", up to 2 h on QR, 7 days on invites), so a reporter could pick a time outside an existing group's 2 h window, start a second group for one act, credit the doer twice and get past the cap of 5. Grouping now uses a server-recorded time: a QR deed uses its consumed scan's `scanned_at`; an invite deed uses its `reported_at` (when the reporter created it). The acceptance time is not used, because it can be days after the act. `occurred_at` is stored as entered and used only for display. No new column or migration: both times already exist (`qr_scans.scanned_at`, `deeds.reported_at`). Groups created before this change keep their `occurred_at`-based `anchor_at` (dev data only, pre-launch). Withdrawal and promotion (§3.4b) and `same_act_group_view` don't read either time, so they are unchanged. | §2.3, §3.2 #14, §3.4, §7. |
 
 ### Config rows: current state
 
@@ -83,18 +100,18 @@ M2 creates the mechanism: `app/core/runtime_config.py` plus the `config_versions
 7. **Profile deed counts** (D4): public *Self-log Deeds* and *Verified Deeds* counts.
 8. **Edit and withdraw** a reported deed by its reporter (D7), with an append-only revision history.
 9. **Events** `DeedSubmitted`, `DeedVerified`, `DeedRejected`, `DeedPrizeRankChanged`, `DeedEdited` and `DeedWithdrawn`. Nothing subscribes in M2.
-10. **Frontend** (built to the PO's Figma designs):
-   - ScanPage rewrite
-   - report hub with ID+code entry and the deed form
-   - invite form and share screen
-   - invite acceptance page
-   - manual code on My QR
-   - My deeds (with edit and withdraw), my invites and self-logs pages
-   - the two counts on own and public profiles
+10. **Monthly limits** (D19): 15 per reporter–doer pair and 150 per reporter, with remaining counts for the UI (D20).
+11. **Frontend** (built to the approved Design canvases, §5):
+   - global header with "Record a deed"; Log out on Profile (D25)
+   - My QR with the manual code, countdown bar, large QR and reconnecting state (F2)
+   - Record a deed: hub, location gate, in-app camera or camera-app fallback, ID + code, deed form with the public-feed notice, results and every error (F3)
+   - My deeds (Recognised for / I reported), deed detail, edit, withdraw, self-logs, profile counts (F6)
+   - **Not in M2:** invite screens (D26), photo controls (D23), feed items on the canvases (follows, Saved, "Hide from feed")
 
 ### Out (later milestones)
 
-- Photos/video, feed posts, and the public deed display with coarse area (M3). No coordinates are returned by any M2 API.
+- Photos/video (storage not chosen; D23), feed posts, hide-from-feed, follows, saves, comments and the public deed display with coarse area (M3). No coordinates are returned by any M2 API.
+- Invite screens (D26); the invite backend stays built and switched off.
 - Points, the daily cap of 10, reporter points and scoring (M4). M2 only sets `counts_for_points` and `prize_rank_eligible`.
 - Reciprocal, ring, concentration and invite-anomaly detectors, `FlagCase`, human review of invite deeds, and the admin config UI (M5). In M2, config changes go through a data migration.
 - Notifications such as "You were recognized" (M6). Moderation removal (M7), apart from the `removed` status value existing.
@@ -120,6 +137,7 @@ All new deeds tables live in `backend/app/modules/deeds/models.py`. `config_vers
 | `2026_11_13_0000-0004_runtime_config.py` | `config_versions` table, append-only trigger, seed rows |
 | `2026_11_13_0100-0005_deeds.py` | All deeds tables |
 | `2026_11_16_0000-0007_deeds_v2.py` | Revision 4: publishes `deeds` v2 (D16, D17) and replaces the Verified Deeds count index (D15) |
+| `2026_11_17_0000-0008_deeds_v3.py` | Revision 5: publishes `deeds` v3 (D19, D23). No schema change |
 
 ### 2.1 `config_versions` (core, append-only)
 
@@ -174,6 +192,7 @@ All new deeds tables live in `backend/app/modules/deeds/models.py`. `config_vers
   "rate_manual_witness": "10/900",
   "rate_manual_ip": "20/900",
   "rate_manual_target": "20/900",
+  "rate_manual_target_daily": "60/86400",  // v4, migration 0009 (security L4)
   "rate_invite_create_ip": "30/86400",
   "rate_invite_preview_ip": "60/900",
   "rate_invite_accept_user": "10/3600",
@@ -195,7 +214,17 @@ All new deeds tables live in `backend/app/modules/deeds/models.py`. `config_vers
 - `reporter_monthly_limit` (D16): deeds a reporter may create per IST calendar month, both paths, all statuses.
 - `invites_enabled` (D17): while false, invite create, preview, accept and reissue return 403 `invites_disabled`.
 
-v2 is inserted only if it doesn't exist yet, so the migration is safe to re-run; its downgrade deletes only v2 (trigger disabled for that one statement, as in 0006). `DeedLimits` has both keys with no defaults, so v1 alone no longer validates.
+v2 is built from the **latest** version plus the new keys and inserted only if the latest lacks them, so the migration is safe to re-run. Its downgrade is append-only: it publishes a new version equal to the latest minus the two keys (as built in 40a9550; nothing is deleted). `DeedLimits` has both keys with no defaults, so v1 alone no longer validates.
+
+**`deeds` v3** (migration 0008, revision 5; `created_by` NULL, reason citing D19/D23). Same pattern as 0007 (`_publish_from_latest`): the latest values merged with
+```json
+{ "reporter_doer_monthly_limit": 15, "reporter_monthly_limit": 150, "photos_enabled": false }
+```
+- `reporter_doer_monthly_limit` (D19): deeds a reporter may create about one doer per IST calendar month, all statuses.
+- `reporter_monthly_limit` (D19): raised from 15 to 150; same meaning as in v2.
+- `photos_enabled` (D23): false until photo storage ships; only read by `GET /api/deeds/options`.
+- Upgrade runs only if the latest version lacks `reporter_doer_monthly_limit`. Downgrade appends a version equal to the latest minus `reporter_doer_monthly_limit` and `photos_enabled`, with `reporter_monthly_limit` set back to 15.
+- `DeedLimits` gains `reporter_doer_monthly_limit: int` and `photos_enabled: bool` (no defaults).
 
 The category list is the default from Q1. Every limited action has an account counter and an IP counter (D1). Invite creation's account limit is `invites_per_day`; profile counts are public, so they have only an IP counter. The IP values are generous on purpose, because Indian mobile carriers put many users behind one IP; they can be tuned with a new config version.
 
@@ -235,7 +264,7 @@ The category list is the default from Q1. Every limited action has an account co
 | id | uuid pk | |
 | doer_user_id | uuid not null FK users RESTRICT | |
 | centre | geography(Point,4326) null | the anchor report's location; null for a deed with no location (an invite deed without one), which then forms a group of one that nothing else can join |
-| anchor_at | timestamptz not null | the anchor report's `occurred_at` |
+| anchor_at | timestamptz not null | the anchor report's server grouping time: the scan's `scanned_at` for a QR deed, `reported_at` for an invite deed (D28). Never `occurred_at`. |
 | radius_m | integer not null | copied from config at creation |
 | window_minutes | integer not null | copied from config at creation |
 | cap | integer not null | copied from config at creation |
@@ -289,7 +318,7 @@ The parameters are copied onto the group so that a later config change never res
 - `uq_deeds_pair_day UNIQUE (doer_user_id, reporter_user_id, report_day) WHERE doer_user_id IS NOT NULL`. This covers the invite path's `(doer, witness, day)` rule.
 - GiST `(location)`
 - `(doer_user_id, occurred_at)`
-- `(reporter_user_id, reported_at DESC)`, also used by the monthly reporting limit's count (D16)
+- `(reporter_user_id, reported_at DESC)`, also used by both monthly limits' counts (D16, D19). The pair count filters `doer_user_id` within the reporter's month (at most 150 rows), so no new index is needed.
 - `(same_act_group_id)`
 - `ix_deeds_doer_counted (doer_user_id) WHERE status = 'verified' AND counts_for_points` for the Verified Deeds count (D15; replaces `ix_deeds_doer_verified` in migration 0007)
 
@@ -378,14 +407,14 @@ A private record. It has no link to deeds, scans or groups (D3).
 ### 3.1 Conventions
 
 - **Router:** `backend/app/modules/deeds/router.py`, mounted under `/api` by the registry.
-- **Errors:** `{detail, code}` via `AppError`. Add `Gone(AppError)` (status 410) to `app/core/errors.py`.
+- **Errors:** `{detail, code}` via `AppError`. Add `Gone(AppError)` (status 410) to `app/core/errors.py`. Revision 5 (D27): `AppError.__init__` gains `extra: Mapping[str, Any] | None = None`, merged into the body after `detail` and `code` (it may not override them). Only the two scan-time errors in §3.2 #1 use it.
 - **Auth:** "Onboarded" means the `identity.service.OnboardedUser` dependency (adult, consents, verified phone, active).
 - **Rate limits:** applied **before** any lookup, through `Limiter.hit(key, spec)`, with the spec read from config. Every limited action checks **both** an account key and an IP key (D1); a request is refused if either is over its limit. `ip` is `core.ratelimit.client_ip`.
 
   | Action | Account key | IP key | Other |
   |---|---|---|---|
   | QR scan | `scan:u:{user_id}` | `scan:ip:{ip}` | |
-  | Manual ID + code | `manual:u:{user_id}` | `manual:ip:{ip}` | `manual:t:{short_id}` (Q14) |
+  | Manual ID + code | `manual:u:{user_id}` | `manual:ip:{ip}` | `manual:t:{short_id}` (Q14), plus `manual:td:{short_id}` at 60 per day (`rate_manual_target_daily`, v4) |
   | Create invite | daily count (`invites_per_day`) | `invite:create:ip:{ip}` | |
   | Invite preview (public) | – (no account) | `invite:preview:ip:{ip}` | |
   | Accept invite | `invite:accept:u:{user_id}` | `invite:accept:ip:{ip}` | |
@@ -410,17 +439,23 @@ Request (exactly one identity form):
 { "short_id": "GD-7K3M9Q0", "code": "482913", "location": {...} }
 ```
 
-`201` response:
+`201` response (Revision 5 adds the last three fields, D20):
 ```json
-{ "scan_id": "uuid", "doer": {"handle": "...", "display_name": "..."}, "expires_at": "..." }
+{ "scan_id": "uuid", "doer": {"handle": "...", "display_name": "..."}, "expires_at": "...",
+  "scanned_at": "...", "pair_reports_remaining": 3, "month_resets_at": "2026-12-01T00:00:00+05:30" }
 ```
+- `scanned_at`: the server's scan time. The deed form's "Earlier" choices are offsets from it.
+- `pair_reports_remaining`: `max(0, reporter_doer_monthly_limit − deeds this reporter created about this doer this IST month)`, counted before this report, so `1` means "this is the last one this month". Unlocked, informational.
+- `month_resets_at`: 00:00 IST on the 1st of the next month (`ist_month(now)[1]`), sent with the `+05:30` offset.
 
 Order of checks:
 1. Rate limits: account and IP. For manual entry, the manual account, IP and target (`short_id`) limits.
-1b. Monthly reporting limit pre-check (D16, unlocked): a witness already at `reporter_monthly_limit` gets 429 `monthly_report_limit` before a scan is recorded, because a recorded scan uses up the pair's IST day even if no deed follows. The locked check on deed create is the authoritative one.
+1b. Total monthly limit pre-check (D16/D19, unlocked): a witness already at `reporter_monthly_limit` gets 429 `monthly_report_limit` before a scan is recorded, because a recorded scan uses up the pair's IST day even if no deed follows. The locked check on deed create is the authoritative one.
 2. Resolve the doer: `resolve_qr_token` or `resolve_manual_code`.
 3. Self-check (same account).
 4. Phone check (D10): `phone_hashes(witness)` must not intersect `phone_hashes(doer)`.
+4b. Pair-window and pair-day pre-checks (as built): `already_scanned`, `already_recognized_today` (the latter now with `extra={"doer": {...}}`, D27).
+4c. **Pair monthly pre-check (D19, unlocked, new):** if the witness already has `reporter_doer_monthly_limit` deeds about this doer this IST month, 429 `pair_monthly_limit` with `extra={"doer": {...}}`. No scan is recorded, so the pair-day isn't used up. It runs here, after the doer is resolved and the self and phone checks passed, never earlier, so it can't be used to learn anything about a code the witness couldn't already use.
 5. Location checks: accuracy, service area.
 6. Witness travel check.
 7. Doer travel check: compare with the doer's last accepted scan by anyone.
@@ -437,9 +472,12 @@ Order of checks:
 | 400 | `location_too_imprecise`, `outside_service_area`, `implausible_travel` | |
 | 422 | (validation) | Missing location, or both or neither identity forms |
 | 429 | `rate_limited` | |
-| 429 | `monthly_report_limit` | The witness already has `reporter_monthly_limit` deeds this IST month (D16) |
+| 429 | `monthly_report_limit` | The witness already has `reporter_monthly_limit` (150) deeds this IST month (D16/D19) |
+| 429 | `pair_monthly_limit` | The witness already has `reporter_doer_monthly_limit` (15) deeds about this doer this IST month (D19). Body: `{detail, code, doer: {handle, display_name}}` (D27) |
 
-**2. `GET /api/scans/{scan_id}`**: Onboarded, witness only. Returns the same shape as the `POST`, plus `consumed: bool`, so the deed form survives a page reload.
+The 409 `already_recognized_today` body also carries `doer: {handle, display_name}` (D27). The `detail` strings never name the doer; the frontend builds the named copy from `doer`.
+
+**2. `GET /api/scans/{scan_id}`**: Onboarded, witness only. Returns the same shape as the `POST`, plus `consumed: bool`, so the deed form survives a page reload. `pair_reports_remaining` and `month_resets_at` are recomputed at read time.
 - 404 `scan_not_found` if the scan isn't the caller's.
 - 410 `scan_expired`.
 
@@ -452,6 +490,7 @@ QR request:
 ```
 - `occurred_at` must fall within `[scanned_at - qr_occurred_max_age_minutes, scanned_at + 60 s]`.
 - **Monthly reporting limit (D16), both paths:** before any `deeds` row is created, take `advisory_xact_lock("reporter_month", reporter_id)`, then count the reporter's `deeds` with `reported_at` in the current IST calendar month (boundaries from `identity.service.LAUNCH_TZ`), whatever their status. At or above `reporter_monthly_limit`, return 429 `monthly_report_limit`. On the QR path this runs **before** the scan is consumed (lock order: `reporter_month`, then the scan row, then `same_act`), so a refused report leaves the scan unused; on the invite path it runs before the `invites` lock.
+- **Pair monthly limit (D19), QR path:** first read the scan's `doer_user_id` with a plain, witness-scoped `SELECT` (no lock; a scan's doer never changes; a missing or foreign scan gives 404 `scan_not_found` as now). Then, **under the same `reporter_month` lock** and right after the total check, count the reporter's deeds with `doer_user_id = scan.doer` and `reported_at` in the current IST month. At or above `reporter_doer_monthly_limit`, return 429 `pair_monthly_limit` (body `{detail, code}` only; the form already knows the doer). Every deed this reporter creates takes the same lock, so the pair count is serialised too: no new lock, and the lock order is unchanged. A refused report leaves the scan unused. Implement both checks in `_reporter_limit.py` (`ensure_under_monthly_limits(session, reporter_id, doer_id | None, limits, now)`; `doer_id=None` on invite create checks only the total).
 - The scan is consumed atomically:
   ```sql
   UPDATE qr_scans SET consumed_at=now()
@@ -484,12 +523,13 @@ Invite request:
 | 400 | `invalid_category`, `implausible_time`, plus the location codes above | |
 | 403 | `invites_disabled` | Invite request while `invites_enabled` is false (D17), after the invite IP rate limit |
 | 429 | `invite_daily_limit`, `monthly_report_limit`, `rate_limited` | |
+| 429 | `pair_monthly_limit` | QR path only (D19) |
 
 **D17, all invite endpoints (#3 invite request, #7, #8, #9):** while `deeds.invites_enabled` is false, each returns 403 `invites_disabled` with a friendly message. The check runs after the endpoint's rate limits and before any lookup, so a real and an unknown token get the same answer. `GET /api/me/invites` (#6) still lists the user's existing invites, and the expiry job keeps running.
 
-**4. `GET /api/deeds/{id}`**: authenticated; reporter or doer only. Anyone else gets 404 `deed_not_found`. Returns `DeedOut`.
+**4. `GET /api/deeds/{id}`**: authenticated; reporter or doer only. Anyone else gets 404 `deed_not_found`. Returns `DeedOut`. Revision 5 (D24): the doer gets 404 unless the deed is `verified`.
 
-**5. `GET /api/me/deeds?role=doer|reporter&cursor=&limit=20`**: authenticated. Returns `{items: DeedOut[], next_cursor: string|null}`, using keyset pagination on `(reported_at, id)`.
+**5. `GET /api/me/deeds?role=doer|reporter&cursor=&limit=20`**: authenticated. Returns `{items: DeedOut[], next_cursor: string|null}`, using keyset pagination on `(reported_at, id)`. Revision 5 (D24): `role=doer` returns only `status = 'verified'` deeds; `role=reporter` is unchanged (all statuses). Each item's `reporter` is the public summary (`handle`, `display_name`) that the doer's "{name} recognised you" line uses.
 
 **6. `GET /api/me/invites?status=pending|accepted|expired`**: the reporter's invites, `{items: InviteOut[], next_cursor}`.
 
@@ -505,10 +545,12 @@ Invite request:
 
 **9. `POST /api/invites/by-token/{token}/accept`**: Onboarded. Rate limit `invite:accept:u`.
 
-Steps:
+Steps (Revision 5 adds 0 and 3b, D21):
+0. Read the invite's `reporter_user_id` by `token_hash` **without a lock** (it never changes; unknown token → 404 as now), then take `advisory_xact_lock("reporter_month", reporter_id)`. This keeps `reporter_month` first in every lock order.
 1. `SELECT … FOR UPDATE` on the invite by `token_hash`.
 2. Check the invite: pending and `expires_at > now`.
 3. Check accepter ≠ reporter.
+3b. **Pair monthly limit (D21):** count the reporter's deeds with `doer_user_id = accepter` and `reported_at` in the IST month of **this deed's** `reported_at`. At or above `reporter_doer_monthly_limit`, return 429 `pair_monthly_limit`; the invite stays pending (it will expire). The pending deed itself has no doer yet, so it isn't in the count.
 4. Check that the two users share no number: `identity.service.phone_hashes(accepter)` must not intersect `phone_hashes(reporter)`. `phone_history` already makes a number belong to only one account ever, so this is defense in depth.
 5. Shared-device limit (D6): if `device_hashes(accepter)` intersects `device_hashes(reporter)`, take `advisory_xact_lock("shared_device", reporter_id, accepter_id)` and count this pair's accepted invites with `shared_device = true` in the current IST calendar month. If the count is `>= shared_device_pair_monthly_limit` (15), refuse with 403 `same_device_limit`; otherwise continue and set `shared_device = true` on the invite.
 6. Set the deed's doer, `status=verified` and `verified_at`, then group it (§3.4).
@@ -524,13 +566,22 @@ Returns 200 `DeedOut`.
 | 410 | `invite_expired`, `invite_used`, `invite_cancelled` |
 | 403 | `cannot_accept_own_invite`, `same_phone`, `same_device_limit` |
 | 409 | `already_recognized_today` (pair-day unique) |
-| 429 | `rate_limited` |
+| 429 | `rate_limited`, `pair_monthly_limit` (D21) |
 
-**10. `GET /api/deeds/options`**: Onboarded.
+**10. `GET /api/deeds/options`**: Onboarded. As built, plus the Revision 5 fields (D20, D23) that the F3 screens need for copy and warnings:
 ```json
-{ "categories": [...], "invites_remaining_today": 3, "invite_expiry_hours": 168,
-  "description_min": 10, "description_max": 1000, "scan_submit_minutes": 15 }
+{ "categories": [...], "invites_enabled": false, "invites_remaining_today": 3, "invite_expiry_hours": 168,
+  "reports_remaining_this_month": 10, "reporter_monthly_limit": 150,
+  "reporter_doer_monthly_limit": 15, "month_resets_at": "2026-12-01T00:00:00+05:30",
+  "description_min": 10, "description_max": 1000, "beneficiaries_max": 10000,
+  "scan_submit_minutes": 15, "qr_occurred_max_age_minutes": 120,
+  "max_location_accuracy_m": 500, "service_area_radius_km": 40, "same_act_cap": 5,
+  "photos_enabled": false }
 ```
+- `reports_remaining_this_month` (built) = `max(0, reporter_monthly_limit − deeds created this IST month)`.
+- The limits are returned so the copy ("15 times", "150 deeds", "within 500 m", "within 40 km", "Up to 2 hours") follows config instead of being hard-coded.
+- `same_act_cap` (`deeds.same_act_cap`) is the number of reports of one act that count; the extra-witness result note (Q20) uses it.
+- Nothing per-doer is returned here; the pair count comes with the scan (#1, #2).
 
 **11. Self-logs** (D3; Onboarded, owner only; rate limits `selflog:u` + `selflog:ip` on every write):
 - `POST /api/me/self-logs` with `{category, description, occurred_at, location?: Location}`. Returns 201 `SelfLogOut`.
@@ -543,6 +594,7 @@ Returns 200 `DeedOut`.
 **12. Identity changes:**
 - `GET /api/users/me/qr` and `POST /api/users/me/qr/rotate` add `manual_code: "482913"` to `QrCodeResponse`. The code has the same window and expiry as the token.
 - `expires_at` now reflects `grace_windows` from config.
+- Revision 5 (F2): `QrCodeResponse` adds `window_seconds: int` (from the `qr` namespace), so the countdown bar's full length and the "Changes every 30 s" copy follow config. The bar counts down `refresh_after_seconds` from when the response arrived; the reconnecting state lasts until `expires_at`.
 
 **13. `GET /api/users/{handle}/deed-counts`** (D4): public, no auth; rate limit `counts:ip`. Served by the deeds module, which resolves the handle through `identity.service`. Unknown or inactive handle: 404.
 ```json
@@ -553,7 +605,7 @@ Returns 200 `DeedOut`.
 - Neither number reveals any self-log detail. The own-profile page uses the same endpoint with the user's own handle.
 
 **14. `PATCH /api/deeds/{id}`** (D7): Onboarded, reporter only; rate limits `deed:edit:u` + `deed:edit:ip`.
-- Editable fields: `category`, `description`, `beneficiaries_count`. Not editable: `occurred_at`, location, doer, method, status. Those are the verification evidence and the basis for same-act grouping, so changing them would undo the verification.
+- Editable fields: `category`, `description`, `beneficiaries_count`. Not editable: `occurred_at`, location, doer, method, status. Those are the verification evidence, so changing them would undo the verification. (Grouping uses server times, not `occurred_at`; D28.)
 - Allowed while the deed is `pending` or `verified`. Otherwise 409 `deed_not_editable`.
 - In one transaction: update the deed, set `last_edited_at`, insert a `deed_revisions` row with only the changed fields, emit `DeedEdited`. A request that changes nothing returns 200 with no revision and no event.
 - Returns 200 `DeedOut`. Non-reporter (including the doer) gets 404.
@@ -583,12 +635,18 @@ DeedOut = {
 InviteOut = { id, deed_id, status, sent_via, created_at, expires_at, accepted_at, url?: string }
 SelfLogOut = { id, category, description, occurred_at, has_location: bool, created_at, updated_at }
 DeedCountsOut = { self_logged: int, verified: int }
+ScanOut = { scan_id, doer: {handle, display_name}, expires_at, scanned_at,
+            pair_reports_remaining: int, month_resets_at }          // Revision 5 (D20)
+ScanDetail = ScanOut & { consumed: bool }
 ```
+`UserRef` (`{handle, display_name}`) is the only user information any deeds response carries: never phone, email, avatar URL or ID.
 No API response contains coordinates in M2.
 
 ### 3.4 Same-act grouping (`deeds/_grouping.py`)
 
 Runs when a deed becomes verified (QR submit or invite accept), inside the same transaction.
+
+**Grouping time `t` (D28, L7-A):** a server-recorded time, never the reporter's `occurred_at` (which can be backdated and is for display only). QR deed: the consumed scan's `scanned_at`. Invite deed: its `reported_at` (when the reporter created it, not the acceptance time).
 
 1. Take `advisory_xact_lock("same_act", doer_id)`.
    - If the deed has **no location** (an invite deed, D5), skip matching: create a group of one with `centre = null` and go to step 4. A null-centre group never matches anything.
@@ -597,12 +655,12 @@ Runs when a deed becomes verified (QR submit or invite accept), inside the same 
    SELECT … FROM same_act_groups
    WHERE doer_user_id=:doer
      AND ST_DWithin(centre, :loc, radius_m)
-     AND occurred_at BETWEEN anchor_at - window AND anchor_at + window
-   ORDER BY abs(extract(epoch from occurred_at - anchor_at)), created_at
+     AND :t BETWEEN anchor_at - window AND anchor_at + window
+   ORDER BY abs(extract(epoch from :t - anchor_at)), created_at
    LIMIT 1
    ```
    Matching is against the group anchor, not any member, so groups can't creep along a chain.
-3. If no group matches, create one with this deed as the anchor and copy the config parameters onto it.
+3. If no group matches, create one with this deed as the anchor (`anchor_at = t`) and copy the config parameters onto it.
 4. Set `reporter_already_in_group` to whether any verified deed in the group has the same reporter.
 5. Set `counts_for_points = counted_count < cap AND NOT reporter_already_in_group`. PRD §4 says each reporter counts at most once per act.
 6. Update the counters: `verified_count += 1`, `counted_count += counts_for_points`, and `distinct_reporters += !reporter_already_in_group`.
@@ -698,115 +756,214 @@ Payload and ordering rules:
 
 ## 5. UI flows (frontend-developer)
 
-**Visual design comes from the PO's Figma files, which are still to be provided.** This section fixes the screens, states and data; layout and styling follow Figma. Screens without a Figma frame use the existing `ui.tsx` style.
+**Visual design comes from the approved Design canvases** (PO approval 2026-11-16): F2 My QR, F3 Record a deed, F6 My deeds. Each has an interactive mobile prototype, every state at 390 px and key screens at 1440 px; copy, spacing and colours follow the canvases. The copy quoted below is the canvases' copy; `{doer}` is the doer's `display_name` ("Ahmed Khan" on the canvases, first name "Ahmed" in short sentences), and dates such as "1 December" come from `month_resets_at` formatted in IST. Where the canvases have no screen, this section says so and gives interim copy (listed again in §9 for the PO).
 
-### 5.1 New files
+**Where the canvases are:** on 2026-11-17 they exist only in a temporary session folder (`…/scratchpad/f2canvas`, `f3canvas`, `f6canvas`, `f7canvas`, each with `project/Main.dc.html` and `project/canvas.json`). Copy them into the repo (suggested `docs/design/m2/`) before handing out the F tasks, so the frontend developer can open them and they survive a cleanup.
+
+**Not built in M2** although drawn on the canvases: photo sections (D23: render only when `options.photos_enabled`; no photo components in M2), the Invites tab and every invite screen (D26), and everything feed-related: followers / following / Saved line, "Shown in the public feed / Hide from feed" row, and the "it has left the public feed" clause (M3).
+
+### 5.1 Files
 
 | Area | Files |
 |---|---|
-| API client | `src/features/deeds/deedsApi.ts` (types + calls mirroring §3) |
-| Geolocation | `src/lib/geolocation.ts`: `getPosition(): Promise<Location>` with `enableHighAccuracy: true`, `maximumAge: 0`, `timeout: 15000`. Typed errors: `denied`, `unavailable`, `timeout`. |
-| Report | `src/features/report/`: `ReportHubPage`, `ScanPage` (moved from `features/scan`), `ManualCodeForm`, `DeedForm`, `ScanDeedPage`, `InviteDeedPage`, `InviteSharePanel`, `LocationGate` |
-| Invite | `src/features/invite/InvitePage.tsx` |
-| Deeds | `src/features/deeds/MyDeedsPage.tsx`, `DeedCard.tsx`, `DeedDetailPage.tsx` |
-| Self-logs | `src/features/selflog/SelfLogsPage.tsx`, `SelfLogForm.tsx` (create and edit) |
-| Profile counts | `src/features/profile/DeedCounts.tsx`, used on ProfilePage and PublicProfilePage |
-| Deed edit | `src/features/deeds/EditDeedForm.tsx`, `WithdrawDeedDialog.tsx` |
+| API client | `src/features/deeds/deedsApi.ts` (built, F1): add the Revision 5 fields (§3.2 #1, #2, #10, §3.3) and the `ApiError` body field `doer` (D27). `src/features/auth/identityApi.ts`: `QrCode.window_seconds`. |
+| Error copy | `src/features/report/errorCopy.ts`: one map from error code to `{title, body, action}` (§5.4), used by every F3 screen. |
+| Geolocation | `src/lib/geolocation.ts` (built). Add `permissionState()` via `navigator.permissions.query({name: 'geolocation'})`, returning `'granted' \| 'prompt' \| 'denied' \| 'unknown'`. |
+| Camera | `src/features/report/QrCamera.tsx`: `getUserMedia({video: {facingMode: 'environment'}})` + `BarcodeDetector({formats: ['qr_code']})`, polling frames; stops every track on unmount. `src/features/report/parseScanUrl.ts`: accepts only a URL whose origin equals `window.location.origin` and whose path is `/scan/:token`; returns the token or null. |
+| Layout | `src/app/Layout.tsx`: header (D25). |
+| My QR | `src/features/qr/MyQrPage.tsx` (rewrite), `CountdownBar.tsx`, `LargeQrDialog.tsx` |
+| Record a deed | `src/features/report/`: `ReportHubPage`, `LocationGate` (explain / denied / imprecise), `ScanCameraPage`, `ManualCodePage`, `ScanLandingPage` (`/scan/:token`, replaces `features/scan/ScanPage`), `CheckingView`, `ScanDeedPage` + `DeedForm`, `ReportResult`, `ReportErrorView`, `LimitBanner` |
+| My deeds | `src/features/deeds/`: `MyDeedsPage`, `DeedCard`, `DeedDetailPage`, `EditDeedPage`, `WithdrawDeedDialog` |
+| Self-logs | `src/features/selflog/`: `SelfLogsPage`, `SelfLogFormPage` (create and edit), `DeleteSelfLogDialog` |
+| Profile | `src/features/profile/ProfilePage.tsx` (redesign), `PublicProfilePage.tsx` (add counts), `DeedCounts.tsx` |
+| Shared form parts | `src/features/deeds/CategoryPills.tsx`, `DescriptionField.tsx` (counter), `PeopleStepper.tsx` (used by the deed form, edit and self-log form) |
 
-**No new npm dependency.** In-app scanning uses `BarcodeDetector` when it exists. Otherwise the page tells the user to point the phone camera app at the code, which opens `/scan/:token` directly. Manual ID+code always works.
+**No new npm dependency.** Dialogs are `role="dialog" aria-modal="true"`, close on Esc and return focus. Query keys stay under `['deeds', …]`; invalidate `['deeds','options']` and `['deeds','mine']` after a deed is sent, edited or withdrawn, and the deed-counts query after a self-log is created or deleted.
 
 ### 5.2 Routes (`src/app/routes.tsx`)
 
 | Route | Guard | Page |
 |---|---|---|
-| `/scan/:token` | RequireOnboarded | ScanPage |
-| `/report` | RequireOnboarded | ReportHubPage: Scan / Enter ID and code / "They're not on Good Deeds: invite them" |
-| `/report/scan/:scanId` | RequireOnboarded | ScanDeedPage (deed form) |
-| `/report/invite` | RequireOnboarded | InviteDeedPage |
-| `/invite/:token` | public | InvitePage |
-| `/me/deeds` | RequireAuth | MyDeedsPage (tabs: Recognised for · I reported · Invites) |
+| `/me/qr` | RequireOnboarded | MyQrPage (built; rewritten) |
+| `/report` | RequireOnboarded | ReportHubPage |
+| `/report/scan` | RequireOnboarded | LocationGate → ScanCameraPage, or the "use your camera app" screen when `BarcodeDetector` or a camera is missing |
+| `/report/code` | RequireOnboarded | LocationGate → ManualCodePage |
+| `/scan/:token` | RequireOnboarded | ScanLandingPage: LocationGate → Checking → `POST /api/scans` → `navigate('/report/scan/<scanId>', {replace: true})`, so the token leaves history |
+| `/report/scan/:scanId` | RequireOnboarded | ScanDeedPage (deed form → result) |
+| `/me/deeds` | RequireAuth | MyDeedsPage; `?tab=recognised` (default) or `?tab=reported` |
 | `/me/deeds/:id` | RequireAuth | DeedDetailPage |
-| `/me/self-logs` | RequireOnboarded | SelfLogsPage (list + "Log a deed" form) |
+| `/me/deeds/:id/edit` | RequireOnboarded | EditDeedPage |
+| `/me/self-logs` | RequireOnboarded | SelfLogsPage |
+| `/me/self-logs/new`, `/me/self-logs/:id/edit` | RequireOnboarded | SelfLogFormPage |
 
-Add "Report a deed" to Layout navigation, a **"Log a deed"** button on ProfilePage, and links to My deeds and Self-logs from ProfilePage.
+`/report/invite` and `/invite/:token` are **not** added in M2 (D26). A route not in this table gets the existing NotFoundPage.
 
-### 5.3 Flows and states
+### 5.3 Screens and states
 
-**ScanPage (`/scan/:token`):**
-1. LocationGate explains why location is needed, then calls `getPosition`.
-   - **Denied:** explain how to enable location and offer Retry. No verification is possible without location.
-   - **Imprecise:** allow a retry.
-2. `POST /api/scans`, then `navigate('/report/scan/<scanId>', {replace: true})`. This removes the token from history.
-3. Errors:
-   - `qr_invalid`: "This code has expired. Ask them to refresh their QR and scan again."
-   - `cannot_verify_self`
-   - `already_recognized_today`
-   - `already_scanned`
-   - `implausible_travel` / `outside_service_area` / `location_too_imprecise`: friendly copy for each
-   - `rate_limited`
-4. **Known limitation:** a witness who isn't signed in goes to login or sign-up with `next`. The QR will have expired by the time they return, so the page says "Ask them to show their code again" (Q6).
+**Global header (Layout, D25)**
+- Signed in: logo "Good Deeds"; nav **Home · My QR · Profile**; a blue **"Record a deed"** button (`LinkButton` to `/report`) on every page. Desktop: nav then button on the right. Mobile: logo and button on the first row, nav full width below.
+- **No Log out in the header**; it moves to Profile.
+- Signed out: unchanged (Log in, Sign up).
 
-**ManualCodeForm (inside ReportHubPage):**
-- Fields: ID (`GD-XXXXXXX`, normalised client-side as well) and a 6-digit code (`inputMode="numeric"`).
-- Same location gate and errors as ScanPage. `doer_code_invalid` shows "ID and code don't match: codes change every 30 seconds."
-
-**ScanDeedPage / DeedForm:**
-- Header: "Recognising **{display_name}** @{handle}", plus a countdown to `expires_at`.
-- Fields:
-  - category select, from `/api/deeds/options`
-  - description with a counter (min/max from options)
-  - people helped (optional)
-  - "When?", defaulting to now, limited to the last N minutes
-- Submit, then a success screen: "Verified ✓", with a same-act note if `counts_for_points` is false ("Others already reported this act; your report is saved as an extra witness").
-- Errors: `scan_expired` ("Scan again"), `scan_used`, `already_recognized_today`.
-- The form state survives a reload via `GET /api/scans/{id}`.
-
-**InviteDeedPage:**
-- Shows `invites_remaining_today` before the form. When it is 0, the form is disabled with an explanation.
-- Fields: category, description, people helped, when (up to 7 days ago), and an optional toggle "I'm still at the place: add my location". If it is off, a note explains that the deed can't be matched with other reports of the same act.
-- Submit, then InviteSharePanel:
-  - WhatsApp button: `https://wa.me/?text=<encoded message + url>`
-  - Web Share API button, when `navigator.share` exists
-  - Copy link
-  - The expiry date
-  - A note that the link is shown once and can be reissued from My deeds
-- The share text never contains the doer's name.
-
-**InvitePage (`/invite/:token`):**
-- Sets `<meta name="referrer" content="no-referrer">` while mounted. The token goes into `sessionStorage['gd_invite']`, and `next=/invite/resume` is used for login, sign-up and onboarding, so the raw token never appears in a URL on pages that load third-party SDKs (Google/Facebook). `/invite/resume` reads it back from sessionStorage.
+**F2 My QR (`/me/qr`)**
+- Title "My QR code", intro "Show this to someone who saw your good deed. They scan it to recognise you."
+- QR image, then the **countdown bar, always visible**: "New code in {n} s" and "Changes every {window_seconds} s". The bar is full at a new code and empties to 0; it turns orange for the last 5 s. `n` counts down from `refresh_after_seconds` measured from when the response arrived.
+- "Show large QR" opens **LargeQrDialog**: full screen, header "{display_name} · My QR" and a Close button; QR, ID, code and "New code in {n} s", laid out for scanning from about 2 m. Close or Esc returns.
+- Section "No camera? Give them your ID and code":
+  - "Your ID" with `display_id` and a **Copy ID** button. After copying, the button reads "Copied" and a toast "ID copied" shows for 2.5 s.
+  - "Code" with `manual_code` shown as "482 913". **Not copyable**: no copy button, `user-select: none`; it stays readable by screen readers. Help: "They type both. The code changes every 30 s and can't be copied, so read it out or let them look at your screen."
+- Only the **current** code is shown. The previous code keeps working for one more window, silently; there is no "previous code" line.
+- "How the person who saw your deed records it": 1 "They open Record a deed in Good Deeds and scan your QR." 2 "No camera, or it won't scan? They tap Enter ID and code and type the two above."
+- "Worried someone copied your QR?": reset with confirmation, as built ("Resetting makes old screenshots of your QR stop working." → "Resetting makes every earlier copy of your QR code stop working. Your ID stays the same." [Yes, reset my QR] [Cancel] → "Your QR code has been reset. Old screenshots no longer work.").
 - States:
-  - loading
-  - invalid (404)
-  - expired (410 `invite_expired`)
-  - already used (410 `invite_used`)
-  - withdrawn by the reporter (410 `invite_cancelled`)
-  - pending: preview card ("{reporter} recognised you for: …")
-- Calls to action for a pending invite:
-  - logged out: Sign up to accept / Log in
-  - not onboarded: Finish setting up
-  - onboarded: Accept, then confirmation, then success ("Verified! It's on your profile")
-- Errors: `cannot_accept_own_invite`, `same_phone` ("This invite can't be accepted from this account"), `same_device_limit` ("Too many invites between these accounts on a shared device this month"), `already_recognized_today`.
+  - **Loading** (first load): "Loading your QR code…".
+  - **Reconnecting:** a refresh failed but `now < expires_at` of the last good response. Keep the last QR, ID and code visible, **greyed**, with "Reconnecting… You can keep showing this code for now." in place of the countdown. Keep retrying on the normal schedule.
+  - **Error:** the first load failed, or `expires_at` has passed with no fresh response: "QR code unavailable" / "We couldn't load your QR code. Check your internet connection and try again." [Try again]. Never show an expired code as usable.
+  - **Setup not finished** (fallback when the API says `onboarding_required`; the guard normally redirects first): "Finish setting up to get your QR code. People can record your deeds once you've confirmed you're 18 or over, accepted the terms and verified your phone number." [Finish setting up] → `/onboarding`.
 
-**MyQrPage:**
-- Under the ID, show "Code: **482 913**", refreshed with the token. Copy: "They type your ID and this code. It changes every 30 s."
+**F3 Record a deed**
 
-**MyDeedsPage:**
-- Three tabs: Recognised for, I reported, Invites.
-- Each card shows a status badge (Pending · Verified · Unverified · Rejected · Withdrawn) and "Edited" when `last_edited_at` is set.
-- Pending cards never show a doer.
-- The Invites tab shows days left and a "Get a new link" button (reissue), which opens the share panel.
-- On "I reported" cards with `can_edit` / `can_withdraw`: **Edit** (category, description, people helped) and **Withdraw** (confirmation dialog: "This can't be undone. The deed stops counting for {doer}.").
+Flow: Hub → location (explained the first time) → scan or ID + code → Checking → deed form (send within `scan_submit_minutes`) → result.
 
-**SelfLogsPage:**
-- A list of the user's self-logs and a **"Log a deed"** form: category, description, date/time (any past date), optional "add my current location".
-- Each item has Edit and Delete. There is no verify button and no link to deeds (D3).
-- A short note at the top: "Self-logs are private and don't earn points. If someone saw you, ask them to report it by scanning your QR."
+*Hub (`/report`)*
+- Title "Record a deed", intro "Saw someone do something good? Recognise them while you're both still there."
+- Two options: **Scan their QR** ("Fastest. Point your camera at the code on their phone.") and **Enter ID and code** ("If scanning doesn't work, they read out their ID and 6-digit code.").
+- Guidance line (no invite option, D26): "Doer not on Good Deeds? Ask them to sign up, then show you their QR."
+- "How it works": 1 "Find them: scan their QR or type their ID and code." 2 "We check you're both in the same place." 3 "Say what they did. It's verified straight away."
+- **LimitBanner** from `GET /api/deeds/options` (D20):
+  - `1 ≤ reports_remaining_this_month ≤ 10`: "{n} deeds left this month. Resets on {date}." (singular "1 deed left").
+  - `= 0`: "You've recorded {reporter_monthly_limit} deeds this month, the maximum. You can record more from {date}." Both options are disabled (shown at 50 % opacity, `aria-disabled`).
+  - More than 10 left: no banner.
 
-**Profile counts (ProfilePage and PublicProfilePage):**
-- A row like Instagram's followers/following: **25 Self-log Deeds | 12 Verified Deeds**, from `GET /api/users/{handle}/deed-counts`.
-- On the user's own profile, "Self-log Deeds" links to SelfLogsPage and "Verified Deeds" to MyDeedsPage. On someone else's profile the numbers are shown without links to self-log content.
+*Location gate (before the camera or the ID + code form)*
+- If `permissionState()` is `granted`, skip the explain screen and get a position straight away.
+- **Explain first:** "Allow your location" / "We check that you and the person you're recognising are in the same place, so deeds can't be faked from far away." Points: "Your exact location is never shown to anyone." "It's only used to check this report." "Good Deeds works in Bangalore for now." [Allow location], then "Your phone will ask next. Choose **Allow**." The button calls `getPosition()`, which triggers the browser prompt.
+- **Denied:** "Location is blocked" / "We can't verify a deed without your location. You can turn it back on in a few taps." Steps: 1 "Tap the icon to the left of the web address (a lock or settings icon)." 2 "Find Location and choose **Allow**." 3 "Come back here and tap **Try again**." Footer "Still not working? Check that Location is switched on in your phone's settings." [Try again]
+- **Not precise enough** (`accuracy_m > max_location_accuracy_m`, checked on the client before calling the API, and also on a 400 `location_too_imprecise`): "Your location isn't precise enough" / "Your phone places you somewhere within {accuracy} m. We need it within {max} m." Tips: "Turn on precise location for your browser." "Step outside, or move near a window." "Wait a few seconds, then try again." [Try again]
+- **Timeout / unavailable** (no canvas screen): use the not-precise layout with title "We couldn't find your location" and the same tips. *Interim copy.*
+- Once a position is held, the next screens show a chip "Location ready · ±{accuracy} m". Before `POST /api/scans`, get a fresh position if the held one is older than 60 s.
 
-Every page uses `src/components/ui.tsx` primitives, uses TanStack Query keys under `['deeds', …]`, and invalidates `['deeds','options']` after an invite is created.
+*Scan (`/report/scan`)*
+- **Camera** (when `'BarcodeDetector' in window` and a rear camera opens): dark full-screen view, [Close], the location chip, "Scan their QR", viewfinder, "Point your camera at the QR on their phone. It scans by itself.", link "Enter ID and code instead". On a detected code, `parseScanUrl`; a foreign QR is ignored with a quiet hint "That's not a Good Deeds QR". A Good Deeds token goes straight to Checking (no navigation to `/scan/:token`, so the token never enters history).
+- **Use your camera app** (no `BarcodeDetector`, no camera, or camera permission refused): "Scan with your camera app" / "This browser can't scan inside Good Deeds. Use your phone's own camera instead. It opens Good Deeds and carries on from here." Steps: 1 "Open your phone's Camera app." 2 "Point it at the QR on their phone." 3 "Tap the Good Deeds link that appears." On desktop also: "On a computer? Scanning works best on your phone. Or use their ID and code below." Then "or" and [Enter ID and code instead].
+- `/scan/:token` (the camera app's link): location gate, then Checking. A witness who isn't signed in goes through login with `next`; by then the code has usually expired, and the `qr_invalid` screen asks for a new one (Q6).
+
+*Enter ID and code (`/report/code`)*
+- "Enter their ID and code" / "Ask them to open My QR in Good Deeds and read out both."
+- "Their ID", help "It starts with GD-. Capitals and spaces don't matter." (normalised on the client too).
+- "6-digit code" (`inputMode="numeric"`, `autoComplete="off"`), help "It changes every 30 seconds, so type it straight away."
+- Location chip, [Continue].
+- `doer_code_invalid` shows **inline**: "ID and code don't match. Codes change every 30 seconds. Ask for the code on their screen right now and try again." with the code field outlined red.
+
+*Checking*: "Checking…" / "Matching the code and making sure you're both in the same place." while `POST /api/scans` runs.
+
+*Deed form (`/report/scan/:scanId`)*
+- Loads `GET /api/scans/{id}` (survives a reload). `consumed: true` → the `scan_used` screen; 410 → the `scan_expired` screen.
+- Header card: initials avatar, "Recognising", **{display_name}**, @handle, a "Matched" chip.
+- "Send within {mm:ss}. A scan stays valid for {scan_submit_minutes} minutes." counting down to `expires_at`. At 0 the form is replaced by the `scan_expired` screen.
+- **Pair warning** when `1 ≤ pair_reports_remaining ≤ 3`: "You can record {first name} {n} more times this month. Resets on {date}." ("1 more time" when n = 1.)
+- "What kind of deed?": category pills from `options.categories` (one selected; default none, required).
+- "What did they do?": 3-row textarea, help "At least {description_min} characters. Please leave out phone numbers and addresses.", counter "{len} / {description_max}". Too short on Send: red outline and "Write at least {description_min} characters so people understand what happened."
+- (Photos: not rendered in M2, D23.)
+- "How many people did they help? (optional)": stepper −/+, starting at 1, minimum 0, maximum `beneficiaries_max`. 0 means "not given" and is sent as `null`.
+- "When did it happen?": pills **Just now** (default; `occurred_at` omitted, so the server uses `scanned_at`) and **Earlier**, which reveals "How long before you scanned?" with About 15 minutes / About 30 minutes / About 1 hour / About 2 hours; `occurred_at = scanned_at − that offset`. Options longer than `qr_occurred_max_age_minutes` are not shown. Help "Up to 2 hours before you scanned."
+- **Public-feed notice (D22)**, directly above Send: "Verified deeds appear in the public feed. You or {first name} can hide it at any time. Only the area name is shown, never your exact location."
+- [Send report], then "It goes on {first name}'s profile as soon as you send it."
+- "Cancel" (top) returns to the hub. The scan stays unused but the pair's day is already used (§2.2), so Cancel asks first: "Leave without sending? You can't record {first name} again today." [Leave] [Keep writing]. *Interim copy; not on the canvas.*
+
+*Result*
+- `same_act.counts_for_points` true → **"Deed verified"** / "Thanks, {reporter first name}. It now counts on {doer}'s profile."
+- false → **"Saved as an extra witness"** / "Others already reported this act. Your report backs theirs up, but it doesn't count a second time on {first name}'s profile."
+- Summary: Who {doer} · Deed {category label} · When {occurred_at, e.g. "Today, 4:12 pm"} · "Checked by QR code and location". (No Photos row in M2.)
+- [Record another deed] → `/report`; [See my reports] → `/me/deeds?tab=reported`.
+
+*Errors*: full-screen errors use one layout (icon, title, body, primary action, "Back to Home"); see §5.4.
+
+**F6 My deeds, self-logs and profile**
+
+*Profile (`/profile`, own)*
+- Avatar initials, display name, "@handle".
+- Counts row (D4/D15) from `GET /api/users/{handle}/deed-counts`: **{n} Self-log Deeds | {n} Verified Deeds**. On the own profile "Self-log Deeds" links to `/me/self-logs` and "Verified Deeds" to `/me/deeds` (Recognised for).
+- [Log a deed] → `/me/self-logs/new`; link "My QR code".
+- "Your activity": **My deeds** ("Reports about you and reports you made") and **Self-logs** ("Your private diary of good deeds").
+- "Account": the existing M1 account details (name, handle, phone status, link to the public profile) stay here, then **Log out** (D25).
+- Not in M2: the "followers · following · Saved" line, and the "· Bangalore" suffix after the handle (there is no city field; *needs PO OK* to drop it or show a fixed launch city).
+
+*Public profile (`/u/:handle`)*: the counts row without links, and "Verified Deeds were confirmed in person by someone who saw them. Self-logs are private notes: only the number is shown."
+
+*My deeds (`/me/deeds`)*
+- Title "My deeds"; two tabs **Recognised for** and **I reported** (the Invites tab returns with invites). Tab intros: "Deeds other people saw you do." / "Deeds you saw others do. You can edit or withdraw your reports."
+- Lists from `GET /api/me/deeds?role=doer|reporter`, newest first, with a "Show more" button while `next_cursor` is set (*not on the canvas*).
+- Card: status badge (Verified · Withdrawn; Pending/Unverified/Rejected only appear when invites or moderation return), date, " · Edited" when `last_edited_at` is set, the who line, the category label and the description (clamped to 3 lines). Tapping opens the detail.
+  - Recognised for: "{reporter display_name} recognised you" (D24). When `same_act.counts_for_points` is false: "Also reported by others. The act counts once on your profile." (*see §9 Q20 on this wording*).
+  - I reported: "You recognised {doer display_name}", with [Edit] and [Withdraw] when `can_edit` / `can_withdraw`.
+- Empty, Recognised for: "No one has recognised you yet" / "Next time you help someone, show your QR so a witness can record it." [Show my QR]. Empty, I reported (*not on the canvas*): "You haven't recorded a deed yet" / "Saw someone do something good? Record it while you're both there." [Record a deed].
+
+*Deed detail (`/me/deeds/:id`)*
+- Badge, an "Edited" chip when edited, title ("You recognised {doer}" or "{reporter} recognised you"), category, description; rows People helped (hidden when null), When, "Checked by QR code and location", Last edited.
+- Withdrawn (reporter only): "You withdrew this report on {date}. It no longer counts for {doer}." (the canvas's "and it has left the public feed" clause is added in M3).
+- Reporter with `can_edit` / `can_withdraw`: [Edit] [Withdraw]. No "Hide from feed" row in M2.
+- **Withdraw dialog:** "Withdraw this report?" / "This can't be undone. The deed stops counting for {doer}." [Withdraw report] [Keep it]. Success shows the detail in its withdrawn state.
+- 404 → "This deed isn't available" with a link back to My deeds (*interim copy*).
+
+*Edit (`/me/deeds/:id/edit`)*
+- "Edit your report". A locked box "Can't be changed": Who {doer}, When {occurred_at}, Where "Checked by QR and location", note "These are the proof that you were there."
+- Category pills, description with counter, people-helped stepper (as on the deed form). Photos not rendered (D23; the 24 h photo window comes with photos).
+- "Changes are saved with a history, and the deed shows "Edited"." [Save changes] [Cancel].
+- `PATCH` sends only the changed fields; 0 people → `beneficiaries_count: null`. 409 `deed_not_editable` → "This report can't be edited any more." and back to the detail.
+
+*Self-logs (`/me/self-logs`)*
+- Title "Self-logs", note "Self-logs are private and don't earn points. If someone saw you, ask them to record it by scanning your QR.", [Log a deed].
+- Item: an "Only you" chip, date, category, description, meta ("Location added" when `has_location`), [Edit] [Delete].
+- Empty: "No self-logs yet" / "Keep a private note of the good things you do, even when no one is watching."
+- **Delete dialog:** "Delete this self-log?" / "It's removed for good. Self-logs don't affect your points." [Delete] [Keep it].
+
+*Log a deed (`/me/self-logs/new`, `/me/self-logs/:id/edit`)*
+- "Log a deed" / "Private. Only you can see it, and it doesn't earn points."
+- Category pills; "What did you do?" with counter; (photos not rendered, D23).
+- "When did it happen?": Date and Time inputs, `max` = now, help "Any date in the past."
+- Toggle "Add my current location" / "Optional. Only you can see it." (uses `getPosition()`; denied → the toggle turns off with "Location is blocked in your browser."). In edit, a log with a location shows "Location added" and a [Remove] link that sends `location: null`.
+- [Save self-log]. No verify button and no link to deeds (D3).
+
+### 5.4 Error copy (F3; from the canvas's copy sheet)
+
+`{first}` is the doer's first name, `{date}` the reset date. Doer names at scan time come from the error body's `doer` (D27); at the form stage from the scan.
+
+| Code | Where | Title | Body | Action |
+|---|---|---|---|---|
+| `qr_invalid` | Full screen | This code has expired | Codes change every 30 seconds. Ask them to open My QR again, then scan the new code. | Scan again |
+| `doer_code_invalid` | Inline, ID + code | ID and code don't match | Codes change every 30 seconds. Ask for the code on their screen right now and try again. | Continue (retry) |
+| `cannot_verify_self` | Full screen | You can't record your own deed | This QR belongs to your account, or to an account that shares your phone number. Scan the QR of the person who did the deed. | Back to Record a deed |
+| `already_recognized_today` | Full screen | You've already recognised {first} today | You can recognise the same person once a day. You can recognise {first} again tomorrow, or record someone else now. | Record someone else |
+| `already_scanned` | Full screen | You've already scanned this code | Wait for their next code (it changes every 30 seconds), then scan again. | Scan again |
+| `outside_service_area` | Full screen | You're outside Bangalore | Good Deeds is open in Bangalore only for now, within {service_area_radius_km} km of the city centre. | Back to Home |
+| `location_too_imprecise` | Location screen | Your location isn't precise enough | Your phone places you somewhere within {accuracy} m. We need it within {max} m. | Try again |
+| `implausible_travel` | Full screen | We couldn't confirm your location | Your location jumped further than anyone could travel. Turn off any app that changes your location, wait a minute and try again. | Try again |
+| `rate_limited` | Full screen | Too many tries | Please wait a few minutes, then try again. | Back to Home |
+| `pair_monthly_limit` | Full screen | You've recorded {first} {reporter_doer_monthly_limit} times this month | That's the most for one person. You can record {first} again from {date}, and you can still record anyone else. | Record someone else |
+| `monthly_report_limit` | Hub banner, options disabled; full screen if returned by the API | You've recorded {reporter_monthly_limit} deeds this month | That's the monthly maximum. You can record more from {date}. | Back to Home |
+| `scan_expired` | Full screen | Time ran out for this report | Reports must be sent within {scan_submit_minutes} minutes of scanning. Scan {first}'s QR again to start over. | Scan again |
+| `scan_used` | Full screen | This report was already sent | You'll find it in My deeds. | See my reports |
+| location denied | Location screen | Location is blocked | (see §5.3) | Try again |
+
+Not on the copy sheet (*interim copy, §9 Q19*): `qr_invalid` and `already_scanned` use "them" because the doer is unknown at that point (the canvas says "Ahmed"); `scan_not_found` → "This report link isn't valid" / "Start again from Record a deed." [Record a deed]; `invalid_category`, `invalid_description`, `invalid_beneficiaries`, `implausible_time` → inline on the form using the API's `detail`; network failure or 5xx → "Something went wrong" / "Check your internet connection and try again." [Try again].
+
+### 5.5 Frontend rules
+
+- Every screen works at 390 px and 1440 px as drawn; touch targets ≥ 44 px; pills and steppers are real buttons with `aria-pressed` / labels.
+- Never render coordinates. Never render a doer on a pending deed.
+- Use `month_resets_at` for every "Resets on …" date; never compute IST month ends on the client.
+- Warning thresholds are constants in `src/features/report/limits.ts`: `TOTAL_WARN_AT = 10`, `PAIR_WARN_AT = 3`.
+
+### 5.6 F7 Feed (M3): what M2 must not block
+
+- Home `/` becomes the feed for signed-in users in M3; keep the header's Home link pointing at `/`.
+- Visibility ("Hide from feed") will be stored separately from verification (PRD §6.5); M2 adds no visibility column and nothing in M2 should read or assume one.
+- The M3 public deed page will have its own public route; `/me/deeds/:id` stays the private owner view.
+- The profile header leaves room under the counts row for the followers / following / Saved line.
+- Area names will be derived from the stored deed location; M2 already stores it for every QR deed.
+- The public-feed notice (D22) ships in M2, so M2 deeds can be published in M3.
+- Photo storage must be chosen before M3 (ROADMAP); the photo task then adds the 4-photo limit and the 24 h edit window to config and turns on `photos_enabled`.
 
 ---
 
@@ -814,38 +971,37 @@ Every page uses `src/components/ui.tsx` primitives, uses TanStack Query keys und
 
 Agents: **DB** = database-specialist, **BE** = backend-developer, **FE** = frontend-developer, **QA** = qa-engineer, **SEC** = security-reviewer, **AD** = architecture-diagram.
 
+**Done (Revisions 3–4):** D1, D2, B1–B11, F1, QA1, AD1, DOC1 and the Revision 4 work (D15–D17), commit 40a9550. Old F4/F5 (invite screens) are deferred with invites (D26).
+
+**Remaining work (Revision 5):**
+
 | ID | Owner | Task | Depends on |
 |---|---|---|---|
-| D1 | DB | `ConfigVersion` model in `app/core/runtime_config.py`; migration `0004_runtime_config` with the append-only trigger and seed rows `qr` v1 and `deeds` v1 (§2.1) | – |
-| D2 | DB | `deeds/models.py` (all §2.2–2.7 tables including `deed_revisions`, constraints, GiST indexes); migration `0005_deeds` with the `verification_events` and `deed_revisions` append-only triggers; constraint tests in `tests/deeds/test_db_constraints.py` | D1 (revision chain) |
-| B1 | BE | `runtime_config.load/publish` (with audit), `advisory_xact_lock` in `core/db.py`, `Gone` in `core/errors.py`, `tests/test_runtime_config.py` | D1 |
-| B2 | BE | Identity: pure parameterised `_qr`, `manual_code`; `qr` namespace read from config (grace=1); remove the env QR settings; `ResolvedDoer`, `resolve_qr_token` returning the window, `resolve_manual_code`; remove `resolve_short_id`; `phone_hashes`, `device_hash`, `public_summaries`; `QrCodeResponse.manual_code`; update `tests/identity/test_qr.py` | B1 |
-| B3 | BE | `deeds` module skeleton: register in `modules/registry.py`, `events.py`, `schemas.py`, `_limits.py` (`DeedLimits(RuntimeConfig)`, `namespace="deeds"`), `_plausibility.py` (pure functions + unit tests) | B1, D2 |
-| B4 | BE | `_scans.py` + `POST/GET /api/scans`: account + IP rate limits, both resolvers, phone check, plausibility, unique-violation mapping | B2, B3 |
-| B5 | BE | `_grouping.py` + `POST /api/deeds` (QR path): scan consumption, `verification_events`, events; cap 5; null-location groups | B4 |
-| B6 | BE | `_invites.py`: invite path of `POST /api/deeds` (7-day `occurred_at`, optional location), daily limit, preview, accept (shared-device 15/month), reissue; prize-rank upgrade with audit; `jobs.py` `deeds.expire_invites` (periodic `*/15 * * * *`, `FOR UPDATE SKIP LOCKED`, batch 200, sets deed `unverified`, `verification_events(invite_expired)`, `DeedRejected`) | B5 |
-| B7 | BE | `_self_logs.py`: create, list, edit, delete (no conversion); `GET /api/users/{handle}/deed-counts` | B3 |
-| B11 | BE | `_edits.py`: `PATCH /api/deeds/{id}` with `deed_revisions` + `DeedEdited`; `POST /api/deeds/{id}/withdraw` with invite cancel, group counter update and prize-rank revoke (§3.4b) + `DeedWithdrawn` | B5, B6 |
-| B8 | BE | Read endpoints: `GET /api/deeds/{id}`, `/api/me/deeds`, `/api/me/invites`, `/api/deeds/options`; `deeds/service.py` public views | B3 (in parallel with B4–B7; finalise after B6) |
-| B9 | BE | Nightly `deeds.purge_unconsumed_scans` job (deletes unconsumed scans older than `unconsumed_scan_retention_days`) | D2, B1 |
-| B10 | BE | *(Recommended, separable)* Move M1 limits (`rate_*`, `otp_*`) into an `identity` config namespace, seeded by migration `0006` (DB writes the migration) | B1 |
-| F1 | FE | `deedsApi.ts` types and calls from §3; `lib/geolocation.ts` + tests | – (contract) |
-| F2 | FE | MyQrPage manual code | F1, Figma |
-| F3 | FE | ReportHub, ScanPage rewrite, ManualCodeForm, LocationGate, ScanDeedPage/DeedForm | F1, Figma |
-| F4 | FE | InviteDeedPage + InviteSharePanel | F1, Figma |
-| F5 | FE | InvitePage, `/invite/resume`, sessionStorage handoff | F1, Figma |
-| F6 | FE | MyDeedsPage (edit, withdraw), DeedDetailPage, SelfLogsPage, "Log a deed" button, profile counts, nav links | F1, Figma |
-| QA1 | QA | Backend rule tests (§7) in `tests/deeds/` | B4–B9, B11 |
-| QA2 | QA | Frontend flow tests (§7) | F2–F6 |
-| SEC1 | SEC | Review against §8 | QA1, QA2 |
-| AD1 | AD | Update diagrams (promote M2 shapes, workflow pages 2 and 3, module map); refresh `docs/architecture/README.md` discrepancies #2/#3/#4/#6/#7 | SEC1 |
-| DOC1 | main session | Update PRD (approved, Q9): §11 module table (one `deeds` module, self-logs, events incl. `DeedEdited`/`DeedWithdrawn`, identity's two events); §4/§12 same-act cap 5; §5 invite rules (7-day window, optional location, shared device 15/month, existing members can accept); §5 self-logs (simplified, public counts); §6.2 manual entry needs ID + code; edit/withdraw with promotion of the next report (D13); Verified Deeds counts reports (D12); account deletion anonymises. Update CLAUDE.md (deeds module, `runtime_config`, "limits live in `config_versions`") | PO approval of this revision |
+| D3 | DB | Migration `2026_11_17_0000-0008_deeds_v3.py`: publish `deeds` v3 from the latest version (§2.1), append-only downgrade, same helper pattern as 0007 | – |
+| B12 | BE | D19 limits: `DeedLimits` gains `reporter_doer_monthly_limit`, `photos_enabled`; `_reporter_limit.py` `ensure_under_monthly_limits(…, doer_id)` (locked, under `reporter_month`) and the scan-time pair pre-check (§3.2 #1 step 4c); QR deed create reads the scan's doer first (§3.2 #3); error code `pair_monthly_limit`; `AppError.extra` + `doer` on the two scan-time errors (D27); update the existing D16 tests that assume a total of 15 | D3 |
+| B13 | BE | D20 read fields: `ScanOut`/`ScanDetail` add `scanned_at`, `pair_reports_remaining`, `month_resets_at`; `DeedOptions` adds the fields in §3.2 #10 | B12 |
+| B14 | BE | D21 invite acceptance: unlocked reporter read → `reporter_month` lock → invite row; pair check for the deed's month (§3.2 #9). Tests use `invites_on` | B12 |
+| B15 | BE | D24: `role=doer` lists only verified deeds; `GET /api/deeds/{id}` 404 for the doer unless verified; update `tests/deeds/test_reads.py` | – |
+| B16 | BE | Identity: `QrCodeResponse.window_seconds` (§3.2 #12); update `tests/identity/test_qr.py` | – |
+| F1b | FE | `deedsApi.ts` / `identityApi.ts` types for every Revision 5 field and `pair_monthly_limit`; `errorCopy.ts` (§5.4); `limits.ts`; `geolocation.permissionState()`; shared `CategoryPills`, `DescriptionField`, `PeopleStepper` | – (contract) |
+| F8 | FE | Layout header: "Record a deed" button, nav Home · My QR · Profile, Log out removed from the header (D25) | – |
+| F2 | FE | My QR rewrite (§5.3 F2): countdown bar, Copy ID only, large QR dialog, reconnecting / error / loading / setup states | F1b (uses `window_seconds` from B16; falls back to 30 until it lands) |
+| F3a | FE | Record a deed, finding the doer: hub with limit banners, LocationGate (explain, denied, imprecise, timeout), camera + `parseScanUrl`, camera-app fallback, ID + code form, `/scan/:token` landing, Checking, error screens; delete `features/scan/ScanPage` | F1b, F8 |
+| F3b | FE | Record a deed, the form: ScanDeedPage + DeedForm (countdown, pair warning, pills, counter, stepper, When?, public-feed notice, cancel confirm), results (verified / extra witness), form-stage errors | F1b, F3a |
+| F6a | FE | My deeds: tabs, cards, pagination, empty states, deed detail, withdraw dialog, edit page | F1b |
+| F6b | FE | Self-logs: list, empty state, create/edit form, delete dialog | F1b |
+| F6c | FE | Profile redesign (counts row with links, activity links, Account with Log out) and public-profile counts | F1b, F8 |
+| QA3 | QA | Backend tests for D19–D24 and D27 (§7 "Monthly limits", "Doer view", "Errors"); confirm the old D16 tests now run against 150 | B12–B16 |
+| QA4 | QA | Frontend flow tests (§7 "Frontend") | F2, F3a, F3b, F6a–F6c |
+| SEC1 | SEC | Review against §8, including the Revision 5 items | QA3, QA4 |
+| AD2 | AD | Update diagrams: v3 config, pair limit in the deed-create and accept flows, accept lock order, new frontend routes; `docs/architecture/README.md` | SEC1 |
+| DOC2 | main session | CLAUDE.md: the accept lock order becomes `reporter_month` → invite row → `shared_device` → pending deed → `same_act`; deeds limits mention the pair limit; ROADMAP line already updated | PO OK of Revision 5 |
 
 **What can run in parallel:**
-- **Start:** D1 and F1 (API client against fetch mocks). F2–F6 start when the Figma designs arrive.
-- **After B1:** B2, B10 and D2 run side by side.
-- **After B3:** the B4 → B5 → B6 → B11 chain runs alongside B7, B8 and B9.
-- **QA:** QA1 can start writing tests from §7 once B3 lands. QA2 can start as soon as the F tasks land.
+- **Start together:** D3, B15, B16, F1b and F8. None depends on another.
+- **Backend chain:** D3 → B12 → (B13 and B14 side by side). QA3 can write tests from §7 as soon as B12 lands.
+- **Frontend:** after F1b, F2, F3a, F6a and F6b run in parallel (separate folders); F3b follows F3a; F6c follows F8. The frontend builds against the §3 contract with fetch mocks, so it doesn't wait for B12–B16.
+- **End:** QA4 when the F tasks land; SEC1 after QA3 and QA4; AD2 after SEC1.
 
 ---
 
@@ -859,6 +1015,7 @@ Agents: **DB** = database-specialist, **BE** = backend-developer, **FE** = front
 - A missing namespace fails closed.
 - Changing a limit through `publish` inside a test changes behaviour without a code change. Test at least: invites/day, cap, radius and grace.
 - `deeds` v2 equals v1 plus `reporter_monthly_limit: 15` and `invites_enabled: false`, with `created_by` NULL; `DeedLimits` rejects a snapshot missing either key.
+- `deeds` v3 equals v2 with `reporter_monthly_limit: 150`, plus `reporter_doer_monthly_limit: 15` and `photos_enabled: false`, `created_by` NULL. Re-running the upgrade adds nothing; the downgrade appends a version without the two new keys and with `reporter_monthly_limit: 15`, and deletes nothing. `DeedLimits` rejects a snapshot missing either new key.
 
 ### QR and manual code
 - A token is accepted in its own window and 1 earlier window, and rejected at 2 earlier windows and for future windows. Grace comes from config.
@@ -893,7 +1050,8 @@ Also:
 - Client timestamps are ignored.
 
 ### Same-act grouping
-- Reports within 200 m and 2 h of the anchor join one group. A report at 201 m or 2 h 1 s starts a new group.
+- Reports within 200 m and 2 h of the anchor join one group. A report at 201 m or 2 h 1 s starts a new group. Time is the scan time (D28).
+- D28 (L7-A): reporters who scanned within 2 h and 200 m join one group even when they backdate "When?" differently; scans more than 2 h apart form separate groups even with the same "When?"; backdating can't get more than 5 counted reports out of one act; an invite deed groups by its `reported_at`, not its backdated `occurred_at` or the acceptance time.
 - Chained drift (B is 150 m from A, C is 150 m from B but 300 m from A) does not join C into A's group.
 - The first 5 verified reports have `counts_for_points=true`, the 6th and 7th false, and all of them are linked.
 - The same reporter twice in one group (across midnight) gives the second report `counts_for_points=false`.
@@ -933,15 +1091,38 @@ Also:
 - `deed-counts`: `self_logged` counts existing self-logs (drops after a delete); `verified` counts **counted** verified reports about the user (D15). 6 or 7 reports of one act → 5; 20 reports of one act → 5; reports in separate windows → each counts; the same reporter twice in one act (across midnight) → 1. A promotion after a withdrawal keeps the count consistent with the group's `counted_count`. Pending, unverified, withdrawn deeds → 0. Self-logs never change `verified`.
 - The count's partial index is `ix_deeds_doer_counted` (`status = 'verified' AND counts_for_points`).
 
-### Monthly reporting limit (D16)
-- The 15th report in an IST month succeeds; the 16th gets 429 `monthly_report_limit`.
-- Reports to different doers, and QR and invite deeds, share the limit; the invite path is refused the same way.
+### Monthly limits (D16 rules, D19 values)
+
+Seed reports directly as committed `deeds` rows where possible; the pair-day unique constraint means one pair can only get one real report per IST day, so pair boundaries need rows on different `report_day`s in the same month.
+
+*Total (150):*
+- 149 deeds this month → the 150th succeeds; at 150 the 151st gets 429 `monthly_report_limit`.
+- Reports to different doers, and QR and invite deeds, share the total; the invite path is refused the same way.
 - Withdrawn deeds still count. A failed submission (e.g. an expired scan) creates no row and doesn't count. Self-logs don't count.
-- A refused QR report leaves its scan unconsumed (the check runs before the scan is consumed).
-- `POST /api/scans` at the limit returns 429 `monthly_report_limit` and records no scan.
-- The limit resets at 00:00 IST on the 1st, not 00:00 UTC: 23:59 IST on the last day is refused; 00:00 IST on the 1st (still the previous UTC month) is allowed; reports from 00:00 IST on the 1st fill the new month.
-- The limit comes from config (publishing 2, 3 and 0 changes behaviour).
-- Two concurrent submits at 14/15 → exactly one succeeds (advisory lock `reporter_month`); the refused report's scan stays unused.
+- A refused QR report leaves its scan unconsumed. `POST /api/scans` at the total returns 429 `monthly_report_limit` and records no scan.
+- The total resets at 00:00 IST on the 1st, not 00:00 UTC (23:59 IST on the last day refused; 00:00 IST on the 1st allowed).
+- The value comes from config (publishing 2, 3 and 0 changes behaviour).
+- Two concurrent submits at 149/150 → exactly one succeeds; the refused report's scan stays unused.
+
+*Pair (15):*
+- With 14 deeds about Ahmed this month, the 15th succeeds; with 15, the 16th gets 429 `pair_monthly_limit` on `POST /api/deeds`, and `POST /api/scans` for Ahmed gets 429 `pair_monthly_limit` and records **no** scan (so the pair-day is not used).
+- A pair at 15 does **not** affect other doers: the same reporter can still scan and report Kavya, and another reporter can still report Ahmed.
+- Withdrawn deeds about Ahmed still count towards the pair; deeds by other reporters about Ahmed don't.
+- Concurrency: two submits by one reporter about Ahmed at 14/15 → exactly one succeeds, the other gets `pair_monthly_limit` and its scan stays unused. The pair-day rule allows only one scan per pair per IST day, so the fixture commits two scans with different `scan_day`s and `expires_at` still in the future. Because the locked count runs before the insert, the loser gets `pair_monthly_limit`, not `already_recognized_today`. (Even without the lock, `uq_deeds_pair_day` would stop a second deed that day; the test checks the lock gives the right code.)
+- The pair resets at 00:00 IST on the 1st, like the total.
+- Order: a reporter at both limits gets `monthly_report_limit` (total checked first).
+- The value comes from config (publishing 1 changes behaviour).
+- At scan time, the `pair_monthly_limit` and `already_recognized_today` bodies contain `doer: {handle, display_name}` and nothing else beyond `detail` and `code`; no other error body has `doer`. A wrong ID + code, an expired token, or a self/phone failure never returns `pair_monthly_limit`, even when the witness is at the pair limit with someone.
+- Invite acceptance (with `invites_on`): reporter with 15 deeds about the accepter in the deed's month → 429 `pair_monthly_limit`, invite still pending, no deed change; 14 → accept succeeds. A deed created on the 30th and accepted on the 2nd counts in the month of the 30th. Accept still works concurrently with the reporter's own QR submit (no deadlock: run both under a barrier).
+
+*Remaining counts (D20):*
+- `GET /api/deeds/options`: `reports_remaining_this_month` is 150 − count (never negative), `month_resets_at` is 00:00 IST on the 1st of the next month, including when called at 23:59 IST on the last day and at 00:00 IST on the 1st; the limit fields equal config.
+- `POST /api/scans` and `GET /api/scans/{id}`: `pair_reports_remaining` is 15 − pair count before this report (3 when 12 exist; 1 when 14 exist), recomputed on GET after a deed was sent; `scanned_at` equals the stored scan time.
+
+### Doer view (D24)
+- `role=doer` lists verified deeds about the user, including ones with `counts_for_points=false`, and never withdrawn, pending, unverified, rejected or removed ones; `role=reporter` still lists all statuses.
+- The doer gets 404 `deed_not_found` for a withdrawn deed about them; the reporter still gets it.
+- Every item's `reporter` has exactly `handle` and `display_name`.
 
 ### Invites switched off (D17)
 - With the seeded config, invite create, preview, accept and reissue all return 403 `invites_disabled`; preview keeps `no-store` / `no-referrer`.
@@ -975,16 +1156,21 @@ Also:
 Each new limiter key trips at its configured count (InMemoryRateLimiter fixture). For every action, both the account key and the IP key trip independently: one account on many IPs is stopped by the account key, many accounts on one IP by the IP key. The manual per-target limit holds across different witnesses and IPs.
 
 ### Frontend
-- ScanPage: location-denied state; token replaced in history after a scan; error-code copy.
-- ManualCodeForm: normalisation.
-- DeedForm: countdown and expiry.
-- InvitePage: every state; the token is not in any `next=` URL; sessionStorage resume.
-- Invite form disabled at 0 remaining.
-- MyQrPage shows and refreshes the manual code.
-- Pending cards never render a doer.
-- Edit and Withdraw appear only when `can_edit` / `can_withdraw`; withdraw needs confirmation.
-- SelfLogsPage: create, edit, delete; no verify button.
-- Profile counts render on own and public profiles; links to self-log content only on the own profile.
+- Layout: signed-in header has "Record a deed" (→ `/report`) and Home · My QR · Profile, and no Log out; Log out on Profile signs out.
+- MyQrPage: shows and refreshes the manual code; the countdown bar turns orange at ≤ 5 s; Copy ID copies `display_id` and shows "Copied"; the code has no copy control; the large-QR dialog opens and closes with Esc; a failed refresh before `expires_at` shows the greyed reconnecting state with the last code, after `expires_at` the error state; first-load failure shows the error state.
+- Hub: no banner at 11 left, "10 deeds left this month. Resets on 1 December." at 10, the maximum banner and disabled options at 0; no invite option; the guidance line is present.
+- LocationGate: skips the explain screen when permission is granted; denied and imprecise screens; Try again re-requests.
+- Camera: `parseScanUrl` accepts only same-origin `/scan/:token`; without `BarcodeDetector` the camera-app screen shows; tracks are stopped on unmount.
+- `/scan/:token`: the token is replaced in history after the scan.
+- ID + code: normalisation; `doer_code_invalid` inline.
+- DeedForm: countdown and expiry; pair warning at 3, none at 4; "1 more time" wording; Just now omits `occurred_at`, Earlier sends `scanned_at − offset`; 0 people sends `null`; the public-feed notice is shown above Send with the doer's name; no photo controls while `photos_enabled` is false.
+- Results: "Deed verified" vs "Saved as an extra witness" from `same_act.counts_for_points`.
+- Every error code in §5.4 renders its copy; `pair_monthly_limit` and `already_recognized_today` from the scan use the name in the error body's `doer`.
+- My deeds: two tabs only; "{reporter} recognised you" on Recognised for; the extra-witness note; Edit and Withdraw only when `can_edit` / `can_withdraw`; withdraw needs confirmation; empty states.
+- Edit sends only changed fields; the locked box shows who, when and where.
+- Self-logs: create, edit (including removing the location), delete with confirmation; no verify button.
+- Profile counts render on own and public profiles; links only on the own profile.
+- No screen renders an invite, a photo control, a follower count or "Hide from feed".
 
 ---
 
@@ -1045,6 +1231,15 @@ Each new limiter key trips at its configured count (InMemoryRateLimiter fixture)
 - Config can only change via migration or `publish`. There is no HTTP endpoint in M2.
 - Check `publish` refuses unknown keys (`extra="forbid"`).
 
+**Revision 5 checks:**
+- **Monthly limits (D19, D21):** both counts run under `reporter_month`; no path creates a `deeds` row without it (QR create, invite create, invite accept). Check the accept path's new unlocked reporter read can't be used to lock a different reporter than the one in the locked invite row (re-check `invite.reporter_user_id` after `FOR UPDATE`).
+- **Error bodies naming the doer (D27):** `doer` appears only on scan-time `already_recognized_today` and `pair_monthly_limit`, only after the code resolved and the self and phone checks passed. Confirm no path returns it for a wrong code, an expired token, an unknown ID or a self-scan, so it can't be used to look up who owns an ID. `AppError.extra` can't override `detail` or `code`.
+- **Remaining counts (D20):** `pair_reports_remaining` is only returned on the witness's own scan; nothing returns how often *other* people reported a doer.
+- **Doer view (D24):** the doer sees the reporter's `handle` and `display_name` only. Withdrawn deeds are hidden from the doer in list and detail.
+- **In-app camera:** only same-origin `/scan/:token` URLs are acted on; a QR with any other URL is never opened or fetched. Camera tracks stop when the page closes.
+- **Code not copyable (F2):** a speed bump against pasting a code to a remote witness, not a control; the doer travel check and grace window remain the real limits.
+- **Public-feed notice (D22):** shown before Send on every deed form. The doer gets no notice in M2 (§9 Q21).
+
 **Gaps carried forward (not M2):**
 - Identity actions still don't write `audit_log` (discrepancy #2 for identity).
 - The architecture test misses relative imports (#5). New deeds code should use absolute imports only.
@@ -1079,3 +1274,16 @@ Each new limiter key trips at its configured count (InMemoryRateLimiter fixture)
 | Q15 | Verified Deeds: count acts or reports? | Count reports (D12), **reversed 2026-11-16: count counted reports (D15).** |
 | Q16 | Promote an uncounted report after a counted one is withdrawn? | **Promote** (D13). |
 | Q17 | Can the doer hide a deed about them? | **Not in M2**; revisit in M7 (D14). |
+
+Note (Revision 5): PRD §6.5 (2026-11-16) now lets the doer or the reporter hide a deed **from the public feed** in M3. That is a visibility switch, not removal, so D14 still holds for M2 and the M7 question is only about anything beyond feed visibility.
+
+### Open for revision 5 (needs PO OK)
+
+| # | Question | Architect's default in this design |
+|---|---|---|
+| Q18 | Should a withdrawn report disappear from the doer's My deeds (D24)? | **PO decided 2026-11-17: A (yes).** The doer sees only verified deeds about them; the reporter still sees withdrawn ones. D21 (pair limit checked at invite acceptance) also **approved by the PO (A)**. |
+| Q19 | Copy for cases the F3 copy sheet doesn't cover (§5.4: `scan_not_found`, form validation, network errors, location timeout, "I reported" empty state, deed not available) and the Cancel confirmation on the deed form ("Leave without sending? You can't record {first} again today."). | **PO decided 2026-11-17: A.** Cancel shows a confirmation: "Cancel this report?" / "You can't record {first} again until tomorrow." with **Keep writing** (default) and **Cancel report**. Other interim copy as written in §5.3 / §5.4. |
+| Q20 | The Recognised-for note "Also reported by others. The act counts once on your profile." is not quite right: an act counts up to 5 times (one per reporter, D2/D15); this report is the one that doesn't count. | **PO decided 2026-11-17: A.** Only on non-counted reports: "Extra witness: 5 people already reported this act, so this report doesn't add to your count." (the number is the same-act cap from config). Counted reports show no note. |
+| Q21 | The doer is never told in M2 that verified deeds about them will be public from M3. Add a line to My QR (e.g. "Deeds people record about you appear in the public feed. You can hide any of them.") or to the terms? | **PO decided 2026-11-17: A.** Add to My QR (F2) under the QR: "When someone records a deed you did, it appears in the public Good Deeds feed with your name and the area. You can hide any deed from your profile at any time." Add the same sentence to the Privacy Notice. Repeat as a reminder at M3 launch. |
+| Q22 | The profile canvas shows "@handle · Bangalore", but profiles have no city. | **PO decided 2026-11-17: A.** Show "@handle" only; add a city/area field when expanding beyond Bangalore. |
+| L7 | Security finding L7 (low): same-act grouping uses the backdatable "When?" (`occurred_at`), so a reporter can split one act into two groups (double credit, cap of 5 bypassed). Group by server time instead? | **PO decided 2026-11-17: A.** Group by server time: QR deeds by the scan's `scanned_at`, invite deeds by `reported_at`; `occurred_at` is display-only (D28). |

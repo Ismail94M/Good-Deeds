@@ -4,6 +4,8 @@ Limits come from the `deeds` config, so each test publishes small values. They a
 before any lookup, so even requests with bad tokens count.
 """
 
+import itertools
+import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -11,8 +13,13 @@ from typing import Any
 from httpx import ASGITransport, AsyncClient, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.errors import TooManyRequests
+from app.core.ratelimit import InMemoryRateLimiter
 from app.main import app
+from app.modules.deeds import _scans
+from app.modules.deeds._limits import load_limits
 from app.modules.deeds.models import QrScan
+from app.modules.deeds.schemas import Location, ScanCreate
 from tests.deeds.helpers import (
     Member,
     code_for,
@@ -120,3 +127,39 @@ async def test_manual_target_limit_holds_across_witnesses_and_ips(
         other = await make_member(session)
         ok = await _manual(c3, w4, other.short_id, await code_for(session, other))
         assert ok.status_code == 201, ok.text
+
+
+async def test_manual_target_has_a_15_minute_and_a_daily_limit(session: AsyncSession) -> None:
+    """Security L4: typed codes for one ID are limited per 15 minutes (``rate_manual_target``,
+    20/900) and per day (``rate_manual_target_daily``, 60/86400), across witnesses and IPs.
+    Seeded values, with a clock the test moves."""
+    _, limits = await load_limits(session)
+    assert (limits.rate_manual_target, limits.rate_manual_target_daily) == ("20/900", "60/86400")
+    day_start = 1_800_000_000 - (1_800_000_000 % 86_400)  # a UTC midnight
+    now = float(day_start + 1)
+    limiter = InMemoryRateLimiter(clock=lambda: now)
+    ips = itertools.count()
+    data = ScanCreate(
+        short_id="GD-ABCDEFG", code="123456", location=Location.model_validate(location())
+    )
+
+    async def guess() -> bool:
+        """One typed code from a new witness on a new IP; True if it got past the limits."""
+        n = next(ips)
+        ip = f"10.0.{n // 250}.{n % 250}"
+        try:
+            await _scans.enforce_rate_limits(limiter, limits, data, uuid.uuid4(), ip)
+        except TooManyRequests:
+            return False
+        return True
+
+    for window in range(3):  # three 15-minute windows: 20 allowed in each, the 21st refused
+        now = float(day_start + 1 + window * 900)
+        assert [await guess() for _ in range(20)] == [True] * 20
+        assert await guess() is False
+    # 60 counted today: a fresh 15-minute window is still refused by the daily limit ...
+    now = float(day_start + 1 + 3 * 900)
+    assert await guess() is False
+    # ... until the next day.
+    now = float(day_start + 86_400 + 1)
+    assert await guess() is True

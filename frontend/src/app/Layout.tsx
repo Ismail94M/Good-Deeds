@@ -1,6 +1,5 @@
-import { useState } from 'react'
-import { Link, NavLink, Outlet, ScrollRestoration, useLocation, useNavigate } from 'react-router'
-import { LogoMark } from '../components/ui'
+import { Link, NavLink, Outlet, ScrollRestoration, useLocation } from 'react-router'
+import { LinkButton, LogoMark } from '../components/ui'
 import { useAuth } from '../features/auth/authContext'
 
 const focusRing =
@@ -16,18 +15,33 @@ const YEAR = new Date().getFullYear()
 
 const headerLink = `inline-flex min-h-11 items-center gap-1 font-semibold text-brand-700 hover:text-brand-900 ${focusRing}`
 
-export function Layout() {
-  const { user, logout } = useAuth()
-  const navigate = useNavigate()
-  const { pathname } = useLocation()
-  const [loggingOut, setLoggingOut] = useState(false)
+function PlusIcon() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      className="size-4.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+    >
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  )
+}
 
-  async function handleLogout() {
-    setLoggingOut(true)
-    await logout()
-    setLoggingOut(false)
-    navigate('/', { replace: true })
-  }
+/**
+ * Header (M2-DESIGN D25). Signed in: logo, nav Home · My QR · Profile, and a blue "Record a deed"
+ * button on every page; on phones the logo and button share the first row and the nav runs full
+ * width below. Log out lives on the Profile page. Signed out: the sign-in / sign-up link.
+ */
+export function Layout() {
+  const { user } = useAuth()
+  const { pathname } = useLocation()
+  // `/scan/:token` is the camera-app entry into Record a deed.
+  const onReport =
+    pathname === '/report' || pathname.startsWith('/report/') || pathname.startsWith('/scan/')
 
   return (
     <div className="flex min-h-svh flex-col">
@@ -38,17 +52,24 @@ export function Layout() {
         Skip to content
       </a>
       <header className="sticky top-0 z-10 border-b border-slate-200/70 bg-canvas/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-2 px-4 py-2 lg:px-6">
+        <div
+          className={`mx-auto flex max-w-6xl flex-wrap items-center px-4 py-2 lg:px-6 ${
+            user ? 'gap-x-4 gap-y-1' : 'justify-between gap-x-2'
+          }`}
+        >
           <Link
             to="/"
-            className={`flex min-h-11 items-center gap-2.5 text-lg font-bold tracking-tight text-slate-900 ${focusRing}`}
+            className={`order-1 flex min-h-11 items-center gap-2.5 text-lg font-bold tracking-tight text-slate-900 ${focusRing}`}
           >
             <LogoMark />
             Good Deeds
           </Link>
-          <nav aria-label="Main" className={user ? 'w-full sm:w-auto' : undefined}>
+          <nav
+            aria-label="Main"
+            className={user ? 'order-3 w-full sm:order-2 sm:ml-auto sm:w-auto' : 'order-2'}
+          >
             {user ? (
-              <ul className="grid grid-cols-4 gap-1 sm:flex">
+              <ul className="grid grid-cols-3 gap-1 sm:flex">
                 <li>
                   <NavLink to="/" end className={navClass}>
                     Home
@@ -63,16 +84,6 @@ export function Layout() {
                   <NavLink to="/profile" className={navClass}>
                     Profile
                   </NavLink>
-                </li>
-                <li>
-                  <button
-                    type="button"
-                    onClick={() => void handleLogout()}
-                    disabled={loggingOut}
-                    className={`${navClass({ isActive: false })} w-full`}
-                  >
-                    Log out
-                  </button>
                 </li>
               </ul>
             ) : pathname === '/signup' ? (
@@ -91,6 +102,16 @@ export function Layout() {
               </p>
             )}
           </nav>
+          {user && (
+            <LinkButton
+              to="/report"
+              aria-current={onReport ? 'page' : undefined}
+              className="order-2 ml-auto gap-1.5 px-4 text-[15px] sm:order-3 sm:ml-0"
+            >
+              <PlusIcon />
+              Record a deed
+            </LinkButton>
+          )}
         </div>
       </header>
       <div id="content" className="flex flex-1 flex-col">

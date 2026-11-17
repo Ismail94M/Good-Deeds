@@ -1,0 +1,603 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Record a deed</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@600;700&amp;display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div style="position: relative; width: {{s.w}}px; min-height: {{s.h}}px; box-sizing: border-box; display: flex; flex-direction: column; background: {{s.rootBg}}; color: #0f172a; font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 16px; line-height: 1.5;">
+
+<sc-if value="{{f.sheet}}" hint-placeholder-val="{{ false }}">
+<div style="padding: 48px; display: flex; flex-direction: column; gap: 28px;">
+  <div style="display: flex; flex-direction: column; gap: 8px;">
+    <h1 style="margin: 0; font-size: 32px; font-weight: 700; letter-spacing: -0.02em;">Record a deed: every error message</h1>
+    <p style="margin: 0; color: #475569; max-width: 760px;">Copy for each error the server can return while recording a deed. Full-screen errors use the layout in row 5; inline ones appear on the screen named. Ahmed is the sample doer and 1 December the sample reset date.</p>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;">
+    <sc-for list="{{errList}}" as="e" hint-placeholder-count="14">
+    <article style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 8px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <code style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; font-weight: 600; color: #334155; background: #f1f5f9; padding: 2px 8px; border-radius: 6px;">{{e.code}}</code>
+        <span style="font-size: 12px; font-weight: 600; color: #475569;">{{e.where}}</span>
+      </div>
+      <h2 style="margin: 0; font-size: 17px; font-weight: 700; color: #0f172a;">{{e.title}}</h2>
+      <p style="margin: 0; font-size: 15px; color: #334155;">{{e.body}}</p>
+      <p style="margin: 0; font-size: 14px; font-weight: 600; color: #3659e3;">Button: {{e.action}}</p>
+    </article>
+    </sc-for>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{f.camera}}" hint-placeholder-val="{{ false }}">
+<div style="flex-grow: 1; display: flex; flex-direction: column; background: #0b1220; color: #ffffff; min-height: {{s.h}}px;">
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px;">
+    <button type="button" onClick="{{back}}" style="display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.3); background: transparent; color: #ffffff; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+      Close
+    </button>
+    <span style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: rgba(52, 211, 153, 0.16); color: #a7f3d0; font-size: 13px; font-weight: 600;">
+      <span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 999px; background: #34d399;"></span>
+      Location ready · ±35 m
+    </span>
+  </div>
+  <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 24px 16px;">
+    <h1 style="margin: 0; font-size: 22px; font-weight: 700; color: #ffffff; text-align: center;">Scan their QR</h1>
+    <button type="button" onClick="{{simulateScan}}" aria-label="Camera view. In this prototype, tap to simulate a successful scan." style="position: relative; width: 290px; height: 290px; padding: 0; border: 0; border-radius: 24px; background: #1e293b; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+      <span aria-hidden="true" style="position: absolute; top: 18px; left: 18px; width: 44px; height: 44px; border-top: 4px solid #ffffff; border-left: 4px solid #ffffff; border-radius: 14px 0 0 0;"></span>
+      <span aria-hidden="true" style="position: absolute; top: 18px; right: 18px; width: 44px; height: 44px; border-top: 4px solid #ffffff; border-right: 4px solid #ffffff; border-radius: 0 14px 0 0;"></span>
+      <span aria-hidden="true" style="position: absolute; bottom: 18px; left: 18px; width: 44px; height: 44px; border-bottom: 4px solid #ffffff; border-left: 4px solid #ffffff; border-radius: 0 0 0 14px;"></span>
+      <span aria-hidden="true" style="position: absolute; bottom: 18px; right: 18px; width: 44px; height: 44px; border-bottom: 4px solid #ffffff; border-right: 4px solid #ffffff; border-radius: 0 0 14px 0;"></span>
+      <span style="font-size: 14px; color: #cbd5e1;">Camera view</span>
+    </button>
+    <p style="margin: 0; max-width: 300px; text-align: center; color: #e2e8f0;">Point your camera at the QR on their phone. It scans by itself.</p>
+  </div>
+  <div style="padding: 16px 16px 32px;">
+    <button type="button" onClick="{{toManual}}" style="width: 100%; min-height: 48px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.4); background: transparent; color: #ffffff; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">Enter ID and code instead</button>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{f.page}}" hint-placeholder-val="{{ true }}">
+<header style="border-bottom: 1px solid #e2e8f0; background: #faf8f5;">
+  <div style="max-width: 1152px; margin: 0 auto; box-sizing: border-box; padding: 8px {{s.headPad}}px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px;">
+    <a href="#home" style="order: 1; display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; color: #0f172a; text-decoration: none;">
+      <svg aria-hidden="true" viewBox="0 0 32 32" width="32" height="32"><rect width="32" height="32" rx="8" fill="#3659e3"></rect><path fill="#ffffff" d="M16 24.5s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 16 11.7a4.3 4.3 0 0 1 7.5 2.8c0 5.4-7.5 10-7.5 10z"></path></svg>
+      Good Deeds
+    </a>
+    <nav aria-label="Main" style="order: {{s.navOrder}}; width: {{s.navW}}; margin-left: {{s.navMl}};">
+      <ul style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, {{s.navCol}})); gap: 4px;">
+        <li><a href="#home" style="display: flex; min-height: 44px; align-items: center; justify-content: center; padding: 0 14px; border-radius: 8px; font-size: 14px; font-weight: 500; color: #475569; text-decoration: none;">Home</a></li>
+        <li><a href="#qr" style="display: flex; min-height: 44px; align-items: center; justify-content: center; padding: 0 14px; border-radius: 8px; font-size: 14px; font-weight: 500; color: #475569; text-decoration: none;">My QR</a></li>
+        <li><a href="#profile" style="display: flex; min-height: 44px; align-items: center; justify-content: center; padding: 0 14px; border-radius: 8px; font-size: 14px; font-weight: 500; color: #475569; text-decoration: none;">Profile</a></li>
+      </ul>
+    </nav>
+    <a href="#report" aria-current="page" style="order: {{s.btnOrder}}; margin-left: {{s.btnMl}}; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 16px; border-radius: 8px; background: #3659e3; color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+      Record a deed
+    </a>
+  </div>
+</header>
+
+<main style="width: 100%; max-width: {{s.maxW}}px; margin: 0 auto; box-sizing: border-box; padding: {{s.mainPad}}; display: flex; flex-direction: column; gap: 22px;">
+
+  <sc-if value="{{f.hub}}" hint-placeholder-val="{{ true }}">
+  <div style="display: flex; flex-direction: column; gap: 8px;">
+    <h1 style="margin: 0; font-size: {{s.h1}}px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em;">Record a deed</h1>
+    <p style="margin: 0; color: #475569;">Saw someone do something good? Recognise them while you’re both still there.</p>
+  </div>
+  <sc-if value="{{f.hubNear}}" hint-placeholder-val="{{ false }}">
+  <div role="status" style="display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; border: 1px solid #c7d2fe; background: #eef2fe; color: #2442b8; font-size: 15px;">
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink: 0; margin-top: 2px;"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01"></path></svg>
+    <span><strong>10 deeds left this month.</strong> Resets on 1 December.</span>
+  </div>
+  </sc-if>
+  <sc-if value="{{f.hubFull}}" hint-placeholder-val="{{ false }}">
+  <div role="alert" style="display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; border: 1px solid #fde68a; background: #fffbeb; color: #92400e; font-size: 15px;">
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px;"><path d="M12 3.5L2.5 20h19z"></path><path d="M12 10v4.5M12 17.5h.01"></path></svg>
+    <span><strong>You’ve recorded 150 deeds this month, the maximum.</strong> You can record more from 1 December.</span>
+  </div>
+  </sc-if>
+  <div style="display: grid; grid-template-columns: {{s.hubCols}}; gap: 14px;">
+    <button type="button" onClick="{{goScan}}" disabled="{{f.hubFull}}" style="display: flex; align-items: center; gap: 16px; width: 100%; text-align: left; padding: 20px; border-radius: 16px; border: 1px solid #e2e8f0; background: #ffffff; color: #0f172a; font-family: inherit; cursor: pointer; opacity: {{s.optOp}}; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);">
+      <span aria-hidden="true" style="flex-shrink: 0; width: 52px; height: 52px; border-radius: 14px; background: #3659e3; color: #ffffff; display: flex; align-items: center; justify-content: center;">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"></path><path d="M7 12h10"></path></svg>
+      </span>
+      <span style="flex-grow: 1; min-width: 0;">
+        <span style="display: block; font-size: 17px; font-weight: 700;">Scan their QR</span>
+        <span style="display: block; font-size: 14px; color: #475569;">Fastest. Point your camera at the code on their phone.</span>
+      </span>
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#586579" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="M9 6l6 6-6 6"></path></svg>
+    </button>
+    <button type="button" onClick="{{goManual}}" disabled="{{f.hubFull}}" style="display: flex; align-items: center; gap: 16px; width: 100%; text-align: left; padding: 20px; border-radius: 16px; border: 1px solid #e2e8f0; background: #ffffff; color: #0f172a; font-family: inherit; cursor: pointer; opacity: {{s.optOp}}; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);">
+      <span aria-hidden="true" style="flex-shrink: 0; width: 52px; height: 52px; border-radius: 14px; background: #eef2fe; color: #3659e3; display: flex; align-items: center; justify-content: center;">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"></rect><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10"></path></svg>
+      </span>
+      <span style="flex-grow: 1; min-width: 0;">
+        <span style="display: block; font-size: 17px; font-weight: 700;">Enter ID and code</span>
+        <span style="display: block; font-size: 14px; color: #475569;">If scanning doesn’t work, they read out their ID and 6-digit code.</span>
+      </span>
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#586579" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="M9 6l6 6-6 6"></path></svg>
+    </button>
+  </div>
+  <p style="margin: 0; display: flex; gap: 10px; align-items: flex-start; font-size: 15px; color: #475569;">
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink: 0; margin-top: 2px;"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01"></path></svg>
+    <span>Doer not on Good Deeds? Ask them to sign up, then show you their QR.</span>
+  </p>
+  <section aria-labelledby="how-h" style="border-top: 1px solid #e2e8f0; padding-top: 18px; display: flex; flex-direction: column; gap: 12px;">
+    <h2 id="how-h" style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #475569;">How it works</h2>
+    <ol style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: {{s.howCols}}; gap: 12px;">
+      <li style="display: flex; gap: 12px; align-items: flex-start;"><span aria-hidden="true" style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 999px; background: #eef2fe; color: #2442b8; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center;">1</span><span style="font-size: 15px;">Find them: scan their QR or type their ID and code.</span></li>
+      <li style="display: flex; gap: 12px; align-items: flex-start;"><span aria-hidden="true" style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 999px; background: #eef2fe; color: #2442b8; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center;">2</span><span style="font-size: 15px;">We check you’re both in the same place.</span></li>
+      <li style="display: flex; gap: 12px; align-items: flex-start;"><span aria-hidden="true" style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 999px; background: #eef2fe; color: #2442b8; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center;">3</span><span style="font-size: 15px;">Say what they did. It’s verified straight away.</span></li>
+    </ol>
+  </section>
+  </sc-if>
+
+  <sc-if value="{{f.backLink}}" hint-placeholder-val="{{ false }}">
+  <button type="button" onClick="{{back}}" style="align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; margin: -8px 0 -10px; padding: 0 8px 0 0; border: 0; background: transparent; color: #3659e3; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;">
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"></path></svg>
+    {{backLabel}}
+  </button>
+  </sc-if>
+
+  <sc-if value="{{f.locExplain}}" hint-placeholder-val="{{ false }}">
+  <div style="display: flex; flex-direction: column; gap: 18px;">
+    <span aria-hidden="true" style="width: 64px; height: 64px; border-radius: 18px; background: #eef2fe; color: #3659e3; display: flex; align-items: center; justify-content: center;">
+      <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"></path><circle cx="12" cy="9.5" r="2.5"></circle></svg>
+    </span>
+    <h1 style="margin: 0; font-size: {{s.h1}}px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em;">Allow your location</h1>
+    <p style="margin: 0; color: #334155;">We check that you and the person you’re recognising are in the same place, so deeds can’t be faked from far away.</p>
+    <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px;">
+      <li style="display: flex; gap: 10px; align-items: flex-start;"><svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#047857" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px;"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg><span>Your exact location is never shown to anyone.</span></li>
+      <li style="display: flex; gap: 10px; align-items: flex-start;"><svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#047857" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px;"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg><span>It’s only used to check this report.</span></li>
+      <li style="display: flex; gap: 10px; align-items: flex-start;"><svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#047857" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px;"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg><span>Good Deeds works in Bangalore for now.</span></li>
+    </ul>
+    <button type="button" onClick="{{allow}}" style="width: 100%; min-height: 48px; border-radius: 8px; border: 0; background: #3659e3; color: #ffffff; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">Allow location</button>
+    <p style="margin: 0; text-align: center; font-size: 14px; color: #586579;">Your phone will ask next. Choose <strong>Allow</strong>.</p>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{f.locDenied}}" hint-placeholder-val="{{ false }}">
+  <div style="display: flex; flex-direction: column; gap: 18px;">
+    <h1 style="margin: 0; font-size: {{s.h1}}px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em;">Location is blocked</h1>
+    <div role="alert" style="display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; border: 1px solid #fecaca; background: #fef2f2; color: #991b1b; font-size: 15px;">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink: 0; margin-top: 2px;"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5h.01"></path></svg>
+      <span>We can’t verify a deed without your location. You can turn it back on in a few taps.</span>
+    </div>
+    <h2 style="margin: 0; font-size: 17px; font-weight: 700;">How to turn it on</h2>
+    <ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px;">
+      <li style="display: flex; gap: 12px; align-items: flex-start;"><span aria-hidden="true" style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 999px; background: #3659e3; color: #ffffff; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center;">1</span><span>Tap the icon to the left of the web address (a lock or settings icon).</span></li>
+      <li style="display: flex; gap: 12px; align-items: flex-start;"><span aria-hidden="true" style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 999px; background: #3659e3; color: #ffffff; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center;">2</span><span>Find <strong>Location</strong> and choose <strong>Allow</strong>.</span></li>
+      <li style="display: flex; gap: 12px; align-items: flex-start;"><span aria-hidden="true" style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 999px; background: #3659e3; color: #ffffff; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center;">3</span><span>Come back here and tap <strong>Try again</strong>.</span></li>
+    </ol>
+    <p style="margin: 0; font-size: 14px; color: #586579;">Still not working? Check that Location is switched on in your phone’s settings.</p>
+    <button type="button" onClick="{{allow}}" style="width: 100%; min-height: 48px; border-radius: 8px; border: 0; background: #3659e3; color: #ffffff; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">Try again</button>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{f.locImprecise}}" hint-placeholder-val="{{ false }}">
+  <div style="display: flex; flex-direction: column; gap: 18px;">
+    <h1 style="margin: 0; font-size: {{s.h1}}px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em;">Your location isn’t precise enough</h1>
+    <div role="alert" style="display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; border: 1px solid #fde68a; background: #fffbeb; color: #92400e; font-size: 15px;">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px;"><path d="M12 3.5L2.5 20h19z"></path><path d="M12 10v4.5M12 17.5h.01"></path></svg>
+      <span>Your phone places you somewhere within <strong>850 m</strong>. We need it within 500 m.</span>
+    </div>
+    <h2 style="margin: 0; font-size: 17px; font-weight: 700;">Try this</h2>
+    <ul style="margin: 0; padding: 0 0 0 20px; display: flex; flex-direction: column; gap: 8px;">
+      <li>Turn on <strong>precise location</strong> for your browser.</li>
+      <li>Step outside, or move near a window.</li>
+      <li>Wait a few seconds, then try again.</li>
+    </ul>
+    <button type="button" onClick="{{allow}}" style="width: 100%; min-height: 48px; border-radius: 8px; border: 0; background: #3659e3; color: #ffffff; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">Try again</button>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{f.unsupported}}" hint-placeholder-val="{{ false }}">
+  <div style="display: flex; flex-direction: column; gap: 18px;">
+    <h1 style="margin: 0; font-size: {{s.h1}}px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em;">Scan with your camera app</h1>
+    <p style="margin: 0; color: #334155;">This browser can’t scan inside Good Deeds. Use your phone’s own camera instead. It opens Good Deeds and carries on from here.</p>
+    <ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px;">
+      <li style="display: flex; gap: 12px; align-items: flex-start;"><span aria-hidden="true" style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 999px; background: #3659e3; color: #ffffff; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center;">1</span><span>Open your phone’s <strong>Camera</strong> app.</span></li>
+      <li style="display: flex; gap: 12px; align-items: flex-start;"><span aria-hidden="true" style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 999px; background: #3659e3; color: #ffffff; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center;">2</span><span>Point it at the QR on their phone.</span></li>
+      <li style="display: flex; gap: 12px; align-items: flex-start;"><span aria-hidden="true" style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 999px; background: #3659e3; color: #ffffff; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center;">3</span><span>Tap the Good Deeds link that appears.</span></li>
+    </ol>
+    <sc-if value="{{f.desktop}}" hint-placeholder-val="{{ false }}">
+    <div style="display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; border: 1px solid #c7d2fe; background: #eef2fe; color: #2442b8; font-size: 15px;">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink: 0; margin-top: 2px;"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01"></path></svg>
+      <span>On a computer? Scanning works best on your phone. Or use their ID and code below.</span>
+    </div>
+    </sc-if>
+    <div style="display: flex; align-items: center; gap: 12px; color: #586579; font-size: 14px;"><span style="flex-grow: 1; height: 1px; background: #e2e8f0;"></span>or<span style="flex-grow: 1; height: 1px; background: #e2e8f0;"></span></div>
+    <button type="button" onClick="{{toManual}}" style="width: 100%; min-height: 48px; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">Enter ID and code instead</button>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{f.manual}}" hint-placeholder-val="{{ false }}">
+  <div style="display: flex; flex-direction: column; gap: 18px;">
+    <div style="display: flex; flex-direction: column; gap: 6px;">
+      <h1 style="margin: 0; font-size: {{s.h1}}px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em;">Enter their ID and code</h1>
+      <p style="margin: 0; color: #475569;">Ask them to open <strong>My QR</strong> in Good Deeds and read out both.</p>
+    </div>
+    <sc-if value="{{f.manualError}}" hint-placeholder-val="{{ false }}">
+    <div role="alert" style="display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; border: 1px solid #fecaca; background: #fef2f2; color: #991b1b; font-size: 15px;">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink: 0; margin-top: 2px;"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5h.01"></path></svg>
+      <span><strong style="display: block;">ID and code don’t match.</strong>Codes change every 30 seconds. Ask for the code on their screen right now and try again.</span>
+    </div>
+    </sc-if>
+    <div style="display: flex; flex-direction: column; gap: 6px;">
+      <label for="m-id" style="font-weight: 600;">Their ID</label>
+      <input id="m-id" type="text" defaultValue="GD-7K4M9XQ" autoComplete="off" autoCapitalize="characters" spellCheck="false" aria-describedby="m-id-hint" style="min-height: 52px; box-sizing: border-box; width: 100%; padding: 0 14px; border-radius: 8px; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 20px; font-weight: 600; letter-spacing: 0.04em;">
+      <span id="m-id-hint" style="font-size: 14px; color: #586579;">It starts with GD-. Capitals and spaces don’t matter.</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 6px;">
+      <label for="m-code" style="font-weight: 600;">6-digit code</label>
+      <input id="m-code" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength="7" defaultValue="{{codeVal}}" aria-invalid="{{f.manualError}}" aria-describedby="m-code-hint" style="min-height: 56px; box-sizing: border-box; width: 100%; padding: 0 14px; border-radius: 8px; border: {{s.codeBd}}; background: #ffffff; color: #0f172a; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 28px; font-weight: 700; letter-spacing: 0.18em;">
+      <span id="m-code-hint" style="font-size: 14px; color: #586579;">It changes every 30 seconds, so type it straight away.</span>
+    </div>
+    <span style="align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: #ecfdf5; color: #065f46; font-size: 13px; font-weight: 600;">
+      <span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 999px; background: #059669;"></span>
+      Location ready · ±35 m
+    </span>
+    <button type="button" onClick="{{continueManual}}" style="width: 100%; min-height: 48px; border-radius: 8px; border: 0; background: #3659e3; color: #ffffff; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">Continue</button>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{f.checking}}" hint-placeholder-val="{{ false }}">
+  <div role="status" aria-live="polite" style="display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 80px 0 40px; text-align: center;">
+    <svg aria-hidden="true" viewBox="0 0 48 48" width="56" height="56"><circle cx="24" cy="24" r="20" fill="none" stroke="#dfe6fc" stroke-width="5"></circle><path d="M24 4a20 20 0 0 1 20 20" fill="none" stroke="#3659e3" stroke-width="5" stroke-linecap="round"></path></svg>
+    <h1 style="margin: 0; font-size: 22px; font-weight: 700;">Checking…</h1>
+    <p style="margin: 0; color: #475569; max-width: 300px;">Matching the code and making sure you’re both in the same place.</p>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{f.form}}" hint-placeholder-val="{{ false }}">
+  <section aria-label="Who you're recognising" style="display: flex; align-items: center; gap: 14px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px;">
+    <span aria-hidden="true" style="flex-shrink: 0; width: 52px; height: 52px; border-radius: 999px; background: #dfe6fc; color: #2442b8; font-size: 18px; font-weight: 700; display: flex; align-items: center; justify-content: center;">AK</span>
+    <div style="flex-grow: 1; min-width: 0;">
+      <p style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #475569;">Recognising</p>
+      <p style="margin: 0; font-size: 19px; font-weight: 700; line-height: 1.25;">Ahmed Khan</p>
+      <p style="margin: 0; font-size: 14px; color: #586579;">@ahmedk</p>
+    </div>
+    <span style="flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; border: 1px solid #a7f3d0; background: #ecfdf5; color: #047857; font-size: 13px; font-weight: 600;">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+      Matched
+    </span>
+  </section>
+  <div role="timer" style="display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-radius: 12px; background: #eef2fe; color: #2442b8; font-size: 14px;">
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink: 0;"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+    <span><strong>Send within {{mmss}}.</strong> A scan stays valid for 15 minutes.</span>
+  </div>
+  <sc-if value="{{f.pairWarn}}" hint-placeholder-val="{{ false }}">
+  <div role="status" style="display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; border: 1px solid #fde68a; background: #fffbeb; color: #92400e; font-size: 15px;">
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink: 0; margin-top: 2px;"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01"></path></svg>
+    <span><strong>You can record Ahmed 3 more times this month.</strong> Resets on 1 December.</span>
+  </div>
+  </sc-if>
+
+  <form aria-label="Describe the deed" style="display: flex; flex-direction: column; gap: 24px;">
+    <fieldset style="border: 0; margin: 0; padding: 0; min-width: 0;">
+      <legend style="padding: 0; margin-bottom: 10px; font-size: 16px; font-weight: 600;">What kind of deed?</legend>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <sc-for list="{{cats}}" as="c" hint-placeholder-count="8">
+        <button type="button" aria-pressed="{{c.on}}" onClick="{{c.pick}}" style="min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid {{c.bd}}; background: {{c.bg}}; color: {{c.fg}}; font-family: inherit; font-size: 15px; font-weight: {{c.fw}}; cursor: pointer;">{{c.label}}</button>
+        </sc-for>
+      </div>
+    </fieldset>
+
+    <div style="display: flex; flex-direction: column; gap: 6px;">
+      <label for="desc" style="font-size: 16px; font-weight: 600;">What did they do?</label>
+      <textarea id="desc" rows="3" defaultValue="{{descDefault}}" onChange="{{onDesc}}" aria-invalid="{{f.invalid}}" aria-describedby="desc-hint" style="box-sizing: border-box; width: 100%; min-height: 84px; padding: 10px 14px; border-radius: 8px; border: {{s.descBd}}; background: #ffffff; color: #0f172a; font-family: inherit; font-size: 16px; line-height: 1.5; resize: vertical;"></textarea>
+      <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 14px;">
+        <span id="desc-hint" style="color: #586579;">At least 10 characters. Please leave out phone numbers and addresses.</span>
+        <span style="flex-shrink: 0; color: {{s.countColor}}; font-weight: 600;">{{descLen}} / 1000</span>
+      </div>
+      <sc-if value="{{f.invalid}}" hint-placeholder-val="{{ false }}">
+      <p role="alert" style="margin: 0; font-size: 14px; font-weight: 600; color: #b91c1c;">Write at least 10 characters so people understand what happened.</p>
+      </sc-if>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px;">
+        <p id="photos-l" style="margin: 0; font-size: 16px; font-weight: 600;">Photos <span style="font-weight: 400; color: #586579;">(optional)</span></p>
+        <span style="font-size: 14px; font-weight: 600; color: #586579;">{{photoCount}} of 4</span>
+      </div>
+      <sc-if value="{{f.hasPhotos}}" hint-placeholder-val="{{ true }}">
+      <ul aria-labelledby="photos-l" style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px;">
+        <sc-for list="{{photos}}" as="p" hint-placeholder-count="2">
+        <li style="position: relative; aspect-ratio: 1 / 1; border-radius: 10px; background: {{p.bg}}; color: #334155; display: flex; align-items: center; justify-content: center;">
+          <svg role="img" aria-label="{{p.label}}" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M21 16l-5-5-9 9"></path></svg>
+          <button type="button" aria-label="Remove {{p.label}}" onClick="{{p.remove}}" style="position: absolute; top: 4px; right: 4px; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 999px; background: rgba(15, 23, 42, 0.75); color: #ffffff; cursor: pointer; display: flex; align-items: center; justify-content: center;"><svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+        </li>
+        </sc-for>
+      </ul>
+      </sc-if>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+        <button type="button" onClick="{{addPhoto}}" disabled="{{f.photosFull}}" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; opacity: {{s.photoBtnOp}};">
+          <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"></path><circle cx="12" cy="13.5" r="3.5"></circle></svg>
+          Take photo
+        </button>
+        <button type="button" onClick="{{addPhoto}}" disabled="{{f.photosFull}}" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; opacity: {{s.photoBtnOp}};">
+          <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M21 16l-5-5-9 9"></path></svg>
+          Upload
+        </button>
+      </div>
+      <p style="margin: 0; display: flex; gap: 8px; align-items: flex-start; font-size: 14px; color: #586579;">
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px;"><path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z"></path></svg>
+        <span>{{photoNote}}</span>
+      </p>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <p id="people-l" style="margin: 0; font-size: 16px; font-weight: 600;">How many people did they help? <span style="font-weight: 400; color: #586579;">(optional)</span></p>
+      <div role="group" aria-labelledby="people-l" style="align-self: flex-start; display: inline-flex; align-items: center; border: 1px solid #cbd5e1; border-radius: 8px; background: #ffffff;">
+        <button type="button" aria-label="One fewer" onClick="{{peopleMinus}}" style="width: 48px; height: 48px; border: 0; background: transparent; color: #1e293b; cursor: pointer; display: flex; align-items: center; justify-content: center;"><svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"></path></svg></button>
+        <span aria-live="polite" style="min-width: 48px; text-align: center; font-size: 18px; font-weight: 700;">{{people}}</span>
+        <button type="button" aria-label="One more" onClick="{{peoplePlus}}" style="width: 48px; height: 48px; border: 0; background: transparent; color: #1e293b; cursor: pointer; display: flex; align-items: center; justify-content: center;"><svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button>
+      </div>
+    </div>
+
+    <fieldset style="border: 0; margin: 0; padding: 0; min-width: 0;">
+      <legend style="padding: 0; margin-bottom: 10px; font-size: 16px; font-weight: 600;">When did it happen?</legend>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <button type="button" aria-pressed="{{whenNow.on}}" onClick="{{whenNow.pick}}" style="min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid {{whenNow.bd}}; background: {{whenNow.bg}}; color: {{whenNow.fg}}; font-family: inherit; font-size: 15px; font-weight: {{whenNow.fw}}; cursor: pointer;">Just now</button>
+        <button type="button" aria-pressed="{{whenEarlier.on}}" onClick="{{whenEarlier.pick}}" style="min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid {{whenEarlier.bd}}; background: {{whenEarlier.bg}}; color: {{whenEarlier.fg}}; font-family: inherit; font-size: 15px; font-weight: {{whenEarlier.fw}}; cursor: pointer;">Earlier</button>
+      </div>
+      <sc-if value="{{f.earlier}}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 12px;">
+        <label for="when-t" style="font-size: 15px; font-weight: 500;">How long before you scanned?</label>
+        <select id="when-t" style="min-height: 48px; box-sizing: border-box; width: 100%; padding: 0 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; font-family: inherit; font-size: 16px;">
+          <option>About 15 minutes</option>
+          <option>About 30 minutes</option>
+          <option>About 1 hour</option>
+          <option>About 2 hours</option>
+        </select>
+      </div>
+      </sc-if>
+      <p style="margin: 8px 0 0; font-size: 14px; color: #586579;">Up to 2 hours before you scanned.</p>
+    </fieldset>
+
+    <div style="display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; background: #eef2fe; color: #2442b8; font-size: 14px;">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px;"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+      <span><strong>Verified deeds appear in the public feed.</strong> You or Ahmed can hide it at any time. Only the area name is shown, never your exact location.</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <button type="button" onClick="{{send}}" style="width: 100%; min-height: 52px; border-radius: 8px; border: 0; background: #3659e3; color: #ffffff; font-family: inherit; font-size: 17px; font-weight: 600; cursor: pointer;">Send report</button>
+      <p style="margin: 0; text-align: center; font-size: 14px; color: #586579;">It goes on Ahmed’s profile as soon as you send it.</p>
+    </div>
+  </form>
+  </sc-if>
+
+  <sc-if value="{{f.result}}" hint-placeholder-val="{{ false }}">
+  <div style="display: flex; flex-direction: column; align-items: center; gap: 16px; padding-top: 24px; text-align: center;">
+    <sc-if value="{{f.success}}" hint-placeholder-val="{{ true }}">
+    <span aria-hidden="true" style="width: 76px; height: 76px; border-radius: 999px; background: #ecfdf5; color: #047857; display: flex; align-items: center; justify-content: center;">
+      <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+    </span>
+    <h1 style="margin: 0; font-size: {{s.h1}}px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em;">Deed verified</h1>
+    <p style="margin: 0; color: #334155; max-width: 420px;">Thanks, Priya. It now counts on Ahmed Khan’s profile.</p>
+    </sc-if>
+    <sc-if value="{{f.extra}}" hint-placeholder-val="{{ false }}">
+    <span aria-hidden="true" style="width: 76px; height: 76px; border-radius: 999px; background: #eef2fe; color: #2442b8; display: flex; align-items: center; justify-content: center;">
+      <svg viewBox="0 0 24 24" width="38" height="38" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20a6.5 6.5 0 0 1 13 0"></path><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"></path></svg>
+    </span>
+    <h1 style="margin: 0; font-size: {{s.h1}}px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em;">Saved as an extra witness</h1>
+    <p style="margin: 0; color: #334155; max-width: 420px;">Others already reported this act. Your report backs theirs up, but it doesn’t count a second time on Ahmed’s profile.</p>
+    </sc-if>
+    <dl style="margin: 8px 0 0; width: 100%; box-sizing: border-box; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px 18px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px 16px; text-align: left; font-size: 15px;">
+      <dt style="color: #475569;">Who</dt><dd style="margin: 0; font-weight: 600;">Ahmed Khan</dd>
+      <dt style="color: #475569;">Deed</dt><dd style="margin: 0; font-weight: 600;">Helping an elderly person</dd>
+      <dt style="color: #475569;">When</dt><dd style="margin: 0; font-weight: 600;">Today, 4:12 pm</dd>
+      <dt style="color: #475569;">Photos</dt><dd style="margin: 0; font-weight: 600;">2 attached</dd>
+      <dt style="color: #475569;">Checked by</dt><dd style="margin: 0; font-weight: 600;">QR code and location</dd>
+    </dl>
+    <div style="width: 100%; display: flex; flex-direction: column; gap: 10px; margin-top: 8px;">
+      <button type="button" onClick="{{again}}" style="width: 100%; min-height: 48px; border-radius: 8px; border: 0; background: #3659e3; color: #ffffff; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">Record another deed</button>
+      <a href="#my-deeds" style="width: 100%; box-sizing: border-box; min-height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff; color: #1e293b; font-size: 16px; font-weight: 600; text-decoration: none;">See my reports</a>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{f.error}}" hint-placeholder-val="{{ false }}">
+  <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 16px; padding-top: 24px;">
+    <span aria-hidden="true" style="width: 60px; height: 60px; border-radius: 999px; background: {{err.bg}}; color: {{err.fg}}; display: flex; align-items: center; justify-content: center;">
+      <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5h.01"></path></svg>
+    </span>
+    <h1 style="margin: 0; font-size: {{s.h1}}px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em;">{{err.title}}</h1>
+    <p style="margin: 0; color: #334155;">{{err.body}}</p>
+    <div style="width: 100%; display: flex; flex-direction: column; gap: 10px; margin-top: 8px;">
+      <button type="button" onClick="{{again}}" style="width: 100%; min-height: 48px; border-radius: 8px; border: 0; background: #3659e3; color: #ffffff; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">{{err.action}}</button>
+      <a href="#home" style="width: 100%; box-sizing: border-box; min-height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff; color: #1e293b; font-size: 16px; font-weight: 600; text-decoration: none;">Back to Home</a>
+    </div>
+  </div>
+  </sc-if>
+
+</main>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"device":{"editor":"enum","options":["mobile","desktop"],"default":"mobile"},"screen":{"editor":"enum","options":["live","hub","hub-near","hub-full","loc-explain","loc-denied","loc-imprecise","camera","camera-unsupported","manual","manual-error","checking","form","form-pair","form-invalid","form-photos-full","success","success-extra","err-expired","err-today","err-pair-limit","err-form-expired","error-sheet"],"default":"live"},"$preview":{"width":390,"height":1450}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { ui: 'hub', after: 'camera', loc: false, cat: 'helping_elderly', when: 'now', people: 1, left: 900, descLen: 98, photos: 0 };
+  }
+  componentDidMount() {
+    if (this.live()) {
+      this.timer = setInterval(() => {
+        if (this.state.ui === 'form' && this.state.left > 0) this.setState({ left: this.state.left - 1 });
+      }, 1000);
+    }
+  }
+  componentWillUnmount() {
+    clearInterval(this.timer);
+    clearTimeout(this.checkTimer);
+  }
+  live() {
+    return (this.props.screen ?? 'live') === 'live';
+  }
+  go(ui) {
+    if (this.live()) this.setState({ ui: ui });
+  }
+  startCheck() {
+    if (!this.live()) return;
+    this.setState({ ui: 'checking' });
+    clearTimeout(this.checkTimer);
+    this.checkTimer = setTimeout(() => this.setState({ ui: 'form', left: 900 }), 1400);
+  }
+  pill(on) {
+    return on
+      ? { on: true, bd: '#3659e3', bg: '#3659e3', fg: '#ffffff', fw: 600 }
+      : { on: false, bd: '#cbd5e1', bg: '#ffffff', fg: '#1e293b', fw: 500 };
+  }
+  errors() {
+    return {
+      'err-expired': { title: 'This code has expired', body: 'Codes change every 30 seconds. Ask Ahmed to open My QR again, then scan the new code.', action: 'Scan again', bg: '#fffbeb', fg: '#b45309' },
+      'err-today': { title: 'You’ve already recognised Ahmed today', body: 'You can recognise the same person once a day. You can recognise Ahmed again tomorrow, or record someone else now.', action: 'Record someone else', bg: '#eef2fe', fg: '#2442b8' },
+      'err-pair-limit': { title: 'You’ve recorded Ahmed 15 times this month', body: 'That’s the most for one person. You can record Ahmed again from 1 December, and you can still record anyone else.', action: 'Record someone else', bg: '#eef2fe', fg: '#2442b8' },
+      'err-form-expired': { title: 'Time ran out for this report', body: 'Reports must be sent within 15 minutes of scanning. Scan Ahmed’s QR again to start over.', action: 'Scan again', bg: '#fffbeb', fg: '#b45309' }
+    };
+  }
+  errList() {
+    return [
+      { code: 'qr_invalid', where: 'Full screen', title: 'This code has expired', body: 'Codes change every 30 seconds. Ask Ahmed to open My QR again, then scan the new code.', action: 'Scan again' },
+      { code: 'doer_code_invalid', where: 'Inline · Enter ID and code', title: 'ID and code don’t match', body: 'Codes change every 30 seconds. Ask for the code on their screen right now and try again.', action: 'Continue (retry)' },
+      { code: 'cannot_verify_self', where: 'Full screen', title: 'You can’t record your own deed', body: 'This QR belongs to your account, or to an account that shares your phone number. Scan the QR of the person who did the deed.', action: 'Back to Record a deed' },
+      { code: 'already_recognized_today', where: 'Full screen', title: 'You’ve already recognised Ahmed today', body: 'You can recognise the same person once a day. You can recognise Ahmed again tomorrow, or record someone else now.', action: 'Record someone else' },
+      { code: 'already_scanned', where: 'Full screen', title: 'You’ve already scanned this code', body: 'Wait for Ahmed’s next code (it changes every 30 seconds), then scan again.', action: 'Scan again' },
+      { code: 'outside_service_area', where: 'Full screen', title: 'You’re outside Bangalore', body: 'Good Deeds is open in Bangalore only for now, within 40 km of the city centre.', action: 'Back to Home' },
+      { code: 'location_too_imprecise', where: 'Own screen · row 2', title: 'Your location isn’t precise enough', body: 'Your phone places you somewhere within 850 m. We need it within 500 m.', action: 'Try again' },
+      { code: 'implausible_travel', where: 'Full screen', title: 'We couldn’t confirm your location', body: 'Your location jumped further than anyone could travel. Turn off any app that changes your location, wait a minute and try again.', action: 'Try again' },
+      { code: 'rate_limited', where: 'Full screen', title: 'Too many tries', body: 'Please wait a few minutes, then try again.', action: 'Back to Home' },
+      { code: 'pair_monthly_limit (new)', where: 'Full screen', title: 'You’ve recorded Ahmed 15 times this month', body: 'That’s the most for one person. You can record Ahmed again from 1 December, and you can still record anyone else.', action: 'Record someone else' },
+      { code: 'monthly_report_limit (150)', where: 'Hub banner · options disabled', title: 'You’ve recorded 150 deeds this month', body: 'That’s the monthly maximum. You can record more from 1 December.', action: '(none)' },
+      { code: 'scan_expired', where: 'Full screen', title: 'Time ran out for this report', body: 'Reports must be sent within 15 minutes of scanning. Scan Ahmed’s QR again to start over.', action: 'Scan again' },
+      { code: 'scan_used', where: 'Full screen', title: 'This report was already sent', body: 'You’ll find it in My deeds.', action: 'See my reports' },
+      { code: 'location denied', where: 'Own screen · row 2', title: 'Location is blocked', body: 'We can’t verify a deed without your location. You can turn it back on in a few taps.', action: 'Try again' }
+    ];
+  }
+  renderVals() {
+    const desktop = (this.props.device ?? 'mobile') === 'desktop';
+    const live = this.live();
+    const st = this.state;
+    const screen = live ? st.ui : this.props.screen;
+    const sheet = screen === 'error-sheet';
+    const camera = screen === 'camera';
+    const hub = screen === 'hub' || screen === 'hub-near' || screen === 'hub-full';
+    const form = screen === 'form' || screen === 'form-pair' || screen === 'form-invalid' || screen === 'form-photos-full';
+    const photoCount = live ? st.photos : (screen === 'form-photos-full' ? 4 : (screen === 'form-invalid' ? 0 : 2));
+    const tileBgs = ['#dbeafe', '#fde68a', '#d1fae5', '#fce7f3'];
+    const photos = [];
+    for (let i = 0; i < photoCount; i++) {
+      photos.push({ label: 'Photo ' + (i + 1), bg: tileBgs[i % 4], remove: () => { if (this.live()) this.setState({ photos: Math.max(0, this.state.photos - 1) }); } });
+    }
+    const result = screen === 'success' || screen === 'success-extra';
+    const isErr = screen.indexOf('err-') === 0;
+    const manual = screen === 'manual' || screen === 'manual-error';
+    const invalid = screen === 'form-invalid';
+    const left = live ? st.left : 872;
+    const mm = Math.floor(left / 60);
+    const ss = left % 60;
+    const cat = live ? st.cat : 'helping_elderly';
+    const when = live ? st.when : 'now';
+    const catDefs = [
+      ['helping_elderly', 'Helping an elderly person'], ['animals', 'Animals'], ['environment', 'Environment & cleanliness'],
+      ['food_sharing', 'Sharing food'], ['road_safety', 'Road & traffic help'], ['medical_help', 'Medical / emergency help'],
+      ['community', 'Community help'], ['other', 'Other']
+    ];
+    const tall = form;
+    let h = desktop ? (tall ? 1330 : 900) : (tall ? 1450 : 844);
+    if (sheet) h = 1500;
+    const backLabels = { 'loc-explain': 'Back', 'loc-denied': 'Back', 'loc-imprecise': 'Back', 'camera-unsupported': 'Back', 'manual': 'Back', 'manual-error': 'Back', 'form': 'Cancel', 'form-pair': 'Cancel', 'form-invalid': 'Cancel' };
+    const err = this.errors()[screen] || { title: '', body: '', action: '', bg: '#eef2fe', fg: '#2442b8' };
+    return {
+      mmss: mm + ':' + (ss < 10 ? '0' : '') + ss,
+      people: live ? st.people : 1,
+      photoCount: photoCount,
+      photos: photos,
+      photoNote: photoCount >= 4 ? 'You’ve added 4 photos, the most for one report. Remove one to add another.' : 'Faces of people being helped are blurred automatically.',
+      addPhoto: () => { if (this.live() && this.state.photos < 4) this.setState({ photos: this.state.photos + 1 }); },
+      descDefault: invalid ? 'Helped' : 'Helped an elderly man cross the busy junction at Silk Board and carried his bags to the bus stop.',
+      descLen: invalid ? 6 : (live ? st.descLen : 98),
+      codeVal: screen === 'manual-error' ? '482931' : '482913',
+      backLabel: backLabels[screen] || 'Back',
+      err: err,
+      errList: this.errList(),
+      cats: catDefs.map((c) => Object.assign({ slug: c[0], label: c[1], pick: () => { if (this.live()) this.setState({ cat: c[0] }); } }, this.pill(c[0] === cat))),
+      whenNow: Object.assign({ pick: () => { if (this.live()) this.setState({ when: 'now' }); } }, this.pill(when === 'now')),
+      whenEarlier: Object.assign({ pick: () => { if (this.live()) this.setState({ when: 'earlier' }); } }, this.pill(when === 'earlier')),
+      f: {
+        sheet: sheet,
+        camera: camera,
+        page: !sheet && !camera,
+        desktop: desktop,
+        hub: hub,
+        hubNear: screen === 'hub-near',
+        hubFull: screen === 'hub-full',
+        backLink: !!backLabels[screen],
+        locExplain: screen === 'loc-explain',
+        locDenied: screen === 'loc-denied',
+        locImprecise: screen === 'loc-imprecise',
+        unsupported: screen === 'camera-unsupported',
+        manual: manual,
+        manualError: screen === 'manual-error',
+        checking: screen === 'checking',
+        form: form,
+        pairWarn: screen === 'form-pair',
+        invalid: invalid,
+        earlier: when === 'earlier',
+        hasPhotos: photoCount > 0,
+        photosFull: photoCount >= 4,
+        result: result,
+        success: screen === 'success',
+        extra: screen === 'success-extra',
+        error: isErr
+      },
+      s: {
+        w: sheet ? 1240 : (desktop ? 1440 : 390),
+        h: h,
+        rootBg: camera ? '#0b1220' : '#faf8f5',
+        headPad: desktop ? 24 : 16,
+        navOrder: desktop ? 2 : 3,
+        navW: desktop ? 'auto' : '100%',
+        navMl: desktop ? 'auto' : '0',
+        navCol: desktop ? 'auto' : '1fr',
+        btnOrder: desktop ? 3 : 2,
+        btnMl: desktop ? '0' : 'auto',
+        maxW: desktop ? (hub ? 880 : 600) : 390,
+        mainPad: desktop ? '40px 24px 56px' : '20px 16px 40px',
+        h1: desktop ? 32 : 26,
+        hubCols: desktop ? 'repeat(2, minmax(0, 1fr))' : 'minmax(0, 1fr)',
+        howCols: desktop ? 'repeat(3, minmax(0, 1fr))' : 'minmax(0, 1fr)',
+        optOp: screen === 'hub-full' ? 0.5 : 1,
+        codeBd: screen === 'manual-error' ? '2px solid #b91c1c' : '1px solid #cbd5e1',
+        descBd: invalid ? '2px solid #b91c1c' : '1px solid #cbd5e1',
+        countColor: invalid ? '#b91c1c' : '#586579',
+        photoBtnOp: photoCount >= 4 ? 0.5 : 1
+      },
+      goScan: () => { if (this.live()) this.setState(st.loc ? { ui: 'camera' } : { ui: 'loc-explain', after: 'camera' }); },
+      goManual: () => { if (this.live()) this.setState(st.loc ? { ui: 'manual' } : { ui: 'loc-explain', after: 'manual' }); },
+      allow: () => { if (this.live()) this.setState({ loc: true, ui: st.after }); },
+      back: () => this.go('hub'),
+      toManual: () => this.go('manual'),
+      simulateScan: () => this.startCheck(),
+      continueManual: () => this.startCheck(),
+      onDesc: (e) => { if (this.live()) this.setState({ descLen: e.target.value.length }); },
+      peopleMinus: () => { if (this.live()) this.setState({ people: Math.max(0, st.people - 1) }); },
+      peoplePlus: () => { if (this.live()) this.setState({ people: st.people + 1 }); },
+      send: () => this.go('success'),
+      again: () => this.go('hub')
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -34,6 +34,14 @@ EXPECTED_V1 = {
     "rate_refresh_ip": "120/900",
     "rate_oauth_ip": "30/900",
 }
+# Appended by migration 0011 (forgot password).
+PASSWORD_RESET_KEYS = {
+    "rate_password_forgot_ip": "10/3600",
+    "rate_password_forgot_phone": "5/3600",
+    "rate_password_reset_ip": "20/3600",
+    "rate_password_reset_phone": "10/3600",
+}
+EXPECTED_LATEST = {**EXPECTED_V1, **PASSWORD_RESET_KEYS}
 
 
 async def test_seeded_identity_row_matches_model(session: AsyncSession) -> None:
@@ -41,17 +49,28 @@ async def test_seeded_identity_row_matches_model(session: AsyncSession) -> None:
     assert row is not None
     assert row.created_by is None
     assert row.values == EXPECTED_V1
-    assert IdentityLimits.model_validate(row.values).model_dump() == EXPECTED_V1
+
+
+async def test_migration_0011_appends_password_reset_limits(session: AsyncSession) -> None:
+    """0011 publishes the next version = the previous values plus the reset limits."""
+    row = await session.get(ConfigVersion, ("identity", 2))
+    assert row is not None
+    assert row.created_by is None
+    assert row.values == EXPECTED_LATEST
+    assert IdentityLimits.model_validate(row.values).model_dump() == EXPECTED_LATEST
+    assert (await load_limits(session)).model_dump() == EXPECTED_LATEST
 
 
 def test_model_has_no_defaults_and_forbids_extra_keys() -> None:
     assert all(field.is_required() for field in IdentityLimits.model_fields.values())
-    assert set(IdentityLimits.model_fields) == set(EXPECTED_V1)
-    for missing in EXPECTED_V1:
+    assert set(IdentityLimits.model_fields) == set(EXPECTED_LATEST)
+    for missing in EXPECTED_LATEST:
         with pytest.raises(ValidationError):
-            IdentityLimits.model_validate({k: v for k, v in EXPECTED_V1.items() if k != missing})
+            IdentityLimits.model_validate(
+                {k: v for k, v in EXPECTED_LATEST.items() if k != missing}
+            )
     with pytest.raises(ValidationError):
-        IdentityLimits.model_validate({**EXPECTED_V1, "unexpected": 1})
+        IdentityLimits.model_validate({**EXPECTED_LATEST, "unexpected": 1})
 
 
 def test_limits_are_no_longer_env_settings() -> None:

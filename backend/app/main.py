@@ -4,11 +4,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core import health
 from app.core.config import get_settings
 from app.core.errors import install_error_handlers
+from app.core.log_redaction import install_access_log_redaction
 from app.modules.registry import load_modules, module_routers
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    # Uvicorn has configured its loggers before importing this module (security L1).
+    install_access_log_redaction()
     app = FastAPI(title="Good Deeds API", version="0.1.0")
     app.add_middleware(
         CORSMiddleware,

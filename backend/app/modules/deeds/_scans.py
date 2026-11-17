@@ -19,13 +19,18 @@ from app.modules.deeds import _plausibility as plaus
 from app.modules.deeds._common import (
     constraint_name,
     ist_day,
+    ist_month,
     lat_lng,
     point_ewkt,
     to_point,
     utcnow,
 )
 from app.modules.deeds._limits import DeedLimits
-from app.modules.deeds._reporter_limit import precheck_monthly_limit
+from app.modules.deeds._reporter_limit import (
+    pair_limit_reached,
+    pair_reports_remaining,
+    precheck_monthly_limit,
+)
 from app.modules.deeds.models import Deed, QrScan, ScanMethod
 from app.modules.deeds.schemas import ScanCreate, ScanDetail, ScanOut, UserRef
 from app.modules.identity import service as identity
@@ -33,8 +38,12 @@ from app.modules.identity import service as identity
 _ALREADY_TODAY = "You've already recognised this person today. Try again tomorrow."
 
 
-def _already_today() -> Conflict:
-    return Conflict(_ALREADY_TODAY, code="already_recognized_today")
+def _already_today(doer: UserRef) -> Conflict:
+    """Scan-time only: the body names the doer (D27). Raised only after the code resolved and
+    the self and phone checks passed, and the witness has already recorded this person today."""
+    return Conflict(
+        _ALREADY_TODAY, code="already_recognized_today", extra={"doer": doer.model_dump()}
+    )
 
 
 def _already_scanned() -> Conflict:
@@ -64,6 +73,9 @@ async def enforce_rate_limits(
     raw = data.short_id or ""
     target = identity.normalize_short_id(raw) or raw.strip().upper()
     await limiter.hit(f"manual:t:{target}", limits.rate_manual_target)
+    # A slower daily cap per target (security L4): the 15-minute limit alone still allows
+    # 1920 guesses a day at one ID across many witnesses and IPs.
+    await limiter.hit(f"manual:td:{target}", limits.rate_manual_target_daily)
 
 
 # --------------------------------------------------- plausibility inputs
@@ -203,8 +215,18 @@ async def create_scan(
     # Pre-checks for friendly errors; the unique constraints are the real guard.
     if await _window_used(session, witness_id, doer.user_id, doer.window):
         raise _already_scanned()
+    doer_ref = UserRef(handle=doer.handle, display_name=doer.display_name)
     if await _pair_used_today(session, witness_id, doer.user_id, today):
-        raise _already_today()
+        raise _already_today(doer_ref)
+    # D19 pair pre-check (unlocked): refuse before a scan is recorded, so the pair's IST day
+    # isn't used up by a scan that could never become a deed. Only here, after the code resolved
+    # and the self and phone checks passed, so it reveals nothing about a code the witness
+    # couldn't already use. The locked check on deed create is the authoritative one.
+    pair_remaining = await pair_reports_remaining(session, witness_id, doer.user_id, limits, now)
+    if not pair_remaining:
+        raise pair_limit_reached(
+            limits.reporter_doer_monthly_limit, extra={"doer": doer_ref.model_dump()}
+        )
 
     loc = data.location
     here = plaus.Fix(point=plaus.Point(lat=loc.lat, lng=loc.lng), at=now)
@@ -238,12 +260,15 @@ async def create_scan(
         if name == "uq_qr_scans_doer_window_witness":
             raise _already_scanned() from exc
         if name == "uq_qr_scans_doer_witness_day":
-            raise _already_today() from exc
+            raise _already_today(doer_ref) from exc
         raise
     return ScanOut(
         scan_id=scan.id,
-        doer=UserRef(handle=doer.handle, display_name=doer.display_name),
+        doer=doer_ref,
         expires_at=scan.expires_at,
+        scanned_at=scan.scanned_at,
+        pair_reports_remaining=pair_remaining,
+        month_resets_at=ist_month(now)[1],
     )
 
 
@@ -259,10 +284,16 @@ def scan_expired() -> Gone:
 
 
 async def get_scan(
-    session: AsyncSession, witness_id: uuid.UUID, scan_id: uuid.UUID, now: datetime | None = None
+    session: AsyncSession,
+    witness_id: uuid.UUID,
+    scan_id: uuid.UUID,
+    *,
+    limits: DeedLimits,
+    now: datetime | None = None,
 ) -> ScanDetail:
     """The caller's own scan. Another witness's scan is indistinguishable from a missing one.
-    A consumed scan is still returned (``consumed=true``) so the form can show it was used."""
+    A consumed scan is still returned (``consumed=true``) so the form can show it was used.
+    ``pair_reports_remaining`` and ``month_resets_at`` are recomputed at read time (D20)."""
     now = now or utcnow()
     scan = await session.get(QrScan, scan_id)
     if scan is None or scan.witness_user_id != witness_id:
@@ -277,5 +308,10 @@ async def get_scan(
         scan_id=scan.id,
         doer=UserRef(handle=doer.handle, display_name=doer.display_name),
         expires_at=scan.expires_at,
+        scanned_at=scan.scanned_at,
+        pair_reports_remaining=await pair_reports_remaining(
+            session, witness_id, scan.doer_user_id, limits, now
+        ),
+        month_resets_at=ist_month(now)[1],
         consumed=scan.consumed_at is not None,
     )

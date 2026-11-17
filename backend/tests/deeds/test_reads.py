@@ -285,10 +285,31 @@ async def test_options_reflect_config_and_todays_invites(
         "invites_remaining_today",
         "reports_remaining_this_month",
         "invite_expiry_hours",
+        # Revision 5 (D20, D23)
+        "reporter_monthly_limit",
+        "reporter_doer_monthly_limit",
+        "month_resets_at",
         "description_min",
         "description_max",
+        "beneficiaries_max",
         "scan_submit_minutes",
+        "qr_occurred_max_age_minutes",
+        "max_location_accuracy_m",
+        "service_area_radius_km",
+        "same_act_cap",
+        "photos_enabled",
     }
+    # The limits and copy values follow config (seeded values, apart from the two published).
+    assert body["reporter_monthly_limit"] == 10
+    assert body["reporter_doer_monthly_limit"] == 15
+    assert body["photos_enabled"] is False
+    assert body["beneficiaries_max"] == 10000
+    assert body["qr_occurred_max_age_minutes"] == 120
+    assert body["max_location_accuracy_m"] == 500
+    assert body["service_area_radius_km"] == 40
+    assert body["same_act_cap"] == 5
+    assert datetime.fromisoformat(body["month_resets_at"]) == ist_month(now)[1]
+    assert body["month_resets_at"].endswith("+05:30")
 
     await _pending_deed(session, me, at=now)
     await _pending_deed(session, me, at=now)
@@ -301,6 +322,32 @@ async def test_options_need_an_onboarded_member(client: AsyncClient, session: As
     newcomer = await make_member(session, onboarded=False)
     response = await client.get("/api/deeds/options", headers=newcomer.headers)
     assert response.status_code == 403
+
+
+async def test_options_limits_and_copy_values_follow_config(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """Revision 5 (D20, D23): nothing the F3 copy shows is hard-coded in the response."""
+    me = await make_member(session)
+    await publish_limits(
+        session,
+        reporter_monthly_limit=40,
+        reporter_doer_monthly_limit=4,
+        photos_enabled=True,
+        max_location_accuracy_m=250,
+        qr_occurred_max_age_minutes=90,
+        beneficiaries_max=500,
+        same_act_cap=3,
+    )
+    body = (await client.get("/api/deeds/options", headers=me.headers)).json()
+    assert body["reporter_monthly_limit"] == 40
+    assert body["reports_remaining_this_month"] == 40
+    assert body["reporter_doer_monthly_limit"] == 4
+    assert body["photos_enabled"] is True
+    assert body["max_location_accuracy_m"] == 250
+    assert body["qr_occurred_max_age_minutes"] == 90
+    assert body["beneficiaries_max"] == 500
+    assert body["same_act_cap"] == 3
 
 
 # --------------------------------------------------- deeds.service views (§4)

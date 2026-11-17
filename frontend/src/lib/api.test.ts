@@ -166,6 +166,27 @@ describe('api client', () => {
     expect(error.detail).toMatch(/check the form/i)
   })
 
+  it('keeps extra error-body fields (AppError.extra) apart from detail and code', async () => {
+    mockApi({
+      'POST /scans': {
+        status: 429,
+        body: {
+          detail: 'Monthly limit reached.',
+          code: 'pair_monthly_limit',
+          doer: { handle: 'ahmed', display_name: 'Ahmed Khan' },
+        },
+      },
+      'GET /health': { status: 409, body: { detail: 'Nope.', code: 'x' } },
+    })
+    const error = (await apiPost('/scans', {}).catch((e: unknown) => e)) as ApiError
+    expect(error).toMatchObject({ status: 429, code: 'pair_monthly_limit' })
+    expect(error.detail).toBe('Monthly limit reached.')
+    expect(error.extra).toEqual({ doer: { handle: 'ahmed', display_name: 'Ahmed Khan' } })
+
+    const plain = (await apiGet('/health').catch((e: unknown) => e)) as ApiError
+    expect(plain.extra).toEqual({})
+  })
+
   it('handles 204 and non-JSON errors', async () => {
     vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(new Response(null, { status: 204 }))

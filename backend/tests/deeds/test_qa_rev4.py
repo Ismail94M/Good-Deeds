@@ -2,9 +2,10 @@
 
 - D16 (monthly reporting limit): the IST month edge to the microsecond, a report at 23:59:59 IST
   that only reaches the database after midnight, ``reported_at`` being server time only, the
-  15/16 boundary over the API on both paths and the scan pre-check, a pre-check that passes
-  followed by a refused submit, concurrency across both paths, and bypass attempts (statuses,
-  edits, scan stockpiling, accepting an invite in a later month, a disabled invite).
+  149/150/151 boundary (D19 value) over the API on both paths and the scan pre-check, a
+  pre-check that passes followed by a refused submit, concurrency across both paths, and bypass
+  attempts (statuses, edits, scan stockpiling, accepting an invite in a later month, a disabled
+  invite).
 - D17 (invites off): ordering against D16 and that a refused invite leaves nothing behind.
 - D15 (counted reports): the profile count through a withdraw-and-promote sequence.
 """
@@ -39,6 +40,7 @@ from tests.deeds.helpers import (
     report,
     scan,
     scan_and_report,
+    seed_deeds,
     token_for,
 )
 from tests.deeds.invite_helpers import accept, create_invite, invite_body, withdraw
@@ -60,14 +62,13 @@ def _ist(y: int, m: int, d: int, hh: int = 0, mm: int = 0, ss: int = 0, us: int 
     return datetime(y, m, d, hh, mm, ss, us, tzinfo=LAUNCH_TZ)
 
 
-async def _fill(session: AsyncSession, witness: Member, n: int, start: datetime) -> list[Member]:
-    """``n`` QR reports by ``witness`` about new doers, one second apart."""
-    doers = []
-    for i in range(n):
-        doer = await make_member(session)
-        await scan_and_report(session, witness, doer, at=start + timedelta(seconds=i))
-        doers.append(doer)
-    return doers
+# The seeded total (D19 raised it from 15); test_config.py checks the config row.
+LIMIT = 150
+
+
+async def _fill(session: AsyncSession, witness: Member, n: int, start: datetime) -> None:
+    """``n`` deeds by ``witness`` (seeded rows, no doer), one second apart."""
+    await seed_deeds(session, witness, n, start=start)
 
 
 async def _expect_limited(coro: Any) -> None:
@@ -109,34 +110,34 @@ def test_ist_month_bounds(at: datetime, start: datetime, end: datetime) -> None:
 async def test_report_at_235959_ist_counts_for_the_month_it_was_submitted_in(
     session: AsyncSession,
 ) -> None:
-    """A submit stamped 23:59:59.999999 IST is October's 15th, even if the row only lands after
-    midnight: the check and ``reported_at`` use the same server ``now``. November starts fresh,
-    and its first report at exactly 00:00:00 IST belongs to November, not October."""
+    """A submit stamped 23:59:59.999999 IST is October's 150th, even if the row only lands
+    after midnight: the check and ``reported_at`` use the same server ``now``. November starts
+    fresh, and its first report at exactly 00:00:00 IST belongs to November, not October."""
     witness = await make_member(session)
-    await _fill(session, witness, 14, OCT_31_MORNING)
+    await _fill(session, witness, LIMIT - 1, OCT_31_MORNING)
     doer = await make_member(session)
     last_us = NOV_1_IST - _US
     s = await scan(session, witness, doer, at=NOV_1_IST - timedelta(seconds=5))
     fifteenth = await report(session, witness, s.scan_id, at=last_us)
     assert fifteenth.reported_at == last_us
-    assert await reported_this_month(session, witness.user_id, last_us) == 15
+    assert await reported_this_month(session, witness.user_id, last_us) == LIMIT
     assert await reported_this_month(session, witness.user_id, NOV_1_IST) == 0
 
-    # 00:00:00.000000 IST on the 1st is November's first, not October's 16th.
+    # 00:00:00.000000 IST on the 1st is November's first, not October's 151st.
     await scan_and_report(session, witness, await make_member(session), at=NOV_1_IST)
-    assert await reported_this_month(session, witness.user_id, last_us) == 15
+    assert await reported_this_month(session, witness.user_id, last_us) == LIMIT
     assert await reported_this_month(session, witness.user_id, NOV_1_IST) == 1
 
 
 async def test_scan_refused_at_2359_becomes_a_deed_after_midnight(session: AsyncSession) -> None:
-    """A scan made at 14/15, refused at 23:59:55 IST because the 15th slot went elsewhere, is
+    """A scan made at 149/150, refused at 23:59:55 IST because the 150th slot went elsewhere, is
     still unused, so the same scan becomes November's first report at 00:00:10 IST."""
     witness, doer = await make_member(session), await make_member(session)
-    await _fill(session, witness, 14, OCT_31_MORNING)
+    await _fill(session, witness, LIMIT - 1, OCT_31_MORNING)
     early = await scan(session, witness, doer, at=NOV_1_IST - timedelta(seconds=20))
     await scan_and_report(
         session, witness, await make_member(session), at=NOV_1_IST - timedelta(seconds=15)
-    )  # the 15th
+    )  # the 150th
     await _expect_limited(
         report(session, witness, early.scan_id, at=NOV_1_IST - timedelta(seconds=5))
     )
@@ -211,12 +212,9 @@ async def test_client_cannot_send_reported_at_or_report_day(
 
 
 async def _seed_now(session: AsyncSession, witness: Member, n: int) -> None:
-    """``n`` QR reports by ``witness`` in the last minute (real clock, as the API uses)."""
-    now = datetime.now(UTC)
-    for i in range(n):
-        await scan_and_report(
-            session, witness, await make_member(session), at=now - timedelta(seconds=60 - i)
-        )
+    """``n`` deeds by ``witness`` in the last few seconds (real clock, as the API uses)."""
+    step = timedelta(milliseconds=20)
+    await seed_deeds(session, witness, n, start=datetime.now(UTC) - (n + 1) * step, step=step)
     await session.commit()
 
 
@@ -237,14 +235,14 @@ async def _remaining(client: AsyncClient, who: Member) -> int:
     return value
 
 
-async def test_api_qr_path_fifteenth_succeeds_sixteenth_refused_with_default_limit(
+async def test_api_qr_path_150th_succeeds_151st_refused_with_default_limit(
     client: AsyncClient, session: AsyncSession
 ) -> None:
-    """With the seeded limit (15): the scan pre-check at 14 passes, the 15th deed is 201, the
-    pre-check at 15 is 429 and records nothing; options goes 1 -> 0."""
+    """With the seeded limit (150): the scan pre-check at 149 passes, the 150th deed is 201,
+    the pre-check at 150 is 429 and records nothing; options goes 1 -> 0."""
     witness = await make_member(session)
     d15, d16 = await make_member(session), await make_member(session)
-    await _seed_now(session, witness, 14)
+    await _seed_now(session, witness, LIMIT - 1)
     assert await _remaining(client, witness) == 1
 
     scanned = await _api_scan(client, session, witness, d15)
@@ -259,31 +257,31 @@ async def test_api_qr_path_fifteenth_succeeds_sixteenth_refused_with_default_lim
     assert refused.status_code == 429, refused.text
     assert refused.json()["code"] == "monthly_report_limit"
     assert await count(session, QrScan, QrScan.doer_user_id == d16.user_id) == 0
-    assert await count(session, Deed, Deed.reporter_user_id == witness.user_id) == 15
+    assert await count(session, Deed, Deed.reporter_user_id == witness.user_id) == LIMIT
 
 
-async def test_api_invite_path_fifteenth_succeeds_sixteenth_refused(
+async def test_api_invite_path_150th_succeeds_151st_refused(
     client: AsyncClient, session: AsyncSession, invites_on: None
 ) -> None:
     witness = await make_member(session)
     await publish_limits(session, invites_per_day=20)
-    await _seed_now(session, witness, 14)
+    await _seed_now(session, witness, LIMIT - 1)
     first = await client.post("/api/deeds", json=invite_body(), headers=witness.headers)
     assert first.status_code == 201, first.text
     second = await client.post("/api/deeds", json=invite_body(), headers=witness.headers)
     assert second.status_code == 429, second.text
     assert second.json()["code"] == "monthly_report_limit"
     assert await count(session, Invite, Invite.reporter_user_id == witness.user_id) == 1
-    assert await count(session, Deed, Deed.reporter_user_id == witness.user_id) == 15
+    assert await count(session, Deed, Deed.reporter_user_id == witness.user_id) == LIMIT
 
 
 async def test_api_scan_precheck_passes_then_an_invite_takes_the_last_slot(
     client: AsyncClient, session: AsyncSession, invites_on: None
 ) -> None:
-    """Scan at 14/15 (pre-check passes), an invite becomes the 15th, then the scan's deed is
+    """Scan at 149/150 (pre-check passes), an invite becomes the 150th, then the scan's deed is
     refused by the authoritative check and its scan stays unused."""
     witness, doer = await make_member(session), await make_member(session)
-    await _seed_now(session, witness, 14)
+    await _seed_now(session, witness, LIMIT - 1)
     scanned = await _api_scan(client, session, witness, doer)
     assert scanned.status_code == 201, scanned.text
     invite = await client.post("/api/deeds", json=invite_body(), headers=witness.headers)
@@ -313,15 +311,15 @@ async def test_options_never_negative_and_per_user(
 
 
 async def test_stockpiled_scans_at_fourteen_yield_one_deed(session: AsyncSession) -> None:
-    """Scanning several doers while at 14 (each pre-check passes) doesn't buy extra slots."""
+    """Scanning several doers while at 149 (each pre-check passes) doesn't buy extra slots."""
     witness = await make_member(session)
-    await _fill(session, witness, 14, OCT_31_MORNING)
+    await _fill(session, witness, LIMIT - 1, OCT_31_MORNING)
     at = OCT_31_MORNING + timedelta(hours=1)
     scans = [await scan(session, witness, await make_member(session), at=at) for _ in range(3)]
     await report(session, witness, scans[0].scan_id, at=at + timedelta(minutes=1))
     for s in scans[1:]:
         await _expect_limited(report(session, witness, s.scan_id, at=at + timedelta(minutes=2)))
-    assert await count(session, Deed, Deed.reporter_user_id == witness.user_id) == 15
+    assert await count(session, Deed, Deed.reporter_user_id == witness.user_id) == LIMIT
     unused = await count(
         session,
         QrScan,
@@ -341,10 +339,13 @@ async def test_stockpiled_scans_at_fourteen_yield_one_deed(session: AsyncSession
     ],
 )
 async def test_every_status_still_counts(session: AsyncSession, status: DeedStatus) -> None:
-    """QR deeds forced into each closed status (pending is invite-only and is covered by the
-    invite tests) still fill the month."""
+    """Deeds forced into each closed status (pending is invite-only and is covered by the
+    invite tests) still fill the month. One of them is a real QR deed."""
     witness = await make_member(session)
-    await _fill(session, witness, 15, OCT_31_MORNING)
+    await _fill(session, witness, LIMIT - 1, OCT_31_MORNING)
+    await scan_and_report(
+        session, witness, await make_member(session), at=OCT_31_MORNING + timedelta(minutes=30)
+    )
     await session.execute(
         update(Deed)
         .where(Deed.reporter_user_id == witness.user_id)
@@ -363,13 +364,20 @@ async def test_every_status_still_counts(session: AsyncSession, status: DeedStat
 
 async def test_edits_do_not_free_a_slot_or_move_reported_at(session: AsyncSession) -> None:
     witness = await make_member(session)
-    await _fill(session, witness, 15, OCT_31_MORNING)
+    await _fill(session, witness, LIMIT - 3, OCT_31_MORNING)
+    for i in range(3):  # real (verified, so editable) reports
+        await scan_and_report(
+            session,
+            witness,
+            await make_member(session),
+            at=OCT_31_MORNING + timedelta(minutes=10 + i),
+        )
     _, limits = await load_limits(session)
     deeds = list(
         await session.scalars(select(Deed).where(Deed.reporter_user_id == witness.user_id))
     )
     before = {d.id: d.reported_at for d in deeds}
-    for d in deeds[:3]:
+    for d in [d for d in deeds if d.status == DeedStatus.VERIFIED]:
         await _edits.edit_deed(
             session,
             witness.user_id,
@@ -428,11 +436,11 @@ async def test_limit_is_per_reporter_not_per_doer(session: AsyncSession) -> None
 
 
 def _meet_across(monkeypatch: pytest.MonkeyPatch, targets: list[object], parties: int) -> None:
-    """All ``parties`` callers of ``ensure_under_monthly_limit`` in any of ``targets`` wait for
+    """All ``parties`` callers of ``ensure_under_monthly_limits`` in any of ``targets`` wait for
     each other before it runs (one shared barrier, so the QR and invite paths really race)."""
     barrier = asyncio.Barrier(parties)
     for module in targets:
-        real = module.ensure_under_monthly_limit  # type: ignore[attr-defined]
+        real = module.ensure_under_monthly_limits  # type: ignore[attr-defined]
 
         def make(real_fn: Any) -> Any:
             async def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -442,21 +450,19 @@ def _meet_across(monkeypatch: pytest.MonkeyPatch, targets: list[object], parties
 
             return wrapper
 
-        monkeypatch.setattr(module, "ensure_under_monthly_limit", make(real))
+        monkeypatch.setattr(module, "ensure_under_monthly_limits", make(real))
 
 
-async def test_qr_and_invite_racing_at_fourteen_allow_one(
+async def test_qr_and_invite_racing_at_149_allow_one(
     committed_b6: Committed,  # noqa: F811
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    witness = await committed_b6.member()
-    doers = [await committed_b6.member() for _ in range(15)]
+    witness, doer = await committed_b6.member(), await committed_b6.member()
     t0 = datetime(2026, 8, 10, 6, 0, tzinfo=UTC)
     async with SessionLocal() as s:
-        for i, d in enumerate(doers[:14]):
-            await scan_and_report(s, witness, d, at=t0 + timedelta(minutes=i))
+        await seed_deeds(s, witness, LIMIT - 1, start=t0)
         at = t0 + timedelta(hours=1)
-        last = await scan(s, witness, doers[14], at=at)
+        last = await scan(s, witness, doer, at=at)
         await s.commit()
     _meet_across(monkeypatch, [_qr_deeds, _invites], 2)
 
@@ -474,21 +480,20 @@ async def test_qr_and_invite_racing_at_fourteen_allow_one(
         total = await s.scalar(
             select(func.count()).select_from(Deed).where(Deed.reporter_user_id == witness.user_id)
         )
-    assert total == 15
+    assert total == LIMIT
 
 
-async def test_three_concurrent_qr_submits_at_thirteen_allow_two(
+async def test_three_concurrent_qr_submits_at_148_allow_two(
     committed_b6: Committed,  # noqa: F811
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     witness = await committed_b6.member()
-    doers = [await committed_b6.member() for _ in range(16)]
+    doers = [await committed_b6.member() for _ in range(3)]
     t0 = datetime(2026, 8, 12, 6, 0, tzinfo=UTC)
     async with SessionLocal() as s:
-        for i, d in enumerate(doers[:13]):
-            await scan_and_report(s, witness, d, at=t0 + timedelta(minutes=i))
+        await seed_deeds(s, witness, LIMIT - 2, start=t0)
         at = t0 + timedelta(hours=1)
-        scans = [await scan(s, witness, d, at=at) for d in doers[13:]]
+        scans = [await scan(s, witness, d, at=at) for d in doers]
         await s.commit()
     _meet_across(monkeypatch, [_qr_deeds], 3)
 
@@ -502,7 +507,7 @@ async def test_three_concurrent_qr_submits_at_thirteen_allow_two(
         total = await s.scalar(
             select(func.count()).select_from(Deed).where(Deed.reporter_user_id == witness.user_id)
         )
-    assert total == 15
+    assert total == LIMIT
 
 
 # ======================================================================= D17
@@ -519,7 +524,7 @@ async def test_disabled_invite_create_leaves_nothing_and_uses_no_slot(
     assert await count(session, Invite, Invite.reporter_user_id == reporter.user_id) == 0
     body = (await client.get("/api/deeds/options", headers=reporter.headers)).json()
     assert body["invites_enabled"] is False
-    assert body["reports_remaining_this_month"] == 15
+    assert body["reports_remaining_this_month"] == LIMIT
 
 
 async def test_disabled_check_comes_before_the_monthly_limit(

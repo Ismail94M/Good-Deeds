@@ -66,6 +66,12 @@ class ScanOut(BaseModel):
     scan_id: uuid.UUID
     doer: UserRef
     expires_at: datetime
+    # Revision 5 (D20): the server's scan time (the form's "Earlier" choices are offsets from
+    # it), the reports still allowed about this doer this IST month counted before this report
+    # (1 = this is the last), and 00:00 IST on the 1st of next month (sent with +05:30).
+    scanned_at: datetime
+    pair_reports_remaining: int
+    month_resets_at: datetime
 
 
 class ScanDetail(ScanOut):
@@ -240,9 +246,22 @@ class DeedOptions(BaseModel):
     invites_remaining_today: int
     invite_expiry_hours: int
     reports_remaining_this_month: int
+    # Revision 5 (D20, D23): the limits and config values the F3 copy uses, so no number is
+    # hard-coded in the frontend, and the month reset as an ISO timestamp (+05:30). Nothing
+    # per-doer: the pair count comes with the scan.
+    reporter_monthly_limit: int
+    reporter_doer_monthly_limit: int
+    month_resets_at: datetime
     description_min: int
     description_max: int
+    beneficiaries_max: int
     scan_submit_minutes: int
+    qr_occurred_max_age_minutes: int
+    max_location_accuracy_m: int
+    service_area_radius_km: float
+    # Reports of one act that count (Q20 extra-witness note: "the first 5 count").
+    same_act_cap: int
+    photos_enabled: bool
 
 
 # --------------------------------------------------- edit and withdraw (B11)

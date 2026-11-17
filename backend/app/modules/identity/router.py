@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Cookie, Depends, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, Request, Response, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +19,10 @@ from app.modules.identity.schemas import (
     LoginRequest,
     Me,
     OAuthLoginRequest,
+    PasswordForgotRequest,
+    PasswordForgotResponse,
+    PasswordResetRequest,
+    PasswordResetResponse,
     PhoneStartRequest,
     PhoneStartResponse,
     PhoneVerifyRequest,
@@ -180,6 +184,49 @@ async def logout(
     response.status_code = status.HTTP_204_NO_CONTENT
     _clear_refresh_cookie(response)
     return response
+
+
+@router.post("/auth/password/forgot", response_model=PasswordForgotResponse, tags=["auth"])
+async def password_forgot(
+    data: PasswordForgotRequest,
+    request: Request,
+    background: BackgroundTasks,
+    session: Session,
+    limiter: Limiter,
+    sms: Annotated[SmsProvider, Depends(get_sms_provider)],
+) -> PasswordForgotResponse:
+    """Always ``{"sent": true, "resend_after_seconds": n}`` for a valid number: whether a code
+    went out (verified phone, password set, active account) is never revealed."""
+    limits = await load_limits(session)
+    await limiter.hit(f"pw_forgot:ip:{client_ip(request)}", limits.rate_password_forgot_ip)
+    phone = service.normalize_phone(data.phone)
+    # Keyed by the keyed hash: raw numbers never go into rate-limit keys.
+    await limiter.hit(
+        f"pw_forgot:phone:{service.phone_hash(phone)}", limits.rate_password_forgot_phone
+    )
+    await limiter.hit("sms:global", limits.rate_sms_global)
+    outgoing = await service.request_password_reset(session, phone)
+    await session.commit()
+    if outgoing is not None:
+        # Sent after the response, so a slow SMS provider doesn't reveal that an account exists.
+        background.add_task(sms.send, outgoing.phone_e164, outgoing.message)
+    return PasswordForgotResponse(resend_after_seconds=limits.otp_resend_seconds)
+
+
+@router.post("/auth/password/reset", response_model=PasswordResetResponse, tags=["auth"])
+async def password_reset(
+    data: PasswordResetRequest, request: Request, session: Session, limiter: Limiter
+) -> PasswordResetResponse:
+    """Set a new password with the SMS code. Ends every session; does not sign the user in."""
+    limits = await load_limits(session)
+    await limiter.hit(f"pw_reset:ip:{client_ip(request)}", limits.rate_password_reset_ip)
+    phone = service.normalize_phone(data.phone)
+    await limiter.hit(
+        f"pw_reset:phone:{service.phone_hash(phone)}", limits.rate_password_reset_phone
+    )
+    await service.reset_password(session, phone, data.code, data.new_password)
+    await session.commit()
+    return PasswordResetResponse()
 
 
 # --------------------------------------------------- me

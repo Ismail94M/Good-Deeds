@@ -113,12 +113,24 @@ class RefreshToken(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class OtpPurpose(StrEnum):
+    """What a code may be used for. A code only ever works for its own purpose."""
+
+    PHONE_VERIFY = "phone_verify"
+    PASSWORD_RESET = "password_reset"
+
+
 class PhoneOtp(Base):
     __tablename__ = "phone_otps"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    purpose: Mapped[OtpPurpose] = mapped_column(
+        _enum(OtpPurpose, "otp_purpose"),
+        default=OtpPurpose.PHONE_VERIFY,
+        server_default=OtpPurpose.PHONE_VERIFY.value,
     )
     phone_e164: Mapped[str] = mapped_column(String(20), index=True)
     code_hash: Mapped[str] = mapped_column(String(64))

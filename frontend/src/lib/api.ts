@@ -12,12 +12,18 @@ export class ApiError extends Error {
   readonly code: string | null
   /** Per-field messages from a 422 validation error, keyed by field name. */
   readonly fieldErrors: Record<string, string>
+  /**
+   * Any other top-level fields of the error body (`AppError.extra`, M2-DESIGN D27), e.g. the
+   * `doer` on a scan-time `pair_monthly_limit`. Untyped: read it through a feature helper.
+   */
+  readonly extra: Record<string, unknown>
 
   constructor(
     status: number,
     detail: string,
     code: string | null = null,
     fieldErrors: Record<string, string> = {},
+    extra: Record<string, unknown> = {},
   ) {
     super(detail)
     this.name = 'ApiError'
@@ -25,6 +31,7 @@ export class ApiError extends Error {
     this.detail = detail
     this.code = code
     this.fieldErrors = fieldErrors
+    this.extra = extra
   }
 }
 
@@ -137,10 +144,10 @@ async function toApiError(response: Response): Promise<ApiError> {
     // not JSON
   }
   if (body && typeof body === 'object' && 'detail' in body) {
-    const { detail, code } = body as { detail: unknown; code?: unknown }
+    const { detail, code, ...extra } = body as Record<string, unknown>
     const codeValue = typeof code === 'string' ? code : null
     if (typeof detail === 'string') {
-      return new ApiError(response.status, detail, codeValue)
+      return new ApiError(response.status, detail, codeValue, {}, extra)
     }
     if (Array.isArray(detail)) {
       const fieldErrors: Record<string, string> = {}

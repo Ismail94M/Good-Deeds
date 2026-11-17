@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import select, text
+from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError
@@ -25,6 +25,7 @@ from app.modules.deeds.models import (
 )
 from app.modules.deeds.schemas import DeedEdit
 from app.modules.identity import service
+from app.modules.identity.models import User, UserStatus
 from tests.deeds.helpers import (
     Member,
     count,
@@ -372,6 +373,34 @@ async def test_reporter_cannot_accept_own_invite(
     assert response.json()["code"] == "cannot_accept_own_invite"
 
 
+@pytest.mark.parametrize("status", [UserStatus.SUSPENDED, UserStatus.BLOCKED])
+async def test_inactive_reporters_invite_looks_invalid(
+    client: AsyncClient, session: AsyncSession, status: UserStatus
+) -> None:
+    """Security L8: a suspended or blocked reporter's invite can't be accepted. The answer is the
+    same 404 as an unknown token, so it reveals nothing about the reporter's account; the invite
+    is untouched and works again if the account is reactivated."""
+    reporter, doer = await members(session, 2)
+    created, token = await create_invite(session, reporter)
+    await session.execute(update(User).where(User.id == reporter.user_id).values(status=status))
+    await session.commit()
+
+    refused = await client.post(f"/api/invites/by-token/{token}/accept", headers=doer.headers)
+    unknown = await client.post(f"/api/invites/by-token/{'x' * 43}/accept", headers=doer.headers)
+    assert refused.status_code == unknown.status_code == 404
+    assert refused.json() == unknown.json()
+    assert refused.json()["code"] == "invite_invalid"
+    invite = await invite_row(session, created.id)
+    assert invite.status == InviteStatus.PENDING and invite.accepted_by is None
+
+    await session.execute(
+        update(User).where(User.id == reporter.user_id).values(status=UserStatus.ACTIVE)
+    )
+    await session.commit()
+    accepted = await client.post(f"/api/invites/by-token/{token}/accept", headers=doer.headers)
+    assert accepted.status_code == 200, accepted.text
+
+
 async def test_accounts_sharing_a_number_cannot_accept(
     session: AsyncSession, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -447,9 +476,10 @@ async def _accept_on_day(
 
 
 async def test_shared_device_allowed_fifteen_times_a_month(session: AsyncSession) -> None:
-    # Isolate D6 from the reporter's own monthly limit (D16, 15), which would refuse the 16th
-    # invite before it could be accepted.
-    await publish_limits(session, reporter_monthly_limit=100)
+    # Isolate D6 from the reporter's own monthly limits: the total (D16) would refuse creating
+    # more invites, and the pair limit (D21, 15 about one doer) is checked on accept before the
+    # shared-device limit, so the 16th would get ``pair_monthly_limit``.
+    await publish_limits(session, reporter_monthly_limit=100, reporter_doer_monthly_limit=100)
     reporter, doer, other_reporter = await members(session, 3)
     await share_device(session, reporter, doer, other_reporter)
     oct_1 = datetime(2026, 10, 1, 6, 0, tzinfo=UTC)
@@ -562,6 +592,28 @@ async def test_second_report_by_the_same_reporter_does_not_grant(session: AsyncS
     assert group is not None and group.verified_count == 2 and group.distinct_reporters == 1
     assert deed.prize_rank_eligible is False
     assert await audits(session, deed.id, "prize_rank_eligible.granted") == []
+
+
+async def test_invite_groups_by_report_time_not_backdated_when(session: AsyncSession) -> None:
+    """L7-A: an invite deed is grouped by its ``reported_at`` (server time), not by its "When?"
+    (up to 7 days back) and not by the acceptance time."""
+    reporter, doer, early, late = await members(session, 4)
+    t0 = _t0()
+    # A QR report 3 hours before the invite was written, and one 30 minutes after it.
+    before = await scan_and_report(session, early, doer, at=t0 - timedelta(hours=3))
+    after = await scan_and_report(session, late, doer, at=t0 + timedelta(minutes=30), north_m=10)
+    # The invite says the deed happened 3 hours before it was written (matching the first
+    # scan), and is accepted a day later.
+    created, token = await create_invite(
+        session, reporter, at=t0, occurred_at=t0 - timedelta(hours=3), north_m=0
+    )
+    await accept(session, token, doer, at=t0 + timedelta(days=1))
+    deed = await _deed(session, created.id)
+    assert deed.occurred_at == t0 - timedelta(hours=3)
+    before_group = (await _deed(session, before.id)).same_act_group_id
+    after_group = (await _deed(session, after.id)).same_act_group_id
+    assert before_group != after_group
+    assert deed.same_act_group_id == after_group
 
 
 async def test_invite_without_location_never_gets_prize_rank(session: AsyncSession) -> None:

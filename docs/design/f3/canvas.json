@@ -1,0 +1,66 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-11-16T14:00:00Z"},
+  "title": "Good Deeds — F3 Record a deed",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 390, "h": 1450, "title": "Interactive prototype (mobile) — press Play", "is_interactive": true},
+
+    "M-Hub.dc.html": {"x": 0, "y": 1850, "w": 390, "h": 844, "title": "Mobile · Hub"},
+    "M-HubNear.dc.html": {"x": 470, "y": 1850, "w": 390, "h": 844, "title": "Mobile · Hub — 10 deeds left this month"},
+    "M-HubFull.dc.html": {"x": 940, "y": 1850, "w": 390, "h": 844, "title": "Mobile · Hub — 150 reached"},
+
+    "M-LocExplain.dc.html": {"x": 0, "y": 3094, "w": 390, "h": 844, "title": "Mobile · Location — explain first"},
+    "M-LocDenied.dc.html": {"x": 470, "y": 3094, "w": 390, "h": 844, "title": "Mobile · Location — denied"},
+    "M-LocImprecise.dc.html": {"x": 940, "y": 3094, "w": 390, "h": 844, "title": "Mobile · Location — not precise enough"},
+
+    "M-Camera.dc.html": {"x": 0, "y": 4338, "w": 390, "h": 844, "title": "Mobile · Scan — camera"},
+    "M-CameraUnsupported.dc.html": {"x": 470, "y": 4338, "w": 390, "h": 844, "title": "Mobile · Scan — use camera app"},
+    "M-Manual.dc.html": {"x": 940, "y": 4338, "w": 390, "h": 844, "title": "Mobile · Enter ID and code"},
+    "M-ManualError.dc.html": {"x": 1410, "y": 4338, "w": 390, "h": 844, "title": "Mobile · ID and code don't match"},
+    "M-Checking.dc.html": {"x": 1880, "y": 4338, "w": 390, "h": 844, "title": "Mobile · Checking"},
+
+    "M-Form.dc.html": {"x": 0, "y": 5582, "w": 390, "h": 1450, "title": "Mobile · Deed form — 2 photos"},
+    "M-FormPairWarning.dc.html": {"x": 470, "y": 5582, "w": 390, "h": 1450, "title": "Mobile · Deed form — 3 left for Ahmed"},
+    "M-FormInvalid.dc.html": {"x": 940, "y": 5582, "w": 390, "h": 1450, "title": "Mobile · Deed form — no photos, description too short"},
+    "M-FormPhotosFull.dc.html": {"x": 1410, "y": 5582, "w": 390, "h": 1450, "title": "Mobile · Deed form — 4 photos (maximum)"},
+    "M-Success.dc.html": {"x": 1880, "y": 5582, "w": 390, "h": 844, "title": "Mobile · Verified"},
+    "M-SuccessExtra.dc.html": {"x": 2350, "y": 5582, "w": 390, "h": 844, "title": "Mobile · Saved as extra witness"},
+
+    "M-ErrExpired.dc.html": {"x": 0, "y": 7432, "w": 390, "h": 844, "title": "Mobile · Error — code expired"},
+    "M-ErrToday.dc.html": {"x": 470, "y": 7432, "w": 390, "h": 844, "title": "Mobile · Error — already recognised today"},
+    "M-ErrPairLimit.dc.html": {"x": 940, "y": 7432, "w": 390, "h": 844, "title": "Mobile · Error — 15 for Ahmed reached"},
+    "M-ErrFormExpired.dc.html": {"x": 1410, "y": 7432, "w": 390, "h": 844, "title": "Mobile · Error — 15 minutes ran out"},
+    "ErrorCopy.dc.html": {"x": 1880, "y": 7432, "w": 1240, "h": 1500, "title": "All error messages — copy sheet"},
+
+    "D-Hub.dc.html": {"x": 0, "y": 9332, "w": 1440, "h": 900, "title": "Desktop · Hub"},
+    "D-LocExplain.dc.html": {"x": 1520, "y": 9332, "w": 1440, "h": 900, "title": "Desktop · Location — explain first"},
+    "D-CameraUnsupported.dc.html": {"x": 3040, "y": 9332, "w": 1440, "h": 900, "title": "Desktop · Scan — use your phone"},
+    "D-Manual.dc.html": {"x": 4560, "y": 9332, "w": 1440, "h": 900, "title": "Desktop · Enter ID and code"},
+    "D-Form.dc.html": {"x": 0, "y": 10352, "w": 1440, "h": 1330, "title": "Desktop · Deed form"},
+    "D-Success.dc.html": {"x": 1520, "y": 10352, "w": 1440, "h": 900, "title": "Desktop · Verified"},
+    "D-ErrToday.dc.html": {"x": 3040, "y": 10352, "w": 1440, "h": 900, "title": "Desktop · Error — already recognised today"}
+  },
+  "order": [
+    "Main.dc.html",
+    "M-Hub.dc.html", "M-HubNear.dc.html", "M-HubFull.dc.html",
+    "M-LocExplain.dc.html", "M-LocDenied.dc.html", "M-LocImprecise.dc.html",
+    "M-Camera.dc.html", "M-CameraUnsupported.dc.html", "M-Manual.dc.html", "M-ManualError.dc.html", "M-Checking.dc.html",
+    "M-Form.dc.html", "M-FormPairWarning.dc.html", "M-FormInvalid.dc.html", "M-FormPhotosFull.dc.html", "M-Success.dc.html", "M-SuccessExtra.dc.html",
+    "M-ErrExpired.dc.html", "M-ErrToday.dc.html", "M-ErrPairLimit.dc.html", "M-ErrFormExpired.dc.html", "ErrorCopy.dc.html",
+    "D-Hub.dc.html", "D-LocExplain.dc.html", "D-CameraUnsupported.dc.html", "D-Manual.dc.html",
+    "D-Form.dc.html", "D-Success.dc.html", "D-ErrToday.dc.html"
+  ],
+  "notes": {
+    "t-proto": {"x": 0, "y": -300, "text": "F3 · Record a deed — interactive prototype", "kind": "title1", "maxW": 1600},
+    "t-hub": {"x": 0, "y": 1550, "text": "1 · Hub", "kind": "title1", "maxW": 1330},
+    "t-loc": {"x": 0, "y": 2794, "text": "2 · Location check", "kind": "title1", "maxW": 1330},
+    "t-find": {"x": 0, "y": 4038, "text": "3 · Find the doer — scan or ID + code", "kind": "title1", "maxW": 2270},
+    "t-form": {"x": 0, "y": 5282, "text": "4 · Deed form and result", "kind": "title1", "maxW": 2740},
+    "t-err": {"x": 0, "y": 7132, "text": "5 · Errors", "kind": "title1", "maxW": 3120},
+    "t-desk": {"x": 0, "y": 9032, "text": "Desktop · 1440 px — key screens", "kind": "title1", "maxW": 6000},
+    "behaviour": {"x": 470, "y": 0, "w": 600, "fill": "blue", "size": "m", "text": "F3 decisions (product owner, 2026-11-16)\n\n1. A blue \"Record a deed\" button sits in the header on every page. The menu is Home · My QR · Profile; Log out moves into Profile.\n2. No invite option (invites are off). The hub shows a guidance line instead: \"Doer not on Good Deeds? Ask them to sign up, then show you their QR.\"\n3. Limits (new rule, backend change pending): at most 15 reports per person you record per month, and 150 in total. Warnings appear only when close: from 3 left for one person (on the deed form), from 10 left in total (on the hub).\n4. Location: explain first, then the phone's permission prompt. Without location nothing can be verified.\n5. Photos: optional, up to 4 per report (a config value), taken with the camera or uploaded, below the description. Faces of people being helped are blurred automatically. Where photos are stored (Azure Blob, S3 or Google Cloud Storage) is decided later.\n\nFlow: Hub → location (first time) → scan or ID + code → checking → deed form (send within 15 min) → verified.\nWhen? is limited to 2 h before the scan. Ahmed can be recognised by the same person once a day.\n\nPress Play on the prototype: Scan → Allow → tap the viewfinder to simulate a scan → add photos → Send."}
+  },
+  "designSystems": []
+}

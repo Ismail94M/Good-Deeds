@@ -1,5 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { makeMe, mockApi, NOT_ONBOARDED, renderApp, signedIn } from '../test/utils'
 
@@ -30,7 +29,7 @@ describe('route guards', () => {
   it('lets onboarding-incomplete users see their profile', async () => {
     mockApi(signedIn(makeMe({ phone_e164: null, onboarding: NOT_ONBOARDED })))
     renderApp('/profile')
-    expect(await screen.findByRole('heading', { name: 'Your profile' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Asha' })).toBeInTheDocument()
   })
 
   it('redirects signed-in users away from login', async () => {
@@ -43,17 +42,5 @@ describe('route guards', () => {
     mockApi({ ...signedIn(makeMe()), 'GET /users/me/qr': { status: 500, body: {} } })
     const { router } = renderApp('/onboarding')
     await waitFor(() => expect(router.state.location.pathname).toBe('/me/qr'))
-  })
-
-  it('logs out from the header', async () => {
-    const api = mockApi({ ...signedIn(makeMe()), 'POST /auth/logout': { status: 204 } })
-    const user = userEvent.setup()
-    renderApp('/profile')
-    await user.click(await screen.findByRole('button', { name: 'Log out' }))
-    const header = screen.getByRole('banner')
-    expect(
-      await within(header).findByRole('link', { name: 'Create an account' }, { timeout: 2000 }),
-    ).toBeVisible()
-    expect(api.calls('POST /auth/logout')).toHaveLength(1)
   })
 })

@@ -8,7 +8,7 @@ import math
 import secrets
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import func, select
@@ -18,7 +18,9 @@ from app.core.events import OutboxEvent
 from app.core.runtime_config import load, publish
 from app.core.security import create_access_token
 from app.modules.deeds import _qr_deeds, _scans
+from app.modules.deeds._common import ist_day
 from app.modules.deeds._limits import DeedLimits, load_limits
+from app.modules.deeds.models import Deed, DeedStatus, VerificationMethod
 from app.modules.deeds.schemas import DeedOut, Location, QrDeedCreate, ScanCreate, ScanOut
 from app.modules.identity import _qr, service
 from app.modules.identity.models import Consent, DoerCode, PhoneHistory, User
@@ -215,6 +217,55 @@ async def scan_and_report(
 ) -> DeedOut:
     s = await scan(session, witness, doer, at=at, north_m=north_m, east_m=east_m)
     return await report(session, witness, s.scan_id, at=at, occurred_at=occurred_at)
+
+
+async def seed_deeds(
+    session: AsyncSession,
+    reporter: Member,
+    n: int,
+    *,
+    start: datetime,
+    step: timedelta = timedelta(seconds=1),
+    doer: Member | None = None,
+    status: DeedStatus | None = None,
+    unrelated_days: bool = False,
+    day_offset: int = 0,
+) -> None:
+    """Insert ``n`` closed ``deeds`` rows by ``reporter`` with ``reported_at = start + i * step``.
+
+    Much faster than real reports, for the monthly-limit boundaries (150 in total, 15 per pair),
+    which count every row whatever its status (docs/M2-DESIGN.md §7 "Monthly limits"). Without
+    a ``doer`` they look like expired invites (``unverified``, no doer); with one, like accepted
+    invites later rejected. Rows about one doer need distinct IST ``report_day``s
+    (``uq_deeds_pair_day``): use ``step`` of a day, or, where the real clock leaves too few days
+    in the month, ``unrelated_days=True`` gives each row a ``report_day`` long ago (shifted by
+    ``day_offset`` days, so two calls about one doer don't collide). The limits
+    count by ``reported_at`` only, so that day never matters to them or to the pair-day rule.
+    """
+    status = status or (DeedStatus.REJECTED if doer else DeedStatus.UNVERIFIED)
+    assert status not in (DeedStatus.VERIFIED, DeedStatus.PENDING)
+    for i in range(n):
+        at = start + i * step
+        session.add(
+            Deed(
+                reporter_user_id=reporter.user_id,
+                doer_user_id=doer.user_id if doer else None,
+                category="animals",
+                description="Helped a stray dog across the road",
+                occurred_at=at - timedelta(minutes=1),
+                reported_at=at,
+                report_day=(
+                    date(2000, 1, 1) + timedelta(days=day_offset + i)
+                    if unrelated_days
+                    else ist_day(at)
+                ),
+                status=status,
+                withdrawn_at=at if status == DeedStatus.WITHDRAWN else None,
+                verification_method=VerificationMethod.INVITE_ACCEPT,
+                limits_version=1,
+            )
+        )
+    await session.flush()
 
 
 def deed_body(scan_id: str | uuid.UUID, **overrides: Any) -> dict[str, Any]:

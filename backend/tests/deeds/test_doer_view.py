@@ -1,0 +1,117 @@
+"""D24 / Q18 (PO, 2026-11-17): the doer sees only ``verified`` deeds about them.
+
+``GET /api/me/deeds?role=doer`` lists only verified deeds (counted or not), and
+``GET /api/deeds/{id}`` is 404 ``deed_not_found`` to the doer unless the deed is verified. A
+withdrawn, rejected, removed or unverified report disappears from the doer's view; the reporter
+still sees it. Pending deeds have no doer, so they never reach the doer's view anyway.
+"""
+
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
+from httpx import AsyncClient
+from sqlalchemy import update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.modules.deeds.models import Deed, DeedStatus
+from app.modules.deeds.schemas import DeedOut
+from tests.deeds.helpers import Member, make_member, members, scan_and_report
+from tests.deeds.invite_helpers import withdraw
+
+
+async def _pages(client: AsyncClient, who: Member, role: str) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    cursor: str | None = None
+    while True:
+        params: dict[str, Any] = {"role": role, "limit": 1}
+        if cursor:
+            params["cursor"] = cursor
+        response = await client.get("/api/me/deeds", params=params, headers=who.headers)
+        assert response.status_code == 200, response.text
+        body = response.json()
+        items += body["items"]
+        cursor = body["next_cursor"]
+        if cursor is None:
+            return items
+
+
+async def _one_act(
+    session: AsyncSession, doer: Member, n: int
+) -> tuple[list[Member], list[DeedOut]]:
+    """``n`` witnesses report one act (same place, minutes apart): with the cap of 5, reports
+    6 and later are verified but don't count."""
+    witnesses = await members(session, n)
+    base = datetime.now(UTC) - timedelta(minutes=30)
+    deeds = [
+        await scan_and_report(session, w, doer, at=base + timedelta(minutes=i), east_m=i * 5)
+        for i, w in enumerate(witnesses)
+    ]
+    return witnesses, deeds
+
+
+async def _force(session: AsyncSession, deed: DeedOut, status: DeedStatus) -> None:
+    await session.execute(
+        update(Deed).where(Deed.id == deed.id).values(status=status, counts_for_points=False)
+    )
+
+
+async def test_doer_sees_only_verified_deeds_in_list_and_detail(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    doer = await make_member(session)
+    witnesses, deeds = await _one_act(session, doer, 7)
+    assert [d.same_act.counts_for_points for d in deeds if d.same_act] == [True] * 5 + [False] * 2
+    # 1: withdrawn by its reporter (promotes report 6, D13); 2-4: closed by later stages.
+    await withdraw(session, witnesses[0], deeds[0].id)
+    await _force(session, deeds[1], DeedStatus.REJECTED)
+    await _force(session, deeds[2], DeedStatus.REMOVED)
+    await _force(session, deeds[3], DeedStatus.UNVERIFIED)
+    await session.commit()
+    hidden, visible = deeds[:4], deeds[4:]
+
+    listed = await _pages(client, doer, "doer")
+    # Newest first; includes report 7, which is verified but not counted.
+    assert [d["id"] for d in listed] == [str(d.id) for d in reversed(visible)]
+    assert all(d["status"] == "verified" for d in listed)
+    assert listed[0]["same_act"]["counts_for_points"] is False
+    for item in listed:
+        assert set(item["reporter"]) == {"handle", "display_name"}
+
+    for deed in hidden:
+        response = await client.get(f"/api/deeds/{deed.id}", headers=doer.headers)
+        assert response.status_code == 404, response.text
+        assert response.json() == {
+            "detail": "We couldn't find that deed.",
+            "code": "deed_not_found",
+        }
+    for deed in visible:
+        response = await client.get(f"/api/deeds/{deed.id}", headers=doer.headers)
+        assert response.status_code == 200, response.text
+
+
+async def test_reporter_still_sees_every_status(client: AsyncClient, session: AsyncSession) -> None:
+    doer = await make_member(session)
+    witnesses, deeds = await _one_act(session, doer, 2)
+    await withdraw(session, witnesses[0], deeds[0].id)
+    await _force(session, deeds[1], DeedStatus.REJECTED)
+    await session.commit()
+    for witness, deed, status in zip(witnesses, deeds, ("withdrawn", "rejected"), strict=True):
+        detail = await client.get(f"/api/deeds/{deed.id}", headers=witness.headers)
+        assert detail.status_code == 200 and detail.json()["status"] == status
+        own = await _pages(client, witness, "reporter")
+        assert [(d["id"], d["status"]) for d in own] == [(str(deed.id), status)]
+    assert await _pages(client, doer, "doer") == []
+
+
+async def test_a_doers_hidden_deed_looks_like_a_strangers(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """The doer's 404 for a withdrawn deed is the same as anyone's for a deed they can't see."""
+    doer, stranger = await make_member(session), await make_member(session)
+    witnesses, deeds = await _one_act(session, doer, 1)
+    await withdraw(session, witnesses[0], deeds[0].id)
+    await session.commit()
+    as_doer = await client.get(f"/api/deeds/{deeds[0].id}", headers=doer.headers)
+    as_stranger = await client.get(f"/api/deeds/{deeds[0].id}", headers=stranger.headers)
+    assert as_doer.status_code == as_stranger.status_code == 404
+    assert as_doer.json() == as_stranger.json()

@@ -1,8 +1,8 @@
 """The QR path of ``POST /api/deeds`` (§3.2 #3): turn a fresh scan into a verified deed.
 
-In one transaction: check the monthly reporting limit (D16), consume the scan (conditional
-UPDATE, so two submits of one scan create one deed), check the time, group the deed (§3.4),
-insert it ``verified``, write the ``verification_events`` row, emit ``DeedSubmitted`` +
+In one transaction: check the monthly reporting limits (total and pair, D19), consume the scan
+(conditional UPDATE, so two submits of one scan create one deed), check the time, group the deed
+(§3.4), insert it ``verified``, write the ``verification_events`` row, emit ``DeedSubmitted`` +
 ``DeedVerified``, and run the prize-rank upgrade for invite deeds in the group.
 """
 
@@ -19,7 +19,7 @@ from app.modules.deeds import _plausibility as plaus
 from app.modules.deeds._common import constraint_name, ist_day, lat_lng, point_ewkt, utcnow
 from app.modules.deeds._grouping import assign_group, upgrade_prize_rank
 from app.modules.deeds._limits import DeedLimits
-from app.modules.deeds._reporter_limit import ensure_under_monthly_limit
+from app.modules.deeds._reporter_limit import ensure_under_monthly_limits
 from app.modules.deeds._scans import scan_evidence, scan_expired, scan_not_found
 from app.modules.deeds._views import deed_out
 from app.modules.deeds.events import DeedSubmitted, DeedVerified
@@ -53,6 +53,20 @@ def validate_content(
             code="invalid_beneficiaries",
         )
     return text
+
+
+async def _scan_doer(session: AsyncSession, witness_id: uuid.UUID, scan_id: uuid.UUID) -> uuid.UUID:
+    """The scan's doer, read without a lock (a scan's doer never changes) so the pair limit can
+    be checked under ``reporter_month`` before the scan row is locked. A missing or another
+    witness's scan is ``scan_not_found``, as on consume."""
+    doer_id = await session.scalar(
+        select(QrScan.doer_user_id).where(
+            QrScan.id == scan_id, QrScan.witness_user_id == witness_id
+        )
+    )
+    if doer_id is None:
+        raise scan_not_found()
+    return doer_id
 
 
 async def _consume_scan(
@@ -100,9 +114,10 @@ async def create_qr_deed(
     description = validate_content(
         limits, data.category, data.description, data.beneficiaries_count
     )
-    # D16: before the scan is consumed, so the scan row lock is always taken after the
-    # ``reporter_month`` lock and a refused report leaves the scan unused.
-    await ensure_under_monthly_limit(session, reporter_id, limits, now)
+    # D19: both monthly limits before the scan is consumed, so the scan row lock is always taken
+    # after the ``reporter_month`` lock and a refused report leaves the scan unused.
+    doer_id = await _scan_doer(session, reporter_id, data.scan_id)
+    await ensure_under_monthly_limits(session, reporter_id, doer_id, limits, now)
     scan = await _consume_scan(session, reporter_id, data.scan_id, now)
 
     occurred_at = data.occurred_at or scan.scanned_at
@@ -120,7 +135,8 @@ async def create_qr_deed(
         doer_id=scan.doer_user_id,
         reporter_id=reporter_id,
         location=location,
-        occurred_at=occurred_at,
+        # L7-A: group by the server's scan time, not the reporter's (backdatable) "When?".
+        grouped_at=scan.scanned_at,
         limits=limits,
         limits_version=limits_version,
     )

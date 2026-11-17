@@ -72,7 +72,8 @@ async def create_scan(
 
 @router.get("/scans/{scan_id}", response_model=ScanDetail)
 async def get_scan(scan_id: uuid.UUID, user: OnboardedUser, session: Session) -> ScanDetail:
-    return await _scans.get_scan(session, user.id, scan_id)
+    _, limits = await load_limits(session)
+    return await _scans.get_scan(session, user.id, scan_id, limits=limits)
 
 
 # --------------------------------------------------- deed create (§3.2 #3)

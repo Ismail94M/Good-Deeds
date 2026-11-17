@@ -1,7 +1,9 @@
 """Read endpoints (§3.2 #4, #5, #6, #10): one deed, my deeds, my invites, form options.
 
 Privacy: only the reporter or the doer may read a deed; anyone else gets 404 (not 403), so the
-response never confirms that a deed exists. ``deed_out`` never includes coordinates and never
+response never confirms that a deed exists. The doer sees only ``verified`` deeds about them (D24,
+Q18): a withdrawn, rejected, removed or unverified report disappears from their list and is 404
+by ID, while the reporter still sees every status. ``deed_out`` never includes coordinates and never
 reveals the doer of a pending deed. The invite (without its raw link) is shown to the reporter
 only.
 """
@@ -15,12 +17,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import NotFound
 from app.modules.deeds import _cursor
-from app.modules.deeds._common import ist_day, utcnow
+from app.modules.deeds._common import ist_day, ist_month, utcnow
 from app.modules.deeds._invites import invite_out
 from app.modules.deeds._limits import DeedLimits
 from app.modules.deeds._reporter_limit import reported_this_month
 from app.modules.deeds._views import deed_out
-from app.modules.deeds.models import Deed, Invite, InviteStatus, SameActGroup
+from app.modules.deeds.models import Deed, DeedStatus, Invite, InviteStatus, SameActGroup
 from app.modules.deeds.schemas import (
     CategoryOut,
     DeedOptions,
@@ -77,7 +79,11 @@ async def _deed_outs(
 
 async def get_deed(session: AsyncSession, viewer_id: uuid.UUID, deed_id: uuid.UUID) -> DeedOut:
     deed = await session.get(Deed, deed_id)
-    if deed is None or viewer_id not in (deed.reporter_user_id, deed.doer_user_id):
+    if deed is None:
+        raise _deed_not_found()
+    is_reporter = viewer_id == deed.reporter_user_id
+    is_doer = viewer_id == deed.doer_user_id and deed.status == DeedStatus.VERIFIED  # D24
+    if not (is_reporter or is_doer):
         raise _deed_not_found()
     return (await _deed_outs(session, [deed], viewer_id))[0]
 
@@ -90,10 +96,14 @@ async def my_deeds(
     cursor: str | None = None,
     limit: int = _cursor.DEFAULT_PAGE_SIZE,
 ) -> DeedPage:
-    """The viewer's deeds as reporter, or as doer. A pending deed has no doer yet, so it only
-    appears in the reporter's list."""
-    owner = Deed.reporter_user_id if role == "reporter" else Deed.doer_user_id
-    stmt = select(Deed).where(owner == viewer_id)
+    """The viewer's deeds as reporter (every status), or as doer (``verified`` only, D24; a
+    pending deed has no doer yet anyway)."""
+    if role == "reporter":
+        stmt = select(Deed).where(Deed.reporter_user_id == viewer_id)
+    else:
+        stmt = select(Deed).where(
+            Deed.doer_user_id == viewer_id, Deed.status == DeedStatus.VERIFIED
+        )
     if cursor is not None:
         at, last_id = _cursor.decode(cursor)
         stmt = stmt.where(tuple_(Deed.reported_at, Deed.id) < tuple_(at, last_id))
@@ -157,7 +167,16 @@ async def options(
         invites_remaining_today=max(0, limits.invites_per_day - int(used or 0)),
         invite_expiry_hours=limits.invite_expiry_hours,
         reports_remaining_this_month=max(0, limits.reporter_monthly_limit - reported),
+        reporter_monthly_limit=limits.reporter_monthly_limit,
+        reporter_doer_monthly_limit=limits.reporter_doer_monthly_limit,
+        month_resets_at=ist_month(now)[1],
         description_min=limits.description_min,
         description_max=limits.description_max,
+        beneficiaries_max=limits.beneficiaries_max,
         scan_submit_minutes=limits.scan_submit_minutes,
+        qr_occurred_max_age_minutes=limits.qr_occurred_max_age_minutes,
+        max_location_accuracy_m=limits.max_location_accuracy_m,
+        service_area_radius_km=limits.service_area.radius_km,
+        same_act_cap=limits.same_act_cap,
+        photos_enabled=limits.photos_enabled,
     )

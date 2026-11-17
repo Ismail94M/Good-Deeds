@@ -9,6 +9,7 @@ import { SocialButtons } from './social/SocialButtons'
 import {
   collectErrors,
   consentErrors,
+  PASSWORD_HINT,
   validateDisplayName,
   validateEmail,
   validateHandle,
@@ -149,7 +150,7 @@ export function SignupPage() {
           required
           value={values.password}
           onChange={(e) => update({ password: e.target.value })}
-          hint="At least 10 characters."
+          hint={PASSWORD_HINT}
           error={errors.password}
         />
         <ConsentFields values={values} errors={errors} onChange={update} />

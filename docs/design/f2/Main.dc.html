@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>My QR code</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@600;700&amp;display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div style="position: relative; width: {{s.w}}px; min-height: {{s.h}}px; box-sizing: border-box; display: flex; flex-direction: column; background: #faf8f5; color: #0f172a; font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 16px; line-height: 1.5;">
+
+<sc-if value="{{f.large}}" hint-placeholder-val="{{ false }}">
+<div role="dialog" aria-modal="true" aria-label="Large QR code" style="flex-grow: 1; display: flex; flex-direction: column; background: #ffffff; min-height: {{s.h}}px;">
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; border-bottom: 1px solid #e2e8f0;">
+    <p style="margin: 0; font-size: 15px; font-weight: 600; color: #475569;">Ahmed Khan · My QR</p>
+    <button type="button" onClick="{{closeLarge}}" style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+      {{s.closeLabel}}
+    </button>
+  </div>
+  <div style="flex-grow: 1; display: flex; flex-direction: {{s.lgDir}}; align-items: center; justify-content: center; gap: {{s.lgGap}}px; padding: 24px 16px 32px;">
+    <div role="img" aria-label="QR code for GD-7K4M9XQ" style="width: {{s.lgQr}}px; height: {{s.lgQr}}px; padding: {{s.lgPad}}px; background: #ffffff; border: 2px solid #0f172a; border-radius: 16px; flex-shrink: 0;">
+      <svg aria-hidden="true" viewBox="0 0 33 33" width="100%" height="100%" shape-rendering="crispEdges"><path fill="#ffffff" d="M0 0h33v33H0z"></path><path stroke="#000000" d="M0 0.5h7m2 0h1m1 0h1m3 0h2m2 0h2m2 0h1m2 0h7M0 1.5h1m5 0h1m4 0h2m2 0h1m4 0h1m3 0h1m1 0h1m5 0h1M0 2.5h1m1 0h3m1 0h1m1 0h1m5 0h3m2 0h2m1 0h1m3 0h1m1 0h3m1 0h1M0 3.5h1m1 0h3m1 0h1m1 0h1m1 0h2m3 0h1m2 0h4m2 0h1m1 0h1m1 0h3m1 0h1M0 4.5h1m1 0h3m1 0h1m1 0h2m1 0h1m1 0h4m1 0h1m2 0h2m1 0h1m1 0h1m1 0h3m1 0h1M0 5.5h1m5 0h1m1 0h1m3 0h1m1 0h1m2 0h6m3 0h1m5 0h1M0 6.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M8 7.5h2m2 0h1m1 0h1m1 0h1m3 0h5M0 8.5h1m1 0h5m3 0h1m1 0h2m2 0h2m1 0h1m2 0h1m1 0h1m1 0h5M2 9.5h1m5 0h7m2 0h3m1 0h1m1 0h1m2 0h2m1 0h2m1 0h1M1 10.5h1m1 0h1m1 0h3m2 0h7m7 0h1m3 0h1m1 0h1M0 11.5h2m7 0h2m1 0h2m3 0h5m6 0h4M3 12.5h1m2 0h1m1 0h1m1 0h3m1 0h1m1 0h1m1 0h4m2 0h1m4 0h1M3 13.5h2m3 0h1m1 0h1m1 0h1m2 0h1m4 0h3m1 0h2m1 0h1m1 0h1m1 0h2M1 14.5h3m2 0h7m2 0h4m2 0h2m2 0h2m1 0h1m2 0h1M1 15.5h1m2 0h1m3 0h2m1 0h2m1 0h2m3 0h4m1 0h3m2 0h2M0 16.5h1m1 0h1m2 0h7m3 0h1m1 0h1m1 0h1m2 0h1m1 0h2m1 0h3m2 0h1M2 17.5h1m1 0h1m2 0h1m3 0h2m2 0h6m2 0h1m2 0h2m1 0h3M1 18.5h2m3 0h1m1 0h2m5 0h4m1 0h1m4 0h4m1 0h2M1 19.5h1m1 0h1m1 0h1m5 0h4m1 0h1m6 0h1m2 0h5M0 20.5h1m5 0h1m1 0h1m1 0h4m1 0h1m3 0h1m1 0h3m1 0h1m2 0h2m2 0h1M0 21.5h2m1 0h1m1 0h1m2 0h1m2 0h6m4 0h1m2 0h1m5 0h1m1 0h1M0 22.5h1m3 0h6m2 0h2m4 0h1m2 0h2m1 0h2m1 0h5M0 23.5h1m1 0h1m2 0h1m1 0h1m1 0h1m1 0h1m1 0h2m1 0h1m3 0h2m1 0h4m1 0h1m1 0h1m1 0h1M0 24.5h1m3 0h3m2 0h1m2 0h1m3 0h2m4 0h1m1 0h6m1 0h1M8 25.5h3m2 0h1m4 0h3m1 0h1m1 0h1m3 0h1m1 0h2M0 26.5h7m3 0h7m4 0h4m1 0h1m1 0h1m1 0h2M0 27.5h1m5 0h1m1 0h1m3 0h1m3 0h1m1 0h3m2 0h2m3 0h4M0 28.5h1m1 0h3m1 0h1m1 0h1m1 0h3m6 0h4m1 0h6m2 0h1M0 29.5h1m1 0h3m1 0h1m1 0h2m1 0h1m1 0h3m1 0h2m2 0h3m1 0h1m2 0h1m1 0h1m1 0h1M0 30.5h1m1 0h3m1 0h1m1 0h6m1 0h1m1 0h1m5 0h1m2 0h2m1 0h2M0 31.5h1m5 0h1m2 0h1m2 0h1m1 0h2m2 0h9m1 0h1m1 0h1M0 32.5h7m1 0h5m2 0h1m1 0h3m3 0h5m3 0h1"></path></svg>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: {{s.lgInfoGap}}px; text-align: center; width: {{s.lgInfoW}}px; max-width: 100%;">
+      <div>
+        <p style="margin: 0; font-size: 14px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #475569;">ID</p>
+        <p style="margin: 0; font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 700; font-size: {{s.lgId}}px; line-height: 1.15; letter-spacing: 0.04em; color: #0f172a;">GD-7K4M9XQ</p>
+      </div>
+      <div>
+        <p style="margin: 0; font-size: 14px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #475569;">Code</p>
+        <p style="margin: 0; font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 700; font-size: {{s.lgCode}}px; line-height: 1.1; letter-spacing: 0.06em; color: #0f172a;">{{code}}</p>
+      </div>
+      <div style="width: 100%; display: flex; flex-direction: column; gap: 8px;">
+        <p style="margin: 0; font-size: 16px; font-weight: 600; color: {{s.cdColor}};">New code in {{sec}} s</p>
+        <div role="progressbar" aria-label="Time until the code changes" aria-valuemin="0" aria-valuemax="30" aria-valuenow="{{sec}}" style="height: 10px; border-radius: 999px; background: #dfe6fc; overflow: hidden;">
+          <div style="height: 100%; width: {{s.pct}}%; background: {{s.barColor}}; border-radius: 999px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{f.page}}" hint-placeholder-val="{{ true }}">
+<header style="border-bottom: 1px solid #e2e8f0; background: #faf8f5;">
+  <div style="max-width: 1152px; margin: 0 auto; box-sizing: border-box; padding: 8px {{s.headPad}}px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px;">
+    <a href="#home" style="display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; color: #0f172a; text-decoration: none;">
+      <svg aria-hidden="true" viewBox="0 0 32 32" width="32" height="32"><rect width="32" height="32" rx="8" fill="#3659e3"></rect><path fill="#ffffff" d="M16 24.5s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 16 11.7a4.3 4.3 0 0 1 7.5 2.8c0 5.4-7.5 10-7.5 10z"></path></svg>
+      Good Deeds
+    </a>
+    <nav aria-label="Main" style="width: {{s.navW}};">
+      <ul style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, {{s.navCol}})); gap: 4px;">
+        <li><a href="#home" style="display: flex; min-height: 44px; align-items: center; justify-content: center; padding: 0 12px; border-radius: 8px; font-size: 14px; font-weight: 500; color: #475569; text-decoration: none;">Home</a></li>
+        <li><a href="#qr" aria-current="page" style="display: flex; min-height: 44px; align-items: center; justify-content: center; padding: 0 12px; border-radius: 8px; font-size: 14px; font-weight: 600; color: #3659e3; background: #eef2fe; text-decoration: none;">My QR</a></li>
+        <li><a href="#profile" style="display: flex; min-height: 44px; align-items: center; justify-content: center; padding: 0 12px; border-radius: 8px; font-size: 14px; font-weight: 500; color: #475569; text-decoration: none;">Profile</a></li>
+        <li><button type="button" style="display: flex; width: 100%; min-height: 44px; align-items: center; justify-content: center; padding: 0 12px; border-radius: 8px; border: 0; background: transparent; font-family: inherit; font-size: 14px; font-weight: 500; color: #475569; cursor: pointer;">Log out</button></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main style="width: 100%; max-width: {{s.maxW}}px; margin: 0 auto; box-sizing: border-box; padding: {{s.mainPad}}; display: flex; flex-direction: column; gap: 24px;">
+  <div style="display: flex; flex-direction: column; gap: 8px;">
+    <h1 style="margin: 0; font-size: {{s.h1}}px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em; color: #0f172a;">My QR code</h1>
+    <p style="margin: 0; color: #475569; max-width: 560px;">Show this to someone who saw your good deed. They scan it to recognise you.</p>
+  </div>
+
+  <sc-if value="{{f.loading}}" hint-placeholder-val="{{ false }}">
+  <div role="status" aria-live="polite" style="display: flex; flex-direction: column; gap: 20px; max-width: 420px;">
+    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 16px;">
+      <div style="width: {{s.qr}}px; height: {{s.qr}}px; border-radius: 12px; background: #eef1f5;"></div>
+      <div style="width: 100%; height: 8px; border-radius: 999px; background: #eef1f5;"></div>
+      <p style="margin: 0; font-size: 15px; color: #475569;">Loading your QR code…</p>
+    </div>
+    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 12px;">
+      <div style="width: 45%; height: 14px; border-radius: 6px; background: #eef1f5;"></div>
+      <div style="width: 70%; height: 30px; border-radius: 6px; background: #eef1f5;"></div>
+      <div style="width: 55%; height: 44px; border-radius: 6px; background: #eef1f5;"></div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{f.error}}" hint-placeholder-val="{{ false }}">
+  <div style="display: flex; flex-direction: column; gap: 16px; max-width: 560px;">
+    <div role="alert" style="display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 12px; border: 1px solid #fecaca; background: #fef2f2; color: #991b1b;">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink: 0; margin-top: 1px;"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5h.01"></path></svg>
+      <div><strong style="display: block;">We couldn’t load your QR code.</strong>Check your internet connection and try again.</div>
+    </div>
+    <div style="width: {{s.qr}}px; max-width: 100%; height: {{s.qrSmall}}px; box-sizing: border-box; border: 2px dashed #cbd5e1; border-radius: 16px; display: flex; align-items: center; justify-content: center; color: #586579; font-size: 15px; text-align: center; padding: 16px;">QR code unavailable</div>
+    <div><button type="button" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 20px; border-radius: 8px; border: 0; background: #3659e3; color: #ffffff; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"></path></svg>
+      Try again
+    </button></div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{f.gated}}" hint-placeholder-val="{{ false }}">
+  <div style="display: flex; flex-direction: column; gap: 16px; max-width: 560px;">
+    <div role="alert" style="display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 12px; border: 1px solid #fde68a; background: #fffbeb; color: #92400e;">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px;"><path d="M12 3.5L2.5 20h19z"></path><path d="M12 10v4.5M12 17.5h.01"></path></svg>
+      <div><strong style="display: block;">Finish setting up to get your QR code.</strong>People can record your deeds once you’ve confirmed you’re 18 or over, accepted the terms and verified your phone number.</div>
+    </div>
+    <div><a href="#onboarding" style="display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 20px; border-radius: 8px; background: #3659e3; color: #ffffff; font-size: 16px; font-weight: 600; text-decoration: none;">Finish setting up</a></div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{f.ready}}" hint-placeholder-val="{{ true }}">
+  <div style="display: {{s.colsDisplay}}; flex-direction: column; grid-template-columns: {{s.cols}}; gap: {{s.colGap}}px; align-items: {{s.colsAlign}};">
+
+    <section aria-label="Your QR code" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 16px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);">
+      <sc-if value="{{f.reconnecting}}" hint-placeholder-val="{{ false }}">
+      <div role="status" style="width: 100%; box-sizing: border-box; display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; border: 1px solid #fde68a; background: #fffbeb; color: #92400e; font-size: 15px;">
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink: 0; margin-top: 2px;"><path d="M2 8.8a15 15 0 0 1 4.2-2.6M10.7 5.1A15 15 0 0 1 22 8.8M5 12.9a10 10 0 0 1 5.2-2.8M19 12.9a10 10 0 0 0-2.2-1.5M8.5 16.4a5 5 0 0 1 7 0M12 20h.01M3 3l18 18"></path></svg>
+        <div><strong style="display: block;">Reconnecting…</strong>You can keep showing this code for now.</div>
+      </div>
+      </sc-if>
+
+      <div role="img" aria-label="QR code for GD-7K4M9XQ" style="width: {{s.qr}}px; height: {{s.qr}}px; box-sizing: border-box; padding: 16px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; opacity: {{s.dim}}; filter: grayscale({{s.gray}});">
+        <svg aria-hidden="true" viewBox="0 0 33 33" width="100%" height="100%" shape-rendering="crispEdges"><path fill="#ffffff" d="M0 0h33v33H0z"></path><path stroke="#000000" d="M0 0.5h7m2 0h1m1 0h1m3 0h2m2 0h2m2 0h1m2 0h7M0 1.5h1m5 0h1m4 0h2m2 0h1m4 0h1m3 0h1m1 0h1m5 0h1M0 2.5h1m1 0h3m1 0h1m1 0h1m5 0h3m2 0h2m1 0h1m3 0h1m1 0h3m1 0h1M0 3.5h1m1 0h3m1 0h1m1 0h1m1 0h2m3 0h1m2 0h4m2 0h1m1 0h1m1 0h3m1 0h1M0 4.5h1m1 0h3m1 0h1m1 0h2m1 0h1m1 0h4m1 0h1m2 0h2m1 0h1m1 0h1m1 0h3m1 0h1M0 5.5h1m5 0h1m1 0h1m3 0h1m1 0h1m2 0h6m3 0h1m5 0h1M0 6.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M8 7.5h2m2 0h1m1 0h1m1 0h1m3 0h5M0 8.5h1m1 0h5m3 0h1m1 0h2m2 0h2m1 0h1m2 0h1m1 0h1m1 0h5M2 9.5h1m5 0h7m2 0h3m1 0h1m1 0h1m2 0h2m1 0h2m1 0h1M1 10.5h1m1 0h1m1 0h3m2 0h7m7 0h1m3 0h1m1 0h1M0 11.5h2m7 0h2m1 0h2m3 0h5m6 0h4M3 12.5h1m2 0h1m1 0h1m1 0h3m1 0h1m1 0h1m1 0h4m2 0h1m4 0h1M3 13.5h2m3 0h1m1 0h1m1 0h1m2 0h1m4 0h3m1 0h2m1 0h1m1 0h1m1 0h2M1 14.5h3m2 0h7m2 0h4m2 0h2m2 0h2m1 0h1m2 0h1M1 15.5h1m2 0h1m3 0h2m1 0h2m1 0h2m3 0h4m1 0h3m2 0h2M0 16.5h1m1 0h1m2 0h7m3 0h1m1 0h1m1 0h1m2 0h1m1 0h2m1 0h3m2 0h1M2 17.5h1m1 0h1m2 0h1m3 0h2m2 0h6m2 0h1m2 0h2m1 0h3M1 18.5h2m3 0h1m1 0h2m5 0h4m1 0h1m4 0h4m1 0h2M1 19.5h1m1 0h1m1 0h1m5 0h4m1 0h1m6 0h1m2 0h5M0 20.5h1m5 0h1m1 0h1m1 0h4m1 0h1m3 0h1m1 0h3m1 0h1m2 0h2m2 0h1M0 21.5h2m1 0h1m1 0h1m2 0h1m2 0h6m4 0h1m2 0h1m5 0h1m1 0h1M0 22.5h1m3 0h6m2 0h2m4 0h1m2 0h2m1 0h2m1 0h5M0 23.5h1m1 0h1m2 0h1m1 0h1m1 0h1m1 0h1m1 0h2m1 0h1m3 0h2m1 0h4m1 0h1m1 0h1m1 0h1M0 24.5h1m3 0h3m2 0h1m2 0h1m3 0h2m4 0h1m1 0h6m1 0h1M8 25.5h3m2 0h1m4 0h3m1 0h1m1 0h1m3 0h1m1 0h2M0 26.5h7m3 0h7m4 0h4m1 0h1m1 0h1m1 0h2M0 27.5h1m5 0h1m1 0h1m3 0h1m3 0h1m1 0h3m2 0h2m3 0h4M0 28.5h1m1 0h3m1 0h1m1 0h1m1 0h3m6 0h4m1 0h6m2 0h1M0 29.5h1m1 0h3m1 0h1m1 0h2m1 0h1m1 0h3m1 0h2m2 0h3m1 0h1m2 0h1m1 0h1m1 0h1M0 30.5h1m1 0h3m1 0h1m1 0h6m1 0h1m1 0h1m5 0h1m2 0h2m1 0h2M0 31.5h1m5 0h1m2 0h1m2 0h1m1 0h2m2 0h9m1 0h1m1 0h1M0 32.5h7m1 0h5m2 0h1m1 0h3m3 0h5m3 0h1"></path></svg>
+      </div>
+
+      <sc-if value="{{f.countdown}}" hint-placeholder-val="{{ true }}">
+      <div style="width: 100%; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 14px;">
+          <span style="font-weight: 600; color: {{s.cdColor}};">New code in {{sec}} s</span>
+          <span style="color: #586579;">Changes every 30 s</span>
+        </div>
+        <div role="progressbar" aria-label="Time until the code changes" aria-valuemin="0" aria-valuemax="30" aria-valuenow="{{sec}}" style="height: 8px; border-radius: 999px; background: #dfe6fc; overflow: hidden;">
+          <div style="height: 100%; width: {{s.pct}}%; background: {{s.barColor}}; border-radius: 999px;"></div>
+        </div>
+      </div>
+      </sc-if>
+
+      <button type="button" onClick="{{openLarge}}" style="width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 20px; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"></path></svg>
+        Show large QR
+      </button>
+    </section>
+
+    <div style="display: flex; flex-direction: column; gap: 20px; min-width: 0;">
+      <section aria-labelledby="idcode-h" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);">
+        <h2 id="idcode-h" style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #475569;">No camera? Give them your ID and code</h2>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+          <div style="opacity: {{s.dim}};">
+            <p style="margin: 0; font-size: 14px; font-weight: 500; color: #475569;">Your ID</p>
+            <p style="margin: 0; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 26px; font-weight: 700; line-height: 1.25; letter-spacing: 0.04em; color: #0f172a;">GD-7K4M9XQ</p>
+          </div>
+          <sc-if value="{{f.copied}}" hint-placeholder-val="{{ false }}">
+          <button type="button" aria-live="polite" style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 8px; border: 1px solid #a7f3d0; background: #ecfdf5; color: #047857; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;">
+            <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+            Copied
+          </button>
+          </sc-if>
+          <sc-if value="{{f.notCopied}}" hint-placeholder-val="{{ true }}">
+          <button type="button" onClick="{{copyId}}" style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;">
+            <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V5a2 2 0 0 1 2-2h10"></path></svg>
+            Copy ID
+          </button>
+          </sc-if>
+        </div>
+        <div style="height: 1px; background: #e2e8f0;"></div>
+        <div style="opacity: {{s.dim}};">
+          <p style="margin: 0; font-size: 14px; font-weight: 500; color: #475569;">Code</p>
+          <p style="margin: 0; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 40px; font-weight: 700; line-height: 1.2; letter-spacing: 0.08em; color: #0f172a;">{{code}}</p>
+        </div>
+        <p style="margin: 0; font-size: 14px; color: #586579;">They type both. The code changes every 30 s and can’t be copied, so read it out or let them look at your screen.</p>
+      </section>
+
+      <section aria-labelledby="how-h" style="background: #eef2fe; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+        <h2 id="how-h" style="margin: 0; font-size: 16px; font-weight: 600; color: #0f172a;">How the person who saw your deed records it</h2>
+        <ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px;">
+          <li style="display: flex; gap: 12px; align-items: flex-start;">
+            <span aria-hidden="true" style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 999px; background: #3659e3; color: #ffffff; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center;">1</span>
+            <span style="color: #1e293b;">They open <strong>Record a deed</strong> in Good Deeds and scan your QR.</span>
+          </li>
+          <li style="display: flex; gap: 12px; align-items: flex-start;">
+            <span aria-hidden="true" style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 999px; background: #3659e3; color: #ffffff; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center;">2</span>
+            <span style="color: #1e293b;">No camera, or it won’t scan? They tap <strong>Enter ID and code</strong> and type the two above.</span>
+          </li>
+        </ol>
+      </section>
+
+      <section aria-labelledby="reset-h" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 12px;">
+        <h2 id="reset-h" style="margin: 0; font-size: 16px; font-weight: 600; color: #0f172a;">Worried someone copied your QR?</h2>
+        <sc-if value="{{f.done}}" hint-placeholder-val="{{ false }}">
+        <div role="status" style="display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; border: 1px solid #a7f3d0; background: #ecfdf5; color: #065f46; font-size: 15px;">
+          <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px;"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.8 2.8L16 10"></path></svg>
+          <span>Your QR code has been reset. Old screenshots no longer work.</span>
+        </div>
+        </sc-if>
+        <sc-if value="{{f.confirm}}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <p style="margin: 0; color: #1e293b;">Resetting makes every earlier copy of your QR code stop working. Your ID stays the same.</p>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+            <button type="button" onClick="{{doReset}}" style="display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 20px; border-radius: 8px; border: 0; background: #b91c1c; color: #ffffff; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">Yes, reset my QR</button>
+            <button type="button" onClick="{{cancelReset}}" style="display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 20px; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">Cancel</button>
+          </div>
+        </div>
+        </sc-if>
+        <sc-if value="{{f.notConfirm}}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; flex-direction: column; gap: 12px; align-items: flex-start;">
+          <p style="margin: 0; color: #475569; font-size: 15px;">Resetting makes old screenshots of your QR stop working.</p>
+          <button type="button" onClick="{{askReset}}" style="display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 20px; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">Reset my QR</button>
+        </div>
+        </sc-if>
+      </section>
+    </div>
+  </div>
+  </sc-if>
+</main>
+
+<sc-if value="{{f.copied}}" hint-placeholder-val="{{ false }}">
+<div role="status" style="position: absolute; left: 50%; top: {{s.toastTop}}px; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-radius: 12px; background: #0f172a; color: #ffffff; font-size: 15px; font-weight: 500; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.25); white-space: nowrap;">
+  <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#6ee7b7" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+  ID copied
+</div>
+</sc-if>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"device":{"editor":"enum","options":["mobile","desktop"],"default":"mobile"},"screen":{"editor":"enum","options":["live","default","ending","copied","reconnecting","large","reset-confirm","reset-done","loading","error","gated"],"default":"live"},"$preview":{"width":390,"height":1500}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { sec: 18, idx: 0, ui: null };
+  }
+  componentDidMount() {
+    if (this.live()) {
+      this.timer = setInterval(() => this.tick(), 1000);
+    }
+  }
+  componentWillUnmount() {
+    clearInterval(this.timer);
+    clearTimeout(this.copyTimer);
+  }
+  live() {
+    return (this.props.screen ?? 'live') === 'live';
+  }
+  codes() {
+    return ['482 913', '615 207', '093 548', '771 362'];
+  }
+  tick() {
+    this.setState((s) => (s.sec <= 1 ? { sec: 30, idx: (s.idx + 1) % 4 } : { sec: s.sec - 1 }));
+  }
+  setUi(ui) {
+    if (this.live()) this.setState({ ui: ui });
+  }
+  renderVals() {
+    const desktop = (this.props.device ?? 'mobile') === 'desktop';
+    const live = this.live();
+    const screen = live ? (this.state.ui || 'default') : this.props.screen;
+    const sec = live ? this.state.sec : (screen === 'ending' ? 4 : 18);
+    const ending = sec <= 5;
+    const large = screen === 'large';
+    const loading = screen === 'loading';
+    const error = screen === 'error';
+    const gated = screen === 'gated';
+    const reconnecting = screen === 'reconnecting';
+    const copied = screen === 'copied';
+    const confirm = screen === 'reset-confirm';
+    const done = screen === 'reset-done';
+    const short = loading || error || gated;
+    const h = large || short ? (desktop ? 900 : 844) : (desktop ? 1020 : 1500);
+    return {
+      sec: sec,
+      code: live ? this.codes()[this.state.idx] : '482 913',
+      f: {
+        large: large,
+        page: !large,
+        loading: loading,
+        error: error,
+        gated: gated,
+        ready: !large && !short,
+        reconnecting: reconnecting,
+        countdown: !reconnecting,
+        copied: copied,
+        notCopied: !copied,
+        confirm: confirm,
+        notConfirm: !confirm,
+        done: done
+      },
+      s: {
+        w: desktop ? 1440 : 390,
+        h: h,
+        headPad: desktop ? 24 : 16,
+        navW: desktop ? 'auto' : '100%',
+        navCol: desktop ? 'auto' : '1fr',
+        maxW: desktop ? 1088 : 390,
+        mainPad: desktop ? '40px 24px 56px' : '24px 16px 40px',
+        h1: desktop ? 30 : 24,
+        colsDisplay: desktop ? 'grid' : 'flex',
+        cols: desktop ? '420px minmax(0, 1fr)' : 'none',
+        colGap: desktop ? 32 : 20,
+        colsAlign: desktop ? 'start' : 'stretch',
+        qr: desktop ? 340 : 264,
+        qrSmall: desktop ? 220 : 180,
+        dim: reconnecting ? 0.55 : 1,
+        gray: reconnecting ? 1 : 0,
+        pct: Math.round((sec / 30) * 100),
+        cdColor: ending ? '#c2410c' : '#3659e3',
+        barColor: ending ? '#ea580c' : '#3659e3',
+        toastTop: desktop ? 820 : 764,
+        closeLabel: desktop ? 'Close (Esc)' : 'Close',
+        lgDir: desktop ? 'row' : 'column',
+        lgGap: desktop ? 72 : 24,
+        lgQr: desktop ? 520 : 290,
+        lgPad: desktop ? 28 : 14,
+        lgInfoGap: desktop ? 28 : 16,
+        lgInfoW: desktop ? 460 : 340,
+        lgId: desktop ? 48 : 30,
+        lgCode: desktop ? 96 : 56
+      },
+      copyId: () => {
+        if (!this.live()) return;
+        clearTimeout(this.copyTimer);
+        this.setState({ ui: 'copied' });
+        this.copyTimer = setTimeout(() => this.setState({ ui: null }), 2500);
+      },
+      openLarge: () => this.setUi('large'),
+      closeLarge: () => this.setUi(null),
+      askReset: () => this.setUi('reset-confirm'),
+      cancelReset: () => this.setUi(null),
+      doReset: () => this.setUi('reset-done')
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 /** Types and calls for the M2 deeds API (docs/M2-DESIGN.md §3; backend/app/modules/deeds). */
 
-import { apiDelete, apiGet, apiPatch, apiPost } from '../../lib/api'
+import { ApiError, apiDelete, apiGet, apiPatch, apiPost } from '../../lib/api'
 import type { Location } from '../../lib/geolocation'
 
 export type { Location } from '../../lib/geolocation'
@@ -44,6 +44,15 @@ export type ScanOut = {
   scan_id: string
   doer: UserSummary
   expires_at: string
+  /** The server's scan time. The deed form's "Earlier" choices are offsets from it. */
+  scanned_at: string
+  /**
+   * Reports this witness may still make about this doer this IST month, counted before this
+   * report (so 1 means "this is the last one"). Recomputed on every read (D20).
+   */
+  pair_reports_remaining: number
+  /** 00:00 IST on the 1st of next month, with the `+05:30` offset. Never compute it locally. */
+  month_resets_at: string
 }
 
 /** `GET /scans/{id}`: the POST shape plus whether a deed has already used the scan. */
@@ -142,16 +151,38 @@ export type MyInvitesParams = {
   cursor?: string | null
 }
 
+/** `GET /deeds/options` (§3.2 #10). The limits are returned so copy follows config. */
 export type DeedOptions = {
   categories: Category[]
   invites_enabled: boolean
   invites_remaining_today: number
-  reports_remaining_this_month: number
   invite_expiry_hours: number
+  /** `max(0, reporter_monthly_limit − deeds created this IST month)`. */
+  reports_remaining_this_month: number
+  /** Total reports per reporter per IST month (150; D19). */
+  reporter_monthly_limit: number
+  /** Reports about one doer per reporter per IST month (15; D19). */
+  reporter_doer_monthly_limit: number
+  /** 00:00 IST on the 1st of next month, with the `+05:30` offset. */
+  month_resets_at: string
   description_min: number
   description_max: number
+  beneficiaries_max: number
   scan_submit_minutes: number
+  qr_occurred_max_age_minutes: number
+  max_location_accuracy_m: number
+  service_area_radius_km: number
+  /** Render photo sections only when true (D23; false throughout M2). */
+  photos_enabled: boolean
+  /**
+   * Reports per act that count (D2/D15). Not sent by the M2 API yet; the Q20 note falls back
+   * to `DEFAULT_SAME_ACT_CAP` until it is.
+   */
+  same_act_cap?: number
 }
+
+/** The same-act cap the F6 "Extra witness" note uses when options don't carry it (Q20). */
+export const DEFAULT_SAME_ACT_CAP = 5
 
 // ----------------------------------------------------------------- invites (public preview)
 
@@ -196,6 +227,53 @@ export type SelfLogOut = {
 export type DeedCountsOut = {
   self_logged: number
   verified: number
+}
+
+// ----------------------------------------------------------------- errors
+
+/** Error codes the deeds endpoints return (§3.2), plus the generic ones the F3 screens handle. */
+export type DeedsErrorCode =
+  | 'not_authenticated'
+  | 'onboarding_required'
+  | 'rate_limited'
+  // scans
+  | 'qr_invalid'
+  | 'doer_code_invalid'
+  | 'cannot_verify_self'
+  | 'already_scanned'
+  | 'already_recognized_today'
+  | 'location_too_imprecise'
+  | 'outside_service_area'
+  | 'implausible_travel'
+  | 'monthly_report_limit'
+  | 'pair_monthly_limit'
+  // deed create, scan read
+  | 'scan_not_found'
+  | 'scan_expired'
+  | 'scan_used'
+  | 'invalid_category'
+  | 'invalid_description'
+  | 'invalid_beneficiaries'
+  | 'implausible_time'
+  | 'invite_daily_limit'
+  | 'invites_disabled'
+  // reads, edit, withdraw
+  | 'deed_not_found'
+  | 'deed_not_editable'
+  | 'deed_not_withdrawable'
+
+/**
+ * The doer named in a scan-time error body (D27): only 409 `already_recognized_today` and
+ * 429 `pair_monthly_limit` from `POST /scans` carry `doer: {handle, display_name}`. Returns null
+ * for any other error or a malformed body.
+ */
+export function errorDoer(error: unknown): UserSummary | null {
+  if (!(error instanceof ApiError)) return null
+  const doer = error.extra.doer
+  if (!doer || typeof doer !== 'object') return null
+  const { handle, display_name } = doer as Record<string, unknown>
+  if (typeof handle !== 'string' || typeof display_name !== 'string') return null
+  return { handle, display_name }
 }
 
 // ----------------------------------------------------------------- calls

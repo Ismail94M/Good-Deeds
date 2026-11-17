@@ -72,3 +72,21 @@ export function getPosition(): Promise<Location> {
     )
   })
 }
+
+export type LocationPermission = 'granted' | 'prompt' | 'denied' | 'unknown'
+
+/**
+ * The browser's current geolocation permission, without prompting. `'unknown'` when the
+ * Permissions API is missing (older Safari) or the query fails; treat it like `'prompt'`.
+ */
+export async function permissionState(): Promise<LocationPermission> {
+  const permissions = typeof navigator !== 'undefined' ? navigator.permissions : undefined
+  if (!permissions || typeof permissions.query !== 'function') return 'unknown'
+  try {
+    const status = await permissions.query({ name: 'geolocation' })
+    const state: string = status.state
+    return state === 'granted' || state === 'prompt' || state === 'denied' ? state : 'unknown'
+  } catch {
+    return 'unknown'
+  }
+}

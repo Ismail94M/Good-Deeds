@@ -28,16 +28,20 @@ async def purge_unconsumed_scans_batch(
     """
     _, limits = await load_limits(session)
     cutoff = (now or utcnow()) - timedelta(days=limits.unconsumed_scan_retention_days)
+    # A MATERIALIZED CTE runs the locking LIMIT query exactly once. As a plain ``IN (subquery)``
+    # the planner may pick a nested-loop semi join that re-runs it per outer row, deleting more
+    # than ``batch_size`` rows (seen with small table statistics).
     batch = (
         select(QrScan.id)
         .where(QrScan.consumed_at.is_(None), QrScan.expires_at < cutoff)
         .limit(batch_size)
         .with_for_update(skip_locked=True)
-        .scalar_subquery()
+        .cte("batch")
+        .prefix_with("MATERIALIZED")
     )
     result = await session.execute(
         delete(QrScan)
-        .where(QrScan.id.in_(batch))
+        .where(QrScan.id.in_(select(batch.c.id)))
         .returning(QrScan.id)
         .execution_options(synchronize_session=False)
     )

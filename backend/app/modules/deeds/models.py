@@ -177,6 +177,8 @@ class SameActGroup(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     doer_user_id: Mapped[uuid.UUID] = mapped_column(_users_fk())
     centre: Mapped[WKBElement | None] = mapped_column(_point())
+    # The anchor report's server grouping time (scan time / invite reported_at), never its
+    # occurred_at (L7-A).
     anchor_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     radius_m: Mapped[int] = mapped_column(Integer)
     window_minutes: Mapped[int] = mapped_column(Integer)

@@ -1,8 +1,11 @@
 """Same-act grouping (docs/M2-DESIGN.md §3.4; PRD §6.4, §9, §10.1).
 
 Reports of one doer within ``radius_m`` and ``window_minutes`` of a group's **anchor** (the
-first report) form one act. The first ``cap`` verified reports, one per reporter, get
-``counts_for_points``; later ones are saved and linked but don't count.
+first report) form one act. Time is always a server-recorded time, never the reporter's "When?"
+(``occurred_at``, which can be backdated): a QR deed's scan ``scanned_at``, an invite deed's
+``reported_at`` (security L7, PO decision L7-A). ``occurred_at`` is for display only.
+The first ``cap`` verified reports, one per reporter, get ``counts_for_points``; later ones
+are saved and linked but don't count.
 
 Runs when a deed becomes verified, inside the caller's transaction, under the per-doer
 ``same_act`` advisory lock so two verifications can never both take the last counted slot.
@@ -46,10 +49,10 @@ async def lock_doer(session: AsyncSession, doer_id: uuid.UUID) -> None:
 
 
 async def _matching_group(
-    session: AsyncSession, doer_id: uuid.UUID, location: str, occurred_at: datetime
+    session: AsyncSession, doer_id: uuid.UUID, location: str, grouped_at: datetime
 ) -> SameActGroup | None:
     window = func.make_interval(0, 0, 0, 0, 0, SameActGroup.window_minutes)
-    at = literal(occurred_at, DateTime(timezone=True))
+    at = literal(grouped_at, DateTime(timezone=True))
     stmt = (
         select(SameActGroup)
         .where(
@@ -77,7 +80,7 @@ async def _matching_group(
 def _new_group(
     doer_id: uuid.UUID,
     location: str | None,
-    occurred_at: datetime,
+    grouped_at: datetime,
     limits: DeedLimits,
     limits_version: int,
 ) -> SameActGroup:
@@ -85,7 +88,7 @@ def _new_group(
     return SameActGroup(
         doer_user_id=doer_id,
         centre=location,
-        anchor_at=occurred_at,
+        anchor_at=grouped_at,
         radius_m=limits.same_act_radius_m,
         window_minutes=limits.same_act_window_minutes,
         cap=limits.same_act_cap,
@@ -102,7 +105,7 @@ async def assign_group(
     doer_id: uuid.UUID,
     reporter_id: uuid.UUID,
     location: str | None,
-    occurred_at: datetime,
+    grouped_at: datetime,
     limits: DeedLimits,
     limits_version: int,
     exclude_deed_id: uuid.UUID | None = None,
@@ -110,18 +113,20 @@ async def assign_group(
     """Find or create the deed's group and take a counted slot if one is free.
 
     ``location`` is the deed's location as EWKT, or None for an invite deed without one, which
-    gets a null-centre group of its own that nothing else can join. The caller sets
+    gets a null-centre group of its own that nothing else can join. ``grouped_at`` is the deed's
+    server-recorded grouping time (scan time or invite ``reported_at``), never ``occurred_at``
+    (L7-A); a new group's ``anchor_at`` is set from it. The caller sets
     ``same_act_group_id`` and ``counts_for_points`` on the deed (which must not be in the group
     yet; pass ``exclude_deed_id`` if it is already flushed).
     """
     await lock_doer(session, doer_id)
     group = (
-        await _matching_group(session, doer_id, location, occurred_at)
+        await _matching_group(session, doer_id, location, grouped_at)
         if location is not None
         else None
     )
     if group is None:
-        group = _new_group(doer_id, location, occurred_at, limits, limits_version)
+        group = _new_group(doer_id, location, grouped_at, limits, limits_version)
         session.add(group)
         await session.flush()
         already = False

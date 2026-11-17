@@ -51,8 +51,11 @@ Each milestone is built, tested and reviewed by the product owner before the nex
 - Private self-logs, with public Self-log Deeds and Verified Deeds counts on the profile.
 - Reporters can edit and withdraw deeds.
 - Limits live in versioned config rows (`config_versions`).
-- At most 15 reports per reporter per calendar month. Invites are built but switched off by config (PO decision 2026-11-16).
+- At most 15 reports per reporter–doer pair and 150 per reporter per calendar month (PO decision 2026-11-16, replaces the flat 15). Invites are built but switched off by config (PO decision 2026-11-16).
+- Screens designed on Design canvases (F2 My QR, F3 Record a deed, F6 My deeds), approved by the PO on 2026-11-16.
 - Events: `DeedSubmitted`, `DeedVerified`, `DeedRejected`, `DeedEdited`, `DeedWithdrawn`, `DeedPrizeRankChanged`, `DeedCountsForPointsChanged`.
+- Same-act grouping uses the server's actual scan time; the reporter's "When?" is display only (PO decision 2026-11-17, security L7).
+- Forgot password via the verified phone and an SMS code; resetting signs out every session (PO decision 2026-11-17, missed in M1).
 - Full decisions: `docs/M2-DESIGN.md`.
 
 **M3 Feed & Social**
@@ -60,6 +63,8 @@ Each milestone is built, tested and reviewed by the product owner before the nex
 - Feed tabs: Nearby, Following, Top this week.
 - Pending posts hide the doer.
 - Likes, comments, shares (Web Share API + WhatsApp link), follows, saves.
+- Verified deeds are auto-published. The doer or reporter can hide one from the feed (visibility only). Withdrawn or invalidated deeds leave the feed. Area names only, never GPS. Comments have length and rate limits and a bad-word filter. Open follows (PO decisions 2026-11-16, PRD §6.5).
+- Before M3: choose a photo storage provider (Azure Blob / S3 / Google Cloud Storage).
 
 **M4 Scoring, Points & Leaderboard**
 - Rule-based scoring: category base points, keyword/regex text rules, fixed photo bonus.

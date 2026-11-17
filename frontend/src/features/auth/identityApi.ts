@@ -68,6 +68,15 @@ export type PhoneStartResponse = {
   resend_after_seconds: number
 }
 
+/** POST /auth/password/forgot always answers this, whether or not the number has an account. */
+export type PasswordForgotResponse = {
+  sent: true
+  /** Not in the current contract; used if the API starts sending it. */
+  resend_after_seconds?: number
+}
+
+export type PasswordResetRequest = { phone: string; code: string; new_password: string }
+
 export type QrCode = {
   short_id: string
   display_id: string
@@ -77,6 +86,8 @@ export type QrCode = {
   refresh_after_seconds: number
   /** 6-digit code typed with the ID for manual verification (M2). Same window as `token`. */
   manual_code: string
+  /** Length of one code window in seconds, from config (M2 Revision 5, F2 countdown bar). */
+  window_seconds: number
 }
 
 export type OAuthProvider = 'google' | 'facebook'
@@ -89,6 +100,10 @@ export const identityApi = {
   oauth: (provider: OAuthProvider, token: string) =>
     apiPost<TokenResponse>(`/auth/oauth/${provider}`, { token }),
   logout: () => apiPost<void>('/auth/logout'),
+  passwordForgot: (phone: string) =>
+    apiPost<PasswordForgotResponse>('/auth/password/forgot', { phone }),
+  passwordReset: (data: PasswordResetRequest) =>
+    apiPost<{ reset: true }>('/auth/password/reset', data),
   me: () => apiGet<Me>('/users/me'),
   updateMe: (data: ProfileUpdate) => apiPatch<Me>('/users/me', data),
   ageConsent: (data: AgeAndConsent) => apiPost<Me>('/users/me/age-consent', data),

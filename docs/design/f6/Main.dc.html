@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>My deeds</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@600;700&amp;display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div style="position: relative; width: {{s.w}}px; min-height: {{s.h}}px; box-sizing: border-box; display: flex; flex-direction: column; background: #faf8f5; color: #0f172a; font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 16px; line-height: 1.5;">
+
+<header style="border-bottom: 1px solid #e2e8f0; background: #faf8f5;">
+  <div style="max-width: 1152px; margin: 0 auto; box-sizing: border-box; padding: 8px {{s.headPad}}px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px;">
+    <a href="#home" style="order: 1; display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; color: #0f172a; text-decoration: none;">
+      <svg aria-hidden="true" viewBox="0 0 32 32" width="32" height="32"><rect width="32" height="32" rx="8" fill="#3659e3"></rect><path fill="#ffffff" d="M16 24.5s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 16 11.7a4.3 4.3 0 0 1 7.5 2.8c0 5.4-7.5 10-7.5 10z"></path></svg>
+      Good Deeds
+    </a>
+    <nav aria-label="Main" style="order: {{s.navOrder}}; width: {{s.navW}}; margin-left: {{s.navMl}};">
+      <ul style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, {{s.navCol}})); gap: 4px;">
+        <li><a href="#home" style="display: flex; min-height: 44px; align-items: center; justify-content: center; padding: 0 14px; border-radius: 8px; font-size: 14px; font-weight: 500; color: #475569; text-decoration: none;">Home</a></li>
+        <li><a href="#qr" style="display: flex; min-height: 44px; align-items: center; justify-content: center; padding: 0 14px; border-radius: 8px; font-size: 14px; font-weight: 500; color: #475569; text-decoration: none;">My QR</a></li>
+        <li><a href="#profile" onClick="{{toProfile}}" aria-current="page" style="display: flex; min-height: 44px; align-items: center; justify-content: center; padding: 0 14px; border-radius: 8px; font-size: 14px; font-weight: 600; color: #3659e3; background: #eef2fe; text-decoration: none;">Profile</a></li>
+      </ul>
+    </nav>
+    <a href="#report" style="order: {{s.btnOrder}}; margin-left: {{s.btnMl}}; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 16px; border-radius: 8px; background: #3659e3; color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+      Record a deed
+    </a>
+  </div>
+</header>
+
+<main style="width: 100%; max-width: {{s.maxW}}px; margin: 0 auto; box-sizing: border-box; padding: {{s.mainPad}}; display: flex; flex-direction: column; gap: 20px;">
+
+  <sc-if value="{{f.backLink}}" hint-placeholder-val="{{ false }}">
+  <button type="button" onClick="{{back}}" style="align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; margin: -8px 0 -8px; padding: 0 8px 0 0; border: 0; background: transparent; color: #3659e3; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;">
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"></path></svg>
+    {{backLabel}}
+  </button>
+  </sc-if>
+
+  <sc-if value="{{f.profile}}" hint-placeholder-val="{{ true }}">
+  <section style="display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; padding-top: 8px;">
+    <span aria-hidden="true" style="width: 88px; height: 88px; border-radius: 999px; background: #dfe6fc; color: #2442b8; font-size: 30px; font-weight: 700; display: flex; align-items: center; justify-content: center;">{{prof.initials}}</span>
+    <h1 style="margin: 4px 0 0; font-size: {{s.h1}}px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em;">{{prof.name}}</h1>
+    <p style="margin: 0; color: #475569;">{{prof.handle}} · Bangalore</p>
+  </section>
+
+  <sc-if value="{{f.own}}" hint-placeholder-val="{{ true }}">
+  <div role="group" aria-label="Deed counts" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;">
+    <a href="#self-logs" onClick="{{toSelfLogs}}" style="display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 16px 8px; text-decoration: none; color: #0f172a;">
+      <span style="font-size: 26px; font-weight: 700; line-height: 1.2;">{{prof.self}}</span>
+      <span style="font-size: 14px; font-weight: 500; color: #3659e3;">Self-log Deeds</span>
+    </a>
+    <a href="#my-deeds" onClick="{{toDeeds}}" style="display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 16px 8px; border-left: 1px solid #e2e8f0; text-decoration: none; color: #0f172a;">
+      <span style="font-size: 26px; font-weight: 700; line-height: 1.2;">{{prof.verified}}</span>
+      <span style="font-size: 14px; font-weight: 500; color: #3659e3;">Verified Deeds</span>
+    </a>
+  </div>
+  <p style="margin: -6px 0 0; text-align: center; font-size: 15px; color: #475569;"><a href="#followers" style="color: #0f172a; font-weight: 700; text-decoration: none;">86</a> followers · <a href="#following" style="color: #0f172a; font-weight: 700; text-decoration: none;">40</a> following · <a href="#saved" style="color: #3659e3; font-weight: 600; text-decoration: none;">Saved</a></p>
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+    <button type="button" onClick="{{toSelfForm}}" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 48px; border-radius: 8px; border: 0; background: #3659e3; color: #ffffff; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+      Log a deed
+    </button>
+    <a href="#qr" style="display: inline-flex; align-items: center; justify-content: center; min-height: 48px; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff; color: #1e293b; font-size: 16px; font-weight: 600; text-decoration: none;">My QR code</a>
+  </div>
+  <section aria-labelledby="act-h" style="display: flex; flex-direction: column; gap: 8px;">
+    <h2 id="act-h" style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #475569;">Your activity</h2>
+    <ul style="margin: 0; padding: 0; list-style: none; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;">
+      <li><a href="#my-deeds" onClick="{{toDeeds}}" style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; text-decoration: none; color: #0f172a;">
+        <span style="flex-grow: 1;"><span style="display: block; font-weight: 600;">My deeds</span><span style="display: block; font-size: 14px; color: #475569;">Reports about you and reports you made</span></span>
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#586579" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg>
+      </a></li>
+      <li style="border-top: 1px solid #e2e8f0;"><a href="#self-logs" onClick="{{toSelfLogs}}" style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; text-decoration: none; color: #0f172a;">
+        <span style="flex-grow: 1;"><span style="display: block; font-weight: 600;">Self-logs</span><span style="display: block; font-size: 14px; color: #475569;">Your private diary of good deeds</span></span>
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#586579" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg>
+      </a></li>
+    </ul>
+  </section>
+  <section aria-labelledby="acc-h" style="display: flex; flex-direction: column; gap: 8px;">
+    <h2 id="acc-h" style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #475569;">Account</h2>
+    <button type="button" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff; color: #b91c1c; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h10"></path></svg>
+      Log out
+    </button>
+  </section>
+  </sc-if>
+
+  <sc-if value="{{f.public}}" hint-placeholder-val="{{ false }}">
+  <div role="group" aria-label="Deed counts" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px;">
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 16px 8px;">
+      <span style="font-size: 26px; font-weight: 700; line-height: 1.2;">{{prof.self}}</span>
+      <span style="font-size: 14px; font-weight: 500; color: #475569;">Self-log Deeds</span>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 16px 8px; border-left: 1px solid #e2e8f0;">
+      <span style="font-size: 26px; font-weight: 700; line-height: 1.2;">{{prof.verified}}</span>
+      <span style="font-size: 14px; font-weight: 500; color: #475569;">Verified Deeds</span>
+    </div>
+  </div>
+  <p style="margin: 0; display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: #475569;">
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink: 0; margin-top: 1px;"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01"></path></svg>
+    <span><strong>Verified Deeds</strong> were confirmed in person by someone who saw them. <strong>Self-logs</strong> are private notes: only the number is shown.</span>
+  </p>
+  </sc-if>
+  </sc-if>
+
+  <sc-if value="{{f.deeds}}" hint-placeholder-val="{{ false }}">
+  <h1 style="margin: 0; font-size: {{s.h1}}px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em;">My deeds</h1>
+  <div role="tablist" aria-label="My deeds" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 12px; background: #e9edf3;">
+    <button type="button" role="tab" aria-selected="{{tabRec.on}}" onClick="{{tabRec.pick}}" style="min-height: 44px; border: 0; border-radius: 9px; background: {{tabRec.bg}}; color: {{tabRec.fg}}; box-shadow: {{tabRec.sh}}; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;">Recognised for</button>
+    <button type="button" role="tab" aria-selected="{{tabRep.on}}" onClick="{{tabRep.pick}}" style="min-height: 44px; border: 0; border-radius: 9px; background: {{tabRep.bg}}; color: {{tabRep.fg}}; box-shadow: {{tabRep.sh}}; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;">I reported</button>
+  </div>
+  <p style="margin: 0; font-size: 14px; color: #475569;">{{tabIntro}}</p>
+
+  <sc-if value="{{f.deedsEmpty}}" hint-placeholder-val="{{ false }}">
+  <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 40px 12px; background: #ffffff; border: 1px dashed #cbd5e1; border-radius: 16px;">
+    <span aria-hidden="true" style="width: 56px; height: 56px; border-radius: 999px; background: #eef2fe; color: #3659e3; display: flex; align-items: center; justify-content: center;">
+      <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.5s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.7a4.3 4.3 0 0 1 7.5 2.8c0 5.4-7.5 10-7.5 10z"></path></svg>
+    </span>
+    <h2 style="margin: 0; font-size: 18px; font-weight: 700;">No one has recognised you yet</h2>
+    <p style="margin: 0; color: #475569; max-width: 300px;">Next time you help someone, show your QR so a witness can record it.</p>
+    <a href="#qr" style="display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 20px; border-radius: 8px; background: #3659e3; color: #ffffff; font-weight: 600; text-decoration: none;">Show my QR</a>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{f.deedsList}}" hint-placeholder-val="{{ true }}">
+  <div style="display: flex; flex-direction: column; gap: 12px;">
+    <sc-for list="{{deedList}}" as="d" hint-placeholder-count="3">
+    <article style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <span style="display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 999px; border: 1px solid {{d.badge.bd}}; background: {{d.badge.bg}}; color: {{d.badge.fg}}; font-size: 13px; font-weight: 600;">{{d.badge.label}}</span>
+        <span style="font-size: 13px; color: #586579;">{{d.when}}{{d.editedTxt}}</span>
+      </div>
+      <h2 style="margin: 0;"><button type="button" onClick="{{d.open}}" style="display: flex; align-items: center; min-height: 40px; padding: 0; border: 0; background: transparent; color: #0f172a; font-family: inherit; font-size: 17px; font-weight: 700; text-align: left; cursor: pointer;">{{d.who}}</button></h2>
+      <p style="margin: 0; font-size: 14px; font-weight: 600; color: #2442b8;">{{d.cat}}</p>
+      <p style="margin: 0; font-size: 15px; color: #334155;">{{d.desc}}</p>
+      <sc-if value="{{d.hasPhotos}}" hint-placeholder-val="{{ false }}">
+      <p style="margin: 0; display: flex; align-items: center; gap: 6px; font-size: 14px; color: #586579;">
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M21 16l-5-5-9 9"></path></svg>
+        {{d.photos}}
+      </p>
+      </sc-if>
+      <sc-if value="{{d.extra}}" hint-placeholder-val="{{ false }}">
+      <p style="margin: 0; padding: 8px 10px; border-radius: 8px; background: #eef2fe; color: #2442b8; font-size: 14px;">Also reported by others. The act counts once on your profile.</p>
+      </sc-if>
+      <sc-if value="{{d.actions}}" hint-placeholder-val="{{ false }}">
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 4px; padding-top: 10px; border-top: 1px solid #e2e8f0;">
+        <button type="button" onClick="{{d.edit}}" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;">
+          <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>
+          Edit
+        </button>
+        <button type="button" onClick="{{d.withdraw}}" style="display: inline-flex; align-items: center; justify-content: center; min-height: 44px; border-radius: 8px; border: 1px solid #fecaca; background: #ffffff; color: #b91c1c; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;">Withdraw</button>
+      </div>
+      </sc-if>
+    </article>
+    </sc-for>
+  </div>
+  </sc-if>
+  </sc-if>
+
+  <sc-if value="{{f.detail}}" hint-placeholder-val="{{ false }}">
+  <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
+    <span style="display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 999px; border: 1px solid {{detailBadge.bd}}; background: {{detailBadge.bg}}; color: {{detailBadge.fg}}; font-size: 13px; font-weight: 600;">{{detailBadge.label}}</span>
+    <span style="display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 999px; background: #f1f5f9; color: #475569; font-size: 13px; font-weight: 600;">Edited</span>
+  </div>
+  <div style="display: flex; flex-direction: column; gap: 4px;">
+    <h1 style="margin: 0; font-size: {{s.h1}}px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em;">You recognised Ahmed Khan</h1>
+    <p style="margin: 0; font-weight: 600; color: #2442b8;">Helping an elderly person</p>
+  </div>
+  <p style="margin: 0; color: #1e293b;">Helped an elderly man cross the busy junction at Silk Board and carried his bags to the bus stop.</p>
+  <ul aria-label="Photos" style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+    <li style="aspect-ratio: 4 / 3; border-radius: 12px; background: #dbeafe; color: #334155; display: flex; align-items: center; justify-content: center;"><svg role="img" aria-label="Photo 1" viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M21 16l-5-5-9 9"></path></svg></li>
+    <li style="aspect-ratio: 4 / 3; border-radius: 12px; background: #fde68a; color: #334155; display: flex; align-items: center; justify-content: center;"><svg role="img" aria-label="Photo 2" viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M21 16l-5-5-9 9"></path></svg></li>
+  </ul>
+  <dl style="margin: 0; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px 18px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px 16px; font-size: 15px;">
+    <dt style="color: #475569;">People helped</dt><dd style="margin: 0; font-weight: 600;">1</dd>
+    <dt style="color: #475569;">When</dt><dd style="margin: 0; font-weight: 600;">Today, 4:12 pm</dd>
+    <dt style="color: #475569;">Checked by</dt><dd style="margin: 0; font-weight: 600;">QR code and location</dd>
+    <dt style="color: #475569;">Last edited</dt><dd style="margin: 0; font-weight: 600;">Today, 4:30 pm</dd>
+  </dl>
+  <sc-if value="{{f.isWithdrawn}}" hint-placeholder-val="{{ false }}">
+  <div role="status" style="display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; border: 1px solid #e2e8f0; background: #f1f5f9; color: #334155; font-size: 15px;">
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink: 0; margin-top: 2px;"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01"></path></svg>
+    <span>You withdrew this report on 16 Nov. It no longer counts for Ahmed Khan and it has left the public feed.</span>
+  </div>
+  </sc-if>
+  <sc-if value="{{f.canAct}}" hint-placeholder-val="{{ true }}">
+  <div style="display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 14px; border-radius: 12px; border: 1px solid #e2e8f0; background: #ffffff; font-size: 14px; color: #334155;">
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#047857" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+    <span style="flex-grow: 1;">Shown in the public feed</span>
+    <button type="button" style="flex-shrink: 0; min-height: 44px; padding: 0 12px; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer;">Hide from feed</button>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+    <button type="button" onClick="{{toEdit}}" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 48px; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>
+      Edit
+    </button>
+    <button type="button" onClick="{{toWithdraw}}" style="display: inline-flex; align-items: center; justify-content: center; min-height: 48px; border-radius: 8px; border: 1px solid #fecaca; background: #ffffff; color: #b91c1c; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">Withdraw</button>
+  </div>
+  </sc-if>
+  </sc-if>
+
+  <sc-if value="{{f.edit}}" hint-placeholder-val="{{ false }}">
+  <h1 style="margin: 0; font-size: {{s.h1}}px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em;">Edit your report</h1>
+  <section aria-labelledby="locked-h" style="background: #f1f5f9; border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;">
+    <h2 id="locked-h" style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: #334155;">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>
+      Can’t be changed
+    </h2>
+    <dl style="margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 16px; font-size: 15px;">
+      <dt style="color: #475569;">Who</dt><dd style="margin: 0; font-weight: 600;">Ahmed Khan</dd>
+      <dt style="color: #475569;">When</dt><dd style="margin: 0; font-weight: 600;">Today, 4:12 pm</dd>
+      <dt style="color: #475569;">Where</dt><dd style="margin: 0; font-weight: 600;">Checked by QR and location</dd>
+    </dl>
+    <p style="margin: 0; font-size: 14px; color: #475569;">These are the proof that you were there.</p>
+  </section>
+
+  <fieldset style="border: 0; margin: 0; padding: 0; min-width: 0;">
+    <legend style="padding: 0; margin-bottom: 10px; font-size: 16px; font-weight: 600;">What kind of deed?</legend>
+    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+      <sc-for list="{{cats}}" as="c" hint-placeholder-count="8">
+      <button type="button" aria-pressed="{{c.on}}" onClick="{{c.pick}}" style="min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid {{c.bd}}; background: {{c.bg}}; color: {{c.fg}}; font-family: inherit; font-size: 15px; font-weight: {{c.fw}}; cursor: pointer;">{{c.label}}</button>
+      </sc-for>
+    </div>
+  </fieldset>
+
+  <div style="display: flex; flex-direction: column; gap: 6px;">
+    <label for="e-desc" style="font-size: 16px; font-weight: 600;">What did they do?</label>
+    <textarea id="e-desc" rows="3" defaultValue="Helped an elderly man cross the busy junction at Silk Board and carried his bags to the bus stop." style="box-sizing: border-box; width: 100%; min-height: 84px; padding: 10px 14px; border-radius: 8px; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; font-family: inherit; font-size: 16px; line-height: 1.5; resize: vertical;"></textarea>
+    <span style="align-self: flex-end; font-size: 14px; font-weight: 600; color: #586579;">98 / 1000</span>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 10px;">
+    <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px;">
+      <p id="e-photos-l" style="margin: 0; font-size: 16px; font-weight: 600;">Photos <span style="font-weight: 400; color: #586579;">(optional)</span></p>
+      <span style="font-size: 14px; font-weight: 600; color: #586579;">{{ph.count}} of 4</span>
+    </div>
+    <sc-if value="{{ph.has}}" hint-placeholder-val="{{ true }}">
+    <ul aria-labelledby="e-photos-l" style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px;">
+      <sc-for list="{{ph.items}}" as="p" hint-placeholder-count="2">
+      <li style="position: relative; aspect-ratio: 1 / 1; border-radius: 10px; background: {{p.bg}}; color: #334155; display: flex; align-items: center; justify-content: center;">
+        <svg role="img" aria-label="{{p.label}}" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M21 16l-5-5-9 9"></path></svg>
+        <sc-if value="{{ph.editable}}" hint-placeholder-val="{{ true }}">
+        <button type="button" aria-label="Remove {{p.label}}" onClick="{{p.remove}}" style="position: absolute; top: 4px; right: 4px; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 999px; background: rgba(15, 23, 42, 0.75); color: #ffffff; cursor: pointer; display: flex; align-items: center; justify-content: center;"><svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+        </sc-if>
+      </li>
+      </sc-for>
+    </ul>
+    </sc-if>
+    <sc-if value="{{ph.editable}}" hint-placeholder-val="{{ true }}">
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+      <button type="button" onClick="{{ph.add}}" disabled="{{ph.full}}" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; opacity: {{ph.btnOp}};">
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"></path><circle cx="12" cy="13.5" r="3.5"></circle></svg>
+        Take photo
+      </button>
+      <button type="button" onClick="{{ph.add}}" disabled="{{ph.full}}" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; opacity: {{ph.btnOp}};">
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M21 16l-5-5-9 9"></path></svg>
+        Upload
+      </button>
+    </div>
+    </sc-if>
+    <p style="margin: 0; display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: 10px; background: {{ph.noteBg}}; color: {{ph.noteFg}}; font-size: 14px;">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px;"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+      <span>{{ph.note}}</span>
+    </p>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px;">
+    <p id="e-people-l" style="margin: 0; font-size: 16px; font-weight: 600;">How many people did they help? <span style="font-weight: 400; color: #586579;">(optional)</span></p>
+    <div role="group" aria-labelledby="e-people-l" style="align-self: flex-start; display: inline-flex; align-items: center; border: 1px solid #cbd5e1; border-radius: 8px; background: #ffffff;">
+      <button type="button" aria-label="One fewer" onClick="{{peopleMinus}}" style="width: 48px; height: 48px; border: 0; background: transparent; color: #1e293b; cursor: pointer; display: flex; align-items: center; justify-content: center;"><svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"></path></svg></button>
+      <span aria-live="polite" style="min-width: 48px; text-align: center; font-size: 18px; font-weight: 700;">{{people}}</span>
+      <button type="button" aria-label="One more" onClick="{{peoplePlus}}" style="width: 48px; height: 48px; border: 0; background: transparent; color: #1e293b; cursor: pointer; display: flex; align-items: center; justify-content: center;"><svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button>
+    </div>
+  </div>
+
+  <p style="margin: 0; font-size: 14px; color: #586579;">Changes are saved with a history, and the deed shows “Edited”.</p>
+  <div style="display: flex; flex-direction: column; gap: 10px;">
+    <button type="button" onClick="{{saveEdit}}" style="width: 100%; min-height: 52px; border-radius: 8px; border: 0; background: #3659e3; color: #ffffff; font-family: inherit; font-size: 17px; font-weight: 600; cursor: pointer;">Save changes</button>
+    <button type="button" onClick="{{back}}" style="width: 100%; min-height: 48px; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">Cancel</button>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{f.selflogs}}" hint-placeholder-val="{{ false }}">
+  <h1 style="margin: 0; font-size: {{s.h1}}px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em;">Self-logs</h1>
+  <div style="display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; background: #eef2fe; color: #2442b8; font-size: 15px;">
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px;"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>
+    <span>Self-logs are private and don’t earn points. If someone saw you, ask them to record it by scanning your QR.</span>
+  </div>
+  <button type="button" onClick="{{toSelfForm}}" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 48px; border-radius: 8px; border: 0; background: #3659e3; color: #ffffff; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+    Log a deed
+  </button>
+  <sc-if value="{{f.logsEmpty}}" hint-placeholder-val="{{ false }}">
+  <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding: 36px 12px; background: #ffffff; border: 1px dashed #cbd5e1; border-radius: 16px;">
+    <span aria-hidden="true" style="width: 56px; height: 56px; border-radius: 999px; background: #eef2fe; color: #3659e3; display: flex; align-items: center; justify-content: center;">
+      <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"></path><path d="M5 17a3 3 0 0 1 3-3h11"></path></svg>
+    </span>
+    <h2 style="margin: 0; font-size: 18px; font-weight: 700;">No self-logs yet</h2>
+    <p style="margin: 0; color: #475569; max-width: 300px;">Keep a private note of the good things you do, even when no one is watching.</p>
+  </div>
+  </sc-if>
+  <sc-if value="{{f.logsList}}" hint-placeholder-val="{{ true }}">
+  <div style="display: flex; flex-direction: column; gap: 12px;">
+    <sc-for list="{{logList}}" as="l" hint-placeholder-count="3">
+    <article style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+        <span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 999px; background: #f1f5f9; color: #475569; font-size: 13px; font-weight: 600;">
+          <svg aria-hidden="true" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>
+          Only you
+        </span>
+        <span style="font-size: 13px; color: #586579;">{{l.when}}</span>
+      </div>
+      <p style="margin: 0; font-size: 14px; font-weight: 600; color: #2442b8;">{{l.cat}}</p>
+      <p style="margin: 0; font-size: 15px; color: #1e293b;">{{l.desc}}</p>
+      <p style="margin: 0; font-size: 14px; color: #586579;">{{l.meta}}</p>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 4px; padding-top: 10px; border-top: 1px solid #e2e8f0;">
+        <button type="button" onClick="{{toSelfForm}}" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;">Edit</button>
+        <button type="button" onClick="{{askDelete}}" style="display: inline-flex; align-items: center; justify-content: center; min-height: 44px; border-radius: 8px; border: 1px solid #fecaca; background: #ffffff; color: #b91c1c; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;">Delete</button>
+      </div>
+    </article>
+    </sc-for>
+  </div>
+  </sc-if>
+  </sc-if>
+
+  <sc-if value="{{f.selfForm}}" hint-placeholder-val="{{ false }}">
+  <div style="display: flex; flex-direction: column; gap: 6px;">
+    <h1 style="margin: 0; font-size: {{s.h1}}px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em;">Log a deed</h1>
+    <p style="margin: 0; display: flex; gap: 8px; align-items: center; color: #475569;">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>
+      Private. Only you can see it, and it doesn’t earn points.
+    </p>
+  </div>
+
+  <fieldset style="border: 0; margin: 0; padding: 0; min-width: 0;">
+    <legend style="padding: 0; margin-bottom: 10px; font-size: 16px; font-weight: 600;">What kind of deed?</legend>
+    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+      <sc-for list="{{scats}}" as="c" hint-placeholder-count="8">
+      <button type="button" aria-pressed="{{c.on}}" onClick="{{c.pick}}" style="min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid {{c.bd}}; background: {{c.bg}}; color: {{c.fg}}; font-family: inherit; font-size: 15px; font-weight: {{c.fw}}; cursor: pointer;">{{c.label}}</button>
+      </sc-for>
+    </div>
+  </fieldset>
+
+  <div style="display: flex; flex-direction: column; gap: 6px;">
+    <label for="s-desc" style="font-size: 16px; font-weight: 600;">What did you do?</label>
+    <textarea id="s-desc" rows="3" placeholder="For example: fed the stray dogs on my street" style="box-sizing: border-box; width: 100%; min-height: 84px; padding: 10px 14px; border-radius: 8px; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; font-family: inherit; font-size: 16px; line-height: 1.5; resize: vertical;"></textarea>
+    <span style="align-self: flex-end; font-size: 14px; font-weight: 600; color: #586579;">0 / 1000</span>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 10px;">
+    <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px;">
+      <p id="s-photos-l" style="margin: 0; font-size: 16px; font-weight: 600;">Photos <span style="font-weight: 400; color: #586579;">(optional)</span></p>
+      <span style="font-size: 14px; font-weight: 600; color: #586579;">{{ph.count}} of 4</span>
+    </div>
+    <sc-if value="{{ph.has}}" hint-placeholder-val="{{ false }}">
+    <ul aria-labelledby="s-photos-l" style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px;">
+      <sc-for list="{{ph.items}}" as="p" hint-placeholder-count="1">
+      <li style="position: relative; aspect-ratio: 1 / 1; border-radius: 10px; background: {{p.bg}}; color: #334155; display: flex; align-items: center; justify-content: center;">
+        <svg role="img" aria-label="{{p.label}}" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M21 16l-5-5-9 9"></path></svg>
+        <button type="button" aria-label="Remove {{p.label}}" onClick="{{p.remove}}" style="position: absolute; top: 4px; right: 4px; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 999px; background: rgba(15, 23, 42, 0.75); color: #ffffff; cursor: pointer; display: flex; align-items: center; justify-content: center;"><svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+      </li>
+      </sc-for>
+    </ul>
+    </sc-if>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+      <button type="button" onClick="{{ph.add}}" disabled="{{ph.full}}" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; opacity: {{ph.btnOp}};">
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"></path><circle cx="12" cy="13.5" r="3.5"></circle></svg>
+        Take photo
+      </button>
+      <button type="button" onClick="{{ph.add}}" disabled="{{ph.full}}" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; opacity: {{ph.btnOp}};">
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M21 16l-5-5-9 9"></path></svg>
+        Upload
+      </button>
+    </div>
+  </div>
+
+  <fieldset style="border: 0; margin: 0; padding: 0; min-width: 0;">
+    <legend style="padding: 0; margin-bottom: 10px; font-size: 16px; font-weight: 600;">When did it happen?</legend>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <label for="s-date" style="font-size: 14px; font-weight: 500; color: #334155;">Date</label>
+        <input id="s-date" type="date" defaultValue="2026-11-16" max="2026-11-16" style="min-height: 48px; box-sizing: border-box; width: 100%; padding: 0 10px; border-radius: 8px; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; font-family: inherit; font-size: 16px;">
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <label for="s-time" style="font-size: 14px; font-weight: 500; color: #334155;">Time</label>
+        <input id="s-time" type="time" defaultValue="07:15" style="min-height: 48px; box-sizing: border-box; width: 100%; padding: 0 10px; border-radius: 8px; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; font-family: inherit; font-size: 16px;">
+      </div>
+    </div>
+    <p style="margin: 8px 0 0; font-size: 14px; color: #586579;">Any date in the past.</p>
+  </fieldset>
+
+  <label style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid #e2e8f0; background: #ffffff; cursor: pointer;">
+    <span><span style="display: block; font-weight: 600;">Add my current location</span><span style="display: block; font-size: 14px; color: #586579;">Optional. Only you can see it.</span></span>
+    <input type="checkbox" role="switch" style="width: 24px; height: 24px; flex-shrink: 0; accent-color: #3659e3;">
+  </label>
+
+  <div style="display: flex; flex-direction: column; gap: 10px;">
+    <button type="button" onClick="{{saveLog}}" style="width: 100%; min-height: 52px; border-radius: 8px; border: 0; background: #3659e3; color: #ffffff; font-family: inherit; font-size: 17px; font-weight: 600; cursor: pointer;">Save self-log</button>
+  </div>
+  </sc-if>
+</main>
+
+<sc-if value="{{f.dialog}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; background: rgba(15, 23, 42, 0.5);"></div>
+<div role="dialog" aria-modal="true" aria-labelledby="dlg-h" style="position: absolute; left: 50%; top: {{s.dialogTop}}px; transform: translateX(-50%); width: {{s.dialogW}}px; box-sizing: border-box; background: #ffffff; border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 20px 48px rgba(15, 23, 42, 0.3);">
+  <h2 id="dlg-h" style="margin: 0; font-size: 20px; font-weight: 700;">{{dlg.title}}</h2>
+  <p style="margin: 0; color: #334155;">{{dlg.body}}</p>
+  <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;">
+    <button type="button" onClick="{{dlg.confirm}}" style="width: 100%; min-height: 48px; border-radius: 8px; border: 0; background: #b91c1c; color: #ffffff; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">{{dlg.yes}}</button>
+    <button type="button" onClick="{{dlg.cancel}}" style="width: 100%; min-height: 48px; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">{{dlg.no}}</button>
+  </div>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"device":{"editor":"enum","options":["mobile","desktop"],"default":"mobile"},"screen":{"editor":"enum","options":["live","profile","profile-public","deeds-recognised","deeds-reported","deeds-empty","detail","withdraw-confirm","withdrawn","edit","edit-locked","selflogs","selflogs-empty","selflog-form","selflog-delete"],"default":"live"},"$preview":{"width":390,"height":1400}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { ui: 'profile', cat: 'helping_elderly', scat: 'animals', photos: 2, sphotos: 0, people: 1, withdrawn: false, logs: 3 };
+  }
+  live() {
+    return (this.props.screen ?? 'live') === 'live';
+  }
+  go(ui) {
+    if (this.live()) this.setState({ ui: ui });
+  }
+  pill(on) {
+    return on
+      ? { on: true, bd: '#3659e3', bg: '#3659e3', fg: '#ffffff', fw: 600 }
+      : { on: false, bd: '#cbd5e1', bg: '#ffffff', fg: '#1e293b', fw: 500 };
+  }
+  tab(on, target) {
+    return {
+      on: on,
+      bg: on ? '#ffffff' : 'transparent',
+      fg: on ? '#0f172a' : '#475569',
+      sh: on ? '0 1px 3px rgba(15, 23, 42, 0.12)' : 'none',
+      pick: () => this.go(target)
+    };
+  }
+  badges() {
+    return {
+      verified: { label: 'Verified', bg: '#ecfdf5', fg: '#047857', bd: '#a7f3d0' },
+      withdrawn: { label: 'Withdrawn', bg: '#f1f5f9', fg: '#475569', bd: '#e2e8f0' }
+    };
+  }
+  photoSet(count, editable, liveKey) {
+    const bgs = ['#dbeafe', '#fde68a', '#d1fae5', '#fce7f3'];
+    const items = [];
+    for (let i = 0; i < count; i++) {
+      items.push({ label: 'Photo ' + (i + 1), bg: bgs[i % 4], remove: () => { if (this.live()) { const u = {}; u[liveKey] = Math.max(0, this.state[liveKey] - 1); this.setState(u); } } });
+    }
+    return {
+      count: count,
+      items: items,
+      has: count > 0,
+      full: count >= 4,
+      editable: editable,
+      btnOp: count >= 4 ? 0.5 : 1,
+      add: () => { if (this.live() && this.state[liveKey] < 4) { const u = {}; u[liveKey] = this.state[liveKey] + 1; this.setState(u); } }
+    };
+  }
+  renderVals() {
+    const desktop = (this.props.device ?? 'mobile') === 'desktop';
+    const live = this.live();
+    const st = this.state;
+    const screen = live ? st.ui : this.props.screen;
+    const B = this.badges();
+    const isProfile = screen === 'profile' || screen === 'profile-public';
+    const isDeeds = screen.indexOf('deeds-') === 0;
+    const isDetail = screen === 'detail' || screen === 'withdraw-confirm' || screen === 'withdrawn';
+    const isEdit = screen === 'edit' || screen === 'edit-locked';
+    const isLogs = screen === 'selflogs' || screen === 'selflogs-empty' || screen === 'selflog-delete';
+    const isForm = screen === 'selflog-form';
+    const withdrawn = screen === 'withdrawn' || (live && st.withdrawn);
+    const repTab = screen === 'deeds-reported';
+    const catDefs = [
+      ['helping_elderly', 'Helping an elderly person'], ['animals', 'Animals'], ['environment', 'Environment & cleanliness'],
+      ['food_sharing', 'Sharing food'], ['road_safety', 'Road & traffic help'], ['medical_help', 'Medical / emergency help'],
+      ['community', 'Community help'], ['other', 'Other']
+    ];
+    const cat = live ? st.cat : 'helping_elderly';
+    const scat = live ? st.scat : 'animals';
+    const recList = [
+      { who: 'Rahul Verma recognised you', cat: 'Animals', desc: 'Fed and gave water to stray puppies near Indiranagar metro station.', when: 'Today, 8:05 am', editedTxt: '', badge: B.verified, hasPhotos: true, photos: '1 photo', extra: false, actions: false },
+      { who: 'Sneha Rao recognised you', cat: 'Environment & cleanliness', desc: 'Organised a clean-up of the Ulsoor lake shore with neighbours.', when: '14 Nov', editedTxt: '', badge: B.verified, hasPhotos: true, photos: '3 photos', extra: false, actions: false },
+      { who: 'Ahmed Khan recognised you', cat: 'Community help', desc: 'Set up chairs and water for the Koramangala blood donation camp.', when: '12 Nov', editedTxt: '', badge: B.verified, hasPhotos: false, photos: '', extra: true, actions: false }
+    ].map((d) => Object.assign(d, { open: () => {} }));
+    const repList = [
+      { who: 'You recognised Ahmed Khan', cat: 'Helping an elderly person', desc: 'Helped an elderly man cross the busy junction at Silk Board and carried his bags to the bus stop.', when: 'Today, 4:12 pm', editedTxt: ' · Edited', badge: withdrawn ? B.withdrawn : B.verified, hasPhotos: true, photos: '2 photos', extra: false, actions: !withdrawn, open: () => this.go(withdrawn ? 'withdrawn' : 'detail') },
+      { who: 'You recognised Kavya Nair', cat: 'Road & traffic help', desc: 'Guided traffic around a broken-down bus on Hosur Road until the police arrived.', when: '10 Nov', editedTxt: '', badge: B.verified, hasPhotos: false, photos: '', extra: false, actions: true, open: () => {} },
+      { who: 'You recognised Arjun Mehta', cat: 'Sharing food', desc: 'Shared lunch with a delivery rider stuck in the rain.', when: '2 Nov', editedTxt: '', badge: B.withdrawn, hasPhotos: false, photos: '', extra: false, actions: false, open: () => {} }
+    ].map((d) => Object.assign(d, { edit: () => this.go('edit'), withdraw: () => this.go('withdraw-confirm') }));
+    const baseLogs = [
+      { cat: 'Animals', desc: 'Fed the stray dogs on my street before work.', when: 'Today, 7:15 am', meta: '1 photo' },
+      { cat: 'Environment & cleanliness', desc: 'Picked up plastic along the Cubbon Park jogging track.', when: '14 Nov', meta: 'Location added' },
+      { cat: 'Community help', desc: 'Helped my neighbour carry groceries up four floors.', when: '9 Nov', meta: 'No photos' }
+    ];
+    let logs = baseLogs;
+    if (live) {
+      logs = baseLogs.slice(0, Math.min(3, st.logs));
+      if (st.logs > 3) logs = [{ cat: catDefs.filter((c) => c[0] === st.scat)[0][1], desc: 'Your new self-log', when: 'Just now', meta: st.sphotos + ' photo(s)' }].concat(logs);
+    }
+    const logsEmpty = screen === 'selflogs-empty' || (live && logs.length === 0);
+    const own = screen !== 'profile-public';
+    const prof = own
+      ? { initials: 'PS', name: 'Priya Sharma', handle: '@priyas', self: 25, verified: 12 }
+      : { initials: 'AK', name: 'Ahmed Khan', handle: '@ahmedk', self: 8, verified: 31 };
+    let ph = this.photoSet(0, true, 'photos');
+    if (isEdit) {
+      const locked = screen === 'edit-locked';
+      ph = this.photoSet(live ? st.photos : 2, !locked, 'photos');
+      ph.note = locked ? 'Photos lock 24 hours after sending, so they can’t be changed now.' : 'You can change photos until 4:12 pm tomorrow.';
+      ph.noteBg = locked ? '#f1f5f9' : '#eef2fe';
+      ph.noteFg = locked ? '#334155' : '#2442b8';
+    }
+    if (isForm) {
+      ph = this.photoSet(live ? st.sphotos : 0, true, 'sphotos');
+    }
+    const dialogWithdraw = screen === 'withdraw-confirm';
+    const dialogDelete = screen === 'selflog-delete';
+    const dlg = dialogWithdraw
+      ? { title: 'Withdraw this report?', body: 'This can’t be undone. The deed stops counting for Ahmed Khan.', yes: 'Withdraw report', no: 'Keep it', confirm: () => { if (this.live()) this.setState({ withdrawn: true, ui: 'withdrawn' }); }, cancel: () => this.go('detail') }
+      : { title: 'Delete this self-log?', body: 'It’s removed for good. Self-logs don’t affect your points.', yes: 'Delete', no: 'Keep it', confirm: () => { if (this.live()) this.setState({ logs: Math.max(0, st.logs - 1), ui: 'selflogs' }); }, cancel: () => this.go('selflogs') };
+    const backTo = { 'deeds-recognised': 'profile', 'deeds-reported': 'profile', 'deeds-empty': 'profile', 'detail': 'deeds-reported', 'withdraw-confirm': 'deeds-reported', 'withdrawn': 'deeds-reported', 'edit': 'detail', 'edit-locked': 'detail', 'selflogs': 'profile', 'selflogs-empty': 'profile', 'selflog-delete': 'profile', 'selflog-form': 'selflogs' };
+    const backLabels = { 'deeds-recognised': 'Profile', 'deeds-reported': 'Profile', 'deeds-empty': 'Profile', 'detail': 'My deeds', 'withdraw-confirm': 'My deeds', 'withdrawn': 'My deeds', 'edit': 'Cancel', 'edit-locked': 'Cancel', 'selflogs': 'Profile', 'selflogs-empty': 'Profile', 'selflog-delete': 'Profile', 'selflog-form': 'Cancel', 'profile-public': 'Back' };
+    const tall = isEdit || isForm;
+    const medium = !tall && screen !== 'deeds-empty' && screen !== 'selflogs-empty';
+    const h = desktop ? (tall ? 1250 : 1000) : (tall ? 1400 : (medium ? 1100 : 844));
+    return {
+      prof: prof,
+      people: live ? st.people : 1,
+      ph: ph,
+      dlg: dlg,
+      detailBadge: withdrawn ? B.withdrawn : B.verified,
+      backLabel: backLabels[screen] || 'Back',
+      tabRec: this.tab(!repTab, 'deeds-recognised'),
+      tabRep: this.tab(repTab, 'deeds-reported'),
+      tabIntro: repTab ? 'Deeds you saw others do. You can edit or withdraw your reports.' : 'Deeds other people saw you do.',
+      deedList: repTab ? repList : recList,
+      logList: logs,
+      cats: catDefs.map((c) => Object.assign({ label: c[1], pick: () => { if (this.live()) this.setState({ cat: c[0] }); } }, this.pill(c[0] === cat))),
+      scats: catDefs.map((c) => Object.assign({ label: c[1], pick: () => { if (this.live()) this.setState({ scat: c[0] }); } }, this.pill(c[0] === scat))),
+      f: {
+        backLink: !!backLabels[screen],
+        profile: isProfile,
+        own: own,
+        public: !own,
+        deeds: isDeeds,
+        deedsEmpty: screen === 'deeds-empty',
+        deedsList: screen !== 'deeds-empty',
+        detail: isDetail,
+        isWithdrawn: withdrawn,
+        canAct: !withdrawn,
+        edit: isEdit,
+        selflogs: isLogs,
+        logsEmpty: logsEmpty,
+        logsList: !logsEmpty,
+        selfForm: isForm,
+        dialog: dialogWithdraw || dialogDelete
+      },
+      s: {
+        w: desktop ? 1440 : 390,
+        h: h,
+        headPad: desktop ? 24 : 16,
+        navOrder: desktop ? 2 : 3,
+        navW: desktop ? 'auto' : '100%',
+        navMl: desktop ? 'auto' : '0',
+        navCol: desktop ? 'auto' : '1fr',
+        btnOrder: desktop ? 3 : 2,
+        btnMl: desktop ? '0' : 'auto',
+        maxW: desktop ? 720 : 390,
+        mainPad: desktop ? '40px 24px 56px' : '20px 16px 40px',
+        h1: desktop ? 32 : 26,
+        dialogTop: desktop ? 260 : 300,
+        dialogW: desktop ? 440 : 350
+      },
+      back: () => this.go(backTo[screen] || 'profile'),
+      toProfile: () => this.go('profile'),
+      toDeeds: () => this.go('deeds-recognised'),
+      toSelfLogs: () => this.go('selflogs'),
+      toSelfForm: () => this.go('selflog-form'),
+      toEdit: () => this.go('edit'),
+      toWithdraw: () => this.go('withdraw-confirm'),
+      saveEdit: () => this.go('detail'),
+      askDelete: () => this.go('selflog-delete'),
+      saveLog: () => { if (this.live()) this.setState({ logs: st.logs + 1, ui: 'selflogs' }); },
+      peopleMinus: () => { if (this.live()) this.setState({ people: Math.max(0, st.people - 1) }); },
+      peoplePlus: () => { if (this.live()) this.setState({ people: st.people + 1 }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

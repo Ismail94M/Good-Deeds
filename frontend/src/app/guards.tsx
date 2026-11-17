@@ -1,17 +1,33 @@
+import { useEffect } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router'
 import { Loading } from '../components/ui'
 import { useAuth } from '../features/auth/authContext'
 import { safeNext } from '../features/auth/validation'
+import { setRescanNotice } from '../features/report/rescanNotice'
 
+/**
+ * The `next` for a login or onboarding redirect. A `/scan/:token` link never puts its token in
+ * `next` (R5-L2): those witnesses come back to the Record a deed hub, which asks for a new code.
+ */
 function useHere() {
   const location = useLocation()
+  if (location.pathname.startsWith('/scan/')) return encodeURIComponent('/report')
   return encodeURIComponent(location.pathname + location.search)
+}
+
+/** Remember to show the hub's "ask for a new code" notice after a `/scan/:token` redirect. */
+function useRescanNotice(redirecting: boolean) {
+  const { pathname } = useLocation()
+  useEffect(() => {
+    if (redirecting && pathname.startsWith('/scan/')) setRescanNotice()
+  }, [redirecting, pathname])
 }
 
 /** Only for signed-in users; others go to /login and come back afterwards. */
 export function RequireAuth() {
   const { user, isLoading } = useAuth()
   const here = useHere()
+  useRescanNotice(!isLoading && !user)
   if (isLoading) return <Loading />
   if (!user) return <Navigate to={`/login?next=${here}`} replace />
   return <Outlet />
@@ -21,6 +37,7 @@ export function RequireAuth() {
 export function RequireOnboarded() {
   const { user, isLoading } = useAuth()
   const here = useHere()
+  useRescanNotice(!isLoading && (!user || !user.onboarding.complete))
   if (isLoading) return <Loading />
   if (!user) return <Navigate to={`/login?next=${here}`} replace />
   if (!user.onboarding.complete) return <Navigate to={`/onboarding?next=${here}`} replace />

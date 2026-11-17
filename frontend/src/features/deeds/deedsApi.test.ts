@@ -1,13 +1,25 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '../../lib/api'
 import { mockApi } from '../../test/utils'
-import { deedsApi, deedsKeys, type DeedOut, type InviteOut, type SelfLogOut } from './deedsApi'
+import {
+  deedsApi,
+  deedsKeys,
+  errorDoer,
+  type DeedOptions,
+  type DeedOut,
+  type InviteOut,
+  type ScanOut,
+  type SelfLogOut,
+} from './deedsApi'
 
 const LOCATION = { lat: 12.97, lng: 77.59, accuracy_m: 20 }
-const SCAN = {
+const SCAN: ScanOut = {
   scan_id: 'scan-1',
   doer: { handle: 'ravi', display_name: 'Ravi' },
   expires_at: '2026-11-15T10:15:00Z',
+  scanned_at: '2026-11-15T10:00:00Z',
+  pair_reports_remaining: 3,
+  month_resets_at: '2026-12-01T00:00:00+05:30',
 }
 
 const INVITE: InviteOut = {
@@ -96,6 +108,35 @@ describe('deedsApi: scans', () => {
     const api = mockApi({ 'GET /scans/scan-1': { body: { ...SCAN, consumed: false } } })
     await expect(deedsApi.scan('scan-1')).resolves.toEqual({ ...SCAN, consumed: false })
     expect(api.calls('GET /scans/scan-1')).toHaveLength(1)
+  })
+
+  it('surfaces 429 pair_monthly_limit with the doer from the body (D27)', async () => {
+    const doer = { handle: 'ahmed', display_name: 'Ahmed Khan' }
+    mockApi({
+      'POST /scans': {
+        status: 429,
+        body: { detail: 'Monthly limit for this person.', code: 'pair_monthly_limit', doer },
+      },
+    })
+    const error = await deedsApi
+      .createScan({ token: 'T.1.sig', location: LOCATION })
+      .catch((e: unknown) => e)
+    expect(error).toMatchObject({ status: 429, code: 'pair_monthly_limit' })
+    expect(errorDoer(error)).toEqual(doer)
+  })
+
+  it('surfaces 429 pair_monthly_limit from deed create without a doer', async () => {
+    mockApi({
+      'POST /deeds': {
+        status: 429,
+        body: { detail: 'Monthly limit for this person.', code: 'pair_monthly_limit' },
+      },
+    })
+    const error = await deedsApi
+      .createDeed({ method: 'qr_scan', scan_id: 'scan-1', category: 'animals', description: 'x' })
+      .catch((e: unknown) => e)
+    expect(error).toMatchObject({ status: 429, code: 'pair_monthly_limit' })
+    expect(errorDoer(error)).toBeNull()
   })
 
   it('surfaces 410 scan_expired', async () => {
@@ -192,16 +233,24 @@ describe('deedsApi: deeds', () => {
     expect(api.calls('POST /deeds/deed-1/withdraw')[0].body).toBeUndefined()
   })
 
-  it('loads deed options', async () => {
-    const options = {
+  it('loads deed options with the Revision 5 limits', async () => {
+    const options: DeedOptions = {
       categories: [{ slug: 'animals', label: 'Animals' }],
       invites_enabled: false,
       invites_remaining_today: 3,
-      reports_remaining_this_month: 12,
       invite_expiry_hours: 168,
+      reports_remaining_this_month: 12,
+      reporter_monthly_limit: 150,
+      reporter_doer_monthly_limit: 15,
+      month_resets_at: '2026-12-01T00:00:00+05:30',
       description_min: 10,
       description_max: 1000,
+      beneficiaries_max: 10000,
       scan_submit_minutes: 15,
+      qr_occurred_max_age_minutes: 120,
+      max_location_accuracy_m: 500,
+      service_area_radius_km: 40,
+      photos_enabled: false,
     }
     mockApi({ 'GET /deeds/options': { body: options } })
     await expect(deedsApi.options()).resolves.toEqual(options)
@@ -310,6 +359,31 @@ describe('deedsApi: profile counts', () => {
     })
     await expect(deedsApi.deedCounts('asha')).resolves.toEqual({ self_logged: 25, verified: 12 })
     expect(api.calls('GET /users/asha/deed-counts')[0].headers.get('Authorization')).toBeNull()
+  })
+})
+
+describe('errorDoer', () => {
+  const doer = { handle: 'ahmed', display_name: 'Ahmed Khan' }
+
+  it('reads a well-formed doer from an ApiError body', () => {
+    expect(errorDoer(new ApiError(409, 'x', 'already_recognized_today', {}, { doer }))).toEqual(
+      doer,
+    )
+  })
+
+  it.each([
+    ['no extra', new ApiError(409, 'x', 'already_recognized_today')],
+    ['doer not an object', new ApiError(409, 'x', 'c', {}, { doer: 'ahmed' })],
+    ['doer missing a name', new ApiError(409, 'x', 'c', {}, { doer: { handle: 'ahmed' } })],
+    ['not an ApiError', new Error('offline')],
+    ['not an error', null],
+  ])('returns null for %s', (_label, error) => {
+    expect(errorDoer(error)).toBeNull()
+  })
+
+  it('keeps only the public summary fields', () => {
+    const error = new ApiError(429, 'x', 'pair_monthly_limit', {}, { doer: { ...doer, id: 'u1' } })
+    expect(errorDoer(error)).toEqual(doer)
   })
 })
 

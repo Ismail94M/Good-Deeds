@@ -53,6 +53,31 @@ export function validatePassword(value: string): string | null {
   return null
 }
 
+/** Shown under every new-password field (sign-up and reset). */
+export const PASSWORD_HINT = 'At least 10 characters.'
+
+export function validatePasswordConfirm(password: string, confirm: string): string | null {
+  if (!confirm) return 'Please type your new password again.'
+  if (confirm !== password) return "The passwords don't match. Please type the same password twice."
+  return null
+}
+
+/** Light check before sending a phone number; the API does the full Indian-number check. */
+export function validatePhone(value: string): string | null {
+  if (value.replace(/\D/g, '').length < 8)
+    return 'Please enter your Indian mobile number, for example 98765 43210.'
+  return null
+}
+
+/**
+ * Mask a typed Indian mobile number to "+91 ••••• •4630", keeping only the last 4 digits.
+ * Accepts the forms the phone field allows (with or without +91, a leading 0, spaces).
+ */
+export function maskPhone(value: string): string {
+  const last4 = value.replace(/\D/g, '').slice(-4)
+  return `+91 ••••• •${last4}`
+}
+
 /** Full years between a YYYY-MM-DD birth date and `today`. */
 export function ageOn(dateOfBirth: string, today: Date = new Date()): number | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOfBirth)

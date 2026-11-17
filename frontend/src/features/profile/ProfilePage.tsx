@@ -1,4 +1,5 @@
 import { useId, useState, type FormEvent } from 'react'
+import { Link, useNavigate } from 'react-router'
 import {
   Button,
   ErrorAlert,
@@ -12,24 +13,29 @@ import { ApiError, errorMessage } from '../../lib/api'
 import { useAuth } from '../auth/authContext'
 import { identityApi, type Me } from '../auth/identityApi'
 import { collectErrors, validateDisplayName, validateHandle } from '../auth/validation'
+import { initials } from '../report/format'
+import { DeedCounts } from './DeedCounts'
 
 const BIO_MAX = 280
 const AREA_MAX = 80
 
+const focusRing =
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700'
+
+/**
+ * `/profile` (F6 canvas, M2-DESIGN §5.3 F6c): avatar, name and "@handle" (Q22: no city), the
+ * deed counts linking to self-logs and My deeds, Log a deed and My QR, "Your activity", and
+ * the Account section with the M1 details, Edit profile and Log out (D25).
+ */
 export function ProfilePage() {
   const { user } = useAuth()
   const [editing, setEditing] = useState(false)
   const [saved, setSaved] = useState(false)
   if (!user) return <Loading />
 
-  return (
-    <Page title="Your profile">
-      {saved && !editing && (
-        <p role="status" className="text-brand-700">
-          Your profile has been saved.
-        </p>
-      )}
-      {editing ? (
+  if (editing) {
+    return (
+      <Page title="Edit your profile">
         <ProfileForm
           me={user}
           onCancel={() => setEditing(false)}
@@ -38,71 +44,222 @@ export function ProfilePage() {
             setSaved(true)
           }}
         />
-      ) : (
-        <ProfileView
-          me={user}
-          onEdit={() => {
-            setSaved(false)
-            setEditing(true)
-          }}
-        />
+      </Page>
+    )
+  }
+
+  return (
+    <main className="mx-auto flex w-full max-w-[720px] flex-col gap-5 px-4 pt-5 pb-10 sm:px-6 sm:pt-10 sm:pb-14">
+      <section className="flex flex-col items-center gap-2 pt-2 text-center">
+        <span
+          aria-hidden
+          className="flex size-22 items-center justify-center rounded-full bg-brand-100 text-[30px] font-bold text-brand-900"
+        >
+          {initials(user.display_name)}
+        </span>
+        <h1 className="mt-1 text-[26px] leading-tight font-bold tracking-tight break-words text-slate-900 sm:text-[32px]">
+          {user.display_name}
+        </h1>
+        <p className="text-slate-600">@{user.handle}</p>
+      </section>
+      {saved && (
+        <p role="status" className="text-center text-brand-700">
+          Your profile has been saved.
+        </p>
       )}
-    </Page>
+      <DeedCounts handle={user.handle} own />
+      <div className="grid grid-cols-2 gap-2">
+        <Link
+          to="/me/self-logs/new"
+          className={`inline-flex min-h-12 items-center justify-center gap-1.5 rounded-lg bg-brand-700 px-3 font-semibold text-white shadow-sm hover:bg-brand-900 ${focusRing}`}
+        >
+          <svg
+            aria-hidden
+            viewBox="0 0 24 24"
+            className="size-4.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+          >
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          Log a deed
+        </Link>
+        <Link
+          to="/me/qr"
+          className={`inline-flex min-h-12 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50 ${focusRing}`}
+        >
+          My QR code
+        </Link>
+      </div>
+      <ActivitySection />
+      <AccountSection
+        me={user}
+        onEdit={() => {
+          setSaved(false)
+          setEditing(true)
+        }}
+      />
+    </main>
   )
 }
 
-function ProfileView({ me, onEdit }: { me: Me; onEdit: () => void }) {
+function SectionHeading({ id, children }: { id: string; children: string }) {
   return (
-    <div className="space-y-5">
-      <section className="space-y-1 rounded-2xl border border-slate-200 bg-white p-4">
-        <p className="text-xl font-semibold">{me.display_name}</p>
-        <p className="text-slate-600">@{me.handle}</p>
-        <p className="text-slate-600">
-          {me.area ? `${me.area}, ` : ''}
-          {me.city}
-        </p>
-        {me.bio ? (
-          <p className="pt-2 whitespace-pre-line">{me.bio}</p>
-        ) : (
-          <p className="pt-2 text-slate-500">No bio yet. Tell people a little about yourself.</p>
-        )}
-      </section>
-      <dl className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm">
-        {me.onboarding.complete && me.short_id && (
-          <div>
-            <dt className="text-slate-500">Your ID</dt>
-            <dd className="font-mono text-base">{me.short_id}</dd>
-          </div>
-        )}
-        {me.email && (
-          <div>
-            <dt className="text-slate-500">Email</dt>
-            <dd className="text-base break-all">{me.email}</dd>
-          </div>
-        )}
+    <h2 id={id} className="text-[13px] font-semibold tracking-wider text-slate-600 uppercase">
+      {children}
+    </h2>
+  )
+}
+
+function ActivitySection() {
+  const headingId = useId()
+  const items = [
+    { to: '/me/deeds', title: 'My deeds', body: 'Reports about you and reports you made' },
+    { to: '/me/self-logs', title: 'Self-logs', body: 'Your private diary of good deeds' },
+  ]
+  return (
+    <section aria-labelledby={headingId} className="flex flex-col gap-2">
+      <SectionHeading id={headingId}>Your activity</SectionHeading>
+      <ul className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        {items.map((item, index) => (
+          <li key={item.to} className={index > 0 ? 'border-t border-slate-200' : undefined}>
+            <Link
+              to={item.to}
+              className={`flex items-center gap-3 px-4 py-3.5 text-slate-900 hover:bg-slate-50 ${focusRing}`}
+            >
+              <span className="grow">
+                <span className="block font-semibold">{item.title}</span>{' '}
+                <span className="block text-sm text-slate-600">{item.body}</span>
+              </span>
+              <svg
+                aria-hidden
+                viewBox="0 0 24 24"
+                className="size-5 shrink-0"
+                fill="none"
+                stroke="#586579"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M9 6l6 6-6 6" />
+              </svg>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+/** The M1 account details, shown only to their owner. */
+function AccountDetails({ me }: { me: Me }) {
+  return (
+    <dl className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm">
+      <div>
+        <dt className="text-slate-600">Name</dt>
+        <dd className="text-base break-words">{me.display_name}</dd>
+      </div>
+      <div>
+        <dt className="text-slate-600">Handle</dt>
+        <dd className="text-base">@{me.handle}</dd>
+      </div>
+      {me.area && (
         <div>
-          <dt className="text-slate-500">Phone (only you can see this)</dt>
-          <dd className="text-base">
-            {me.phone_e164 ? (
-              <>
-                {me.phone_e164}
-                <span className="block text-sm text-slate-500">
-                  To change your number, please contact support.
-                </span>
-              </>
-            ) : (
-              <>
-                Not verified yet. <TextLink to="/onboarding">Verify now</TextLink>
-              </>
-            )}
-          </dd>
+          <dt className="text-slate-600">Area</dt>
+          <dd className="text-base">{me.area}</dd>
         </div>
-      </dl>
+      )}
+      {me.bio && (
+        <div>
+          <dt className="text-slate-600">Bio</dt>
+          <dd className="text-base whitespace-pre-line">{me.bio}</dd>
+        </div>
+      )}
+      {me.onboarding.complete && me.short_id && (
+        <div>
+          <dt className="text-slate-600">Your ID</dt>
+          <dd className="font-mono text-base">{me.short_id}</dd>
+        </div>
+      )}
+      {me.email && (
+        <div>
+          <dt className="text-slate-600">Email</dt>
+          <dd className="text-base break-all">{me.email}</dd>
+        </div>
+      )}
+      <div>
+        <dt className="text-slate-600">Phone (only you can see this)</dt>
+        <dd className="text-base">
+          {me.phone_e164 ? (
+            <>
+              {me.phone_e164}
+              <span className="block text-sm text-slate-600">
+                To change your number, please contact support.
+              </span>
+            </>
+          ) : (
+            <>
+              Not verified yet. <TextLink to="/onboarding">Verify now</TextLink>
+            </>
+          )}
+        </dd>
+      </div>
+    </dl>
+  )
+}
+
+/** "Account": Log out lives here, not in the header (M2-DESIGN D25). */
+function AccountSection({ me, onEdit }: { me: Me; onEdit: () => void }) {
+  const { logout } = useAuth()
+  const navigate = useNavigate()
+  const headingId = useId()
+  const [loggingOut, setLoggingOut] = useState(false)
+
+  function handleLogout() {
+    setLoggingOut(true)
+    // Leave first: once the session is gone this page's guard would send us to /login instead.
+    navigate('/', { replace: true })
+    void logout()
+  }
+
+  return (
+    <section aria-labelledby={headingId} className="space-y-2">
+      <h2
+        id={headingId}
+        className="text-[13px] font-semibold tracking-wider text-slate-600 uppercase"
+      >
+        Account
+      </h2>
+      <AccountDetails me={me} />
       <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={onEdit}>Edit profile</Button>
+        <Button variant="secondary" onClick={onEdit}>
+          Edit profile
+        </Button>
         <TextLink to={`/u/${me.handle}`}>See your public profile</TextLink>
       </div>
-    </div>
+      <button
+        type="button"
+        onClick={handleLogout}
+        disabled={loggingOut}
+        className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-5 font-semibold text-red-700 transition-colors hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+      >
+        <svg
+          aria-hidden
+          viewBox="0 0 24 24"
+          className="size-4.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h10" />
+        </svg>
+        {loggingOut ? 'Logging out…' : 'Log out'}
+      </button>
+    </section>
   )
 }
 

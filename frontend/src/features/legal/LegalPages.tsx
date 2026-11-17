@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Page } from '../../components/ui'
+import { PUBLIC_FEED_NOTICE } from '../qr/qrFormat'
 
 const CONTACT_EMAIL = 'privacy@gooddeeds.example'
 
@@ -81,6 +82,9 @@ export function PrivacyPage() {
             deeds you report. We will ask for your consent before collecting these.
           </li>
         </ul>
+      </Section>
+      <Section title="Deeds other people record about you">
+        <p>{PUBLIC_FEED_NOTICE}</p>
       </Section>
       <Section title="Your rights">
         <p>

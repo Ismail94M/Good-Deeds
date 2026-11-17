@@ -8,9 +8,10 @@ the doer, and the deed is verified and grouped. Unaccepted invites expire after
 Only the SHA-256 of the 256-bit raw token is stored; the raw token is returned on create and on
 reissue only.
 
-Lock order: invite row, then deed row (still pending, so grouping code never touches it), then
-the per-doer ``same_act`` advisory lock. Withdrawal (``_edits``) also takes the invite row first.
-Create takes ``reporter_month`` (D16), then ``invites``.
+Lock order. Accept: ``reporter_month`` (the reporter, read unlocked first; D21), then the
+invite row, then ``shared_device``, then the deed row (still pending, so grouping code never
+touches it), then the per-doer ``same_act`` advisory lock. Withdrawal (``_edits``) takes the
+invite row first. Create takes ``reporter_month`` (D16), then ``invites``.
 
 Invites are switched off by config (D17, ``invites_enabled``): the router calls
 ``ensure_enabled`` on create, preview, accept and reissue. The expiry job keeps running.
@@ -42,7 +43,11 @@ from app.modules.deeds._common import (
 from app.modules.deeds._grouping import assign_group, upgrade_prize_rank
 from app.modules.deeds._limits import DeedLimits
 from app.modules.deeds._qr_deeds import validate_content
-from app.modules.deeds._reporter_limit import ensure_under_monthly_limit
+from app.modules.deeds._reporter_limit import (
+    ensure_under_monthly_limits,
+    pair_limit_reached,
+    reported_this_month,
+)
 from app.modules.deeds._views import deed_out
 from app.modules.deeds.events import DeedRejected, DeedSubmitted, DeedVerified
 from app.modules.deeds.models import (
@@ -201,8 +206,9 @@ async def create_invite_deed(
         )
         location = point_ewkt(loc.lat, loc.lng)
 
-    # D16: the monthly limit across both paths (takes the ``reporter_month`` lock first).
-    await ensure_under_monthly_limit(session, reporter_id, limits, now)
+    # D16/D19: the total monthly limit across both paths (takes the ``reporter_month`` lock
+    # first). The doer is unknown until acceptance, so only the total is checked here (D21).
+    await ensure_under_monthly_limits(session, reporter_id, None, limits, now)
     # Serialise this reporter's creates so concurrent requests can't all pass the count.
     await advisory_xact_lock(session, "invites", str(reporter_id))
     if await _count_today(session, reporter_id, now) >= limits.invites_per_day:
@@ -308,6 +314,17 @@ async def _shared_device_accepts(
     return int(await session.scalar(stmt) or 0)
 
 
+async def _invite_reporter(session: AsyncSession, raw_token: str) -> uuid.UUID | None:
+    """Step 0 (D21): the invite's reporter, read without a lock so ``reporter_month`` can be
+    taken before the invite row, as on every other path that creates or verifies a deed."""
+    token_hash = _hash_token(raw_token)
+    if token_hash is None:
+        return None
+    return await session.scalar(
+        select(Invite.reporter_user_id).where(Invite.token_hash == token_hash)
+    )
+
+
 async def _lock_invite(session: AsyncSession, raw_token: str) -> Invite | None:
     token_hash = _hash_token(raw_token)
     if token_hash is None:
@@ -340,18 +357,46 @@ async def accept(
     limits_version: int,
     now: datetime | None = None,
 ) -> DeedOut:
-    """Accept an invite as its doer. Rate limits are the caller's job (they come first)."""
+    """Accept an invite as its doer. Rate limits are the caller's job (they come first).
+
+    Lock order: ``reporter_month`` (reporter) -> invite row -> ``shared_device`` -> pending deed
+    row -> ``same_act`` (doer)."""
     now = now or utcnow()
-    # 1. Row lock: concurrent accepts (and withdrawal) serialise on the invite.
+    # 0. Unlocked reporter read, then the reporter's ``reporter_month`` lock (D21), so this
+    # path serialises with the reporter's own submits and the pair count below can't race.
+    reporter_id = await _invite_reporter(session, raw_token)
+    if reporter_id is None:
+        raise _invite_invalid()
+    await advisory_xact_lock(session, "reporter_month", str(reporter_id))
+    # 1. Row lock: concurrent accepts (and withdrawal) serialise on the invite. A reissue between
+    # step 0 and here rotates the token, so the lookup finds nothing (404).
     invite = await _lock_invite(session, raw_token)
     if invite is None:
         raise _invite_invalid()
+    # An invite's reporter never changes, so this can't differ; re-checked anyway so the lock
+    # taken above is always the locked invite's reporter's (§8).
+    if invite.reporter_user_id != reporter_id:
+        raise _invite_invalid()
     # 2.
     _ensure_usable(invite, now)
-    reporter_id = invite.reporter_user_id
+    # 2b. A suspended or blocked reporter's invites can't be accepted. Same 404 as an unknown
+    # token, so the response reveals nothing about the reporter's account (security L8).
+    if not await identity.is_active(session, reporter_id):
+        raise _invite_invalid()
     # 3.
     if accepter_id == reporter_id:
         raise Forbidden("You can't accept your own invite.", code="cannot_accept_own_invite")
+    # 3b. Pair monthly limit (D21) for the month the report already counts in (its
+    # ``reported_at``), not the month of acceptance. The pending deed has no doer yet, so it
+    # isn't in the count. Refused: the invite stays pending (and later expires).
+    reported_at = await session.scalar(select(Deed.reported_at).where(Deed.id == invite.deed_id))
+    if reported_at is None:  # every invite has its deed (FK); never reached
+        raise _invite_invalid()
+    about_accepter = await reported_this_month(
+        session, reporter_id, reported_at, doer_id=accepter_id
+    )
+    if about_accepter >= limits.reporter_doer_monthly_limit:
+        raise pair_limit_reached(limits.reporter_doer_monthly_limit)
     # 4. Defense in depth: phone_history already makes a number belong to one account ever.
     if await identity.phone_hashes(session, accepter_id) & await identity.phone_hashes(
         session, reporter_id
@@ -388,7 +433,9 @@ async def accept(
         doer_id=accepter_id,
         reporter_id=reporter_id,
         location=await _deed_location(session, deed),
-        occurred_at=deed.occurred_at,
+        # L7-A: group by when the report was made (server time), not the reporter's
+        # backdatable "When?" and not the acceptance time, which can be days later.
+        grouped_at=deed.reported_at,
         limits=limits,
         limits_version=limits_version,
         exclude_deed_id=deed.id,

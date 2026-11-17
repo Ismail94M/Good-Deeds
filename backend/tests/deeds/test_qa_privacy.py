@@ -184,8 +184,12 @@ async def test_no_coordinates_phone_device_or_ip_anywhere(
         for role in ("reporter", "doer"):
             rec(await client.get(f"/api/me/deeds?role={role}", headers=who.headers), 200)
         rec(await client.get("/api/me/invites", headers=who.headers), 200)
-    for deed_id in (d1["id"], d2["id"], created["id"]):
-        rec(await client.get(f"/api/deeds/{deed_id}", headers=doer.headers), 200)
+    for deed_id, reporter in ((d1["id"], w1), (d2["id"], w2), (created["id"], inviter)):
+        rec(await client.get(f"/api/deeds/{deed_id}", headers=reporter.headers), 200)
+    rec(await client.get(f"/api/deeds/{created['id']}", headers=doer.headers), 200)
+    # d1 and d2 are withdrawn: the doer sees only verified deeds about them (D24).
+    for deed_id in (d1["id"], d2["id"]):
+        rec(await client.get(f"/api/deeds/{deed_id}", headers=doer.headers), 404)
     rec(await client.get(f"/api/scans/{scan1['scan_id']}", headers=w1.headers), 200)
     rec(await client.get("/api/deeds/options", headers=w1.headers), 200)
     rec(await client.get(f"/api/users/{doer.handle}/deed-counts"), 200)

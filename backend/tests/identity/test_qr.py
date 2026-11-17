@@ -94,6 +94,7 @@ async def test_qr_token_and_manual_code_resolve_to_doer(
     assert body["display_id"] == f"GD-{body['short_id']}"
     assert body["scan_url"].endswith(f"/scan/{body['token']}")
     assert 1 <= body["refresh_after_seconds"] <= WINDOW
+    assert body["window_seconds"] == WINDOW  # from the ``qr`` config (§3.2 #12)
     assert len(body["manual_code"]) == 6 and body["manual_code"].isdigit()
 
     user = await _user(session, s)
@@ -159,6 +160,7 @@ async def test_qr_window_and_grace_come_from_config(
     qr = await service.qr_code(session, await _user(session, s), now=now)
     assert qr.token.split(".")[1] == str(window)
     assert qr.refresh_after_seconds == 55
+    assert qr.window_seconds == 60
     assert qr.expires_at == datetime.fromtimestamp(float((window + 4) * 60), UTC)
 
     old = _qr.make_token(code.short_id, code.key_version, window - 3)

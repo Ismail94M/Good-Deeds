@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { GeolocationError, getPosition, POSITION_OPTIONS, toAccuracyM } from './geolocation'
+import {
+  GeolocationError,
+  getPosition,
+  permissionState,
+  POSITION_OPTIONS,
+  toAccuracyM,
+} from './geolocation'
 
 const ERROR_CODES = { PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 }
 
@@ -33,7 +39,14 @@ function stubGeolocation(outcome: Outcome) {
 
 afterEach(() => {
   Object.defineProperty(navigator, 'geolocation', { value: undefined, configurable: true })
+  Object.defineProperty(navigator, 'permissions', { value: undefined, configurable: true })
 })
+
+function stubPermissions(query: (descriptor: PermissionDescriptor) => Promise<unknown>) {
+  const spy = vi.fn(query)
+  Object.defineProperty(navigator, 'permissions', { value: { query: spy }, configurable: true })
+  return spy
+}
 
 describe('getPosition', () => {
   it('resolves to the API Location shape with high-accuracy, fresh, 15 s options', async () => {
@@ -76,5 +89,27 @@ describe('toAccuracyM', () => {
     expect(toAccuracyM(250000)).toBe(100000)
     expect(toAccuracyM(Number.NaN)).toBe(100000)
     expect(toAccuracyM(Number.POSITIVE_INFINITY)).toBe(100000)
+  })
+})
+
+describe('permissionState', () => {
+  it.each(['granted', 'prompt', 'denied'] as const)(
+    'returns "%s" from the Permissions API',
+    async (state) => {
+      const spy = stubPermissions(() => Promise.resolve({ state }))
+      await expect(permissionState()).resolves.toBe(state)
+      expect(spy).toHaveBeenCalledWith({ name: 'geolocation' })
+    },
+  )
+
+  it('returns unknown without the Permissions API', async () => {
+    await expect(permissionState()).resolves.toBe('unknown')
+  })
+
+  it('returns unknown when the query fails or reports something else', async () => {
+    stubPermissions(() => Promise.reject(new TypeError('not supported')))
+    await expect(permissionState()).resolves.toBe('unknown')
+    stubPermissions(() => Promise.resolve({ state: 'weird' }))
+    await expect(permissionState()).resolves.toBe('unknown')
   })
 })

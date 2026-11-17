@@ -1,14 +1,17 @@
 import { useState, type FormEvent } from 'react'
-import { useSearchParams } from 'react-router'
+import { useLocation, useSearchParams } from 'react-router'
 import { Button, ErrorAlert, PasswordField, TextField, TextLink } from '../../components/ui'
 import { errorMessage } from '../../lib/api'
 import { AuthShell } from './AuthShell'
+import type { PasswordResetState } from './ForgotPasswordPage'
 import { useAuth } from './authContext'
 import { SocialButtons } from './social/SocialButtons'
 
 export function LoginPage() {
   const { login } = useAuth()
   const [params] = useSearchParams()
+  const location = useLocation()
+  const passwordReset = (location.state as Partial<PasswordResetState> | null)?.passwordReset
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -40,6 +43,15 @@ export function LoginPage() {
       intro="Celebrate the kindness you see around you, and inspire a community that values every small act."
     >
       <form noValidate onSubmit={(e) => void handleSubmit(e)} className="space-y-5">
+        {passwordReset && !error && (
+          <p
+            role="status"
+            className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-800"
+          >
+            Password changed. Sign in with your new password. You&apos;ve been signed out on your
+            other devices.
+          </p>
+        )}
         {error && <ErrorAlert>{error}</ErrorAlert>}
         <TextField
           label="Email address"
@@ -61,6 +73,11 @@ export function LoginPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
+        <div className="-mt-3 flex justify-end">
+          <TextLink to="/forgot-password" className="inline-flex min-h-11 items-center text-sm">
+            Forgot password?
+          </TextLink>
+        </div>
         <Button type="submit" disabled={submitting} className="w-full">
           {submitting ? 'Signing in…' : 'Sign in'}
           {!submitting && (

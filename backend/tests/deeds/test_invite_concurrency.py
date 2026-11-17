@@ -125,7 +125,7 @@ async def test_six_concurrent_invite_creates_allow_five(
     at = datetime(2026, 11, 10, 6, 0, tzinfo=UTC)
     # All six pass validation and wait together before their first lock (D16's
     # ``reporter_month``, then ``invites``).
-    _meet(monkeypatch, _invites, "ensure_under_monthly_limit", 6, after=False)
+    _meet(monkeypatch, _invites, "ensure_under_monthly_limits", 6, after=False)
 
     async def create(s: AsyncSession) -> uuid.UUID:
         out, _ = await create_invite(s, reporter, at=at)
@@ -149,7 +149,8 @@ async def test_two_accepters_race_for_one_invite(
 ) -> None:
     reporter, doer_1, doer_2 = [await committed_b6.member() for _ in range(3)]
     deed_id, token = await _commit_invite(reporter)
-    _meet_before(monkeypatch, _invites, "_lock_invite")
+    # Meet before step 0, then race for ``reporter_month`` and the invite row (D21 order).
+    _meet_before(monkeypatch, _invites, "_invite_reporter")
 
     results = await asyncio.gather(
         _in_own_session(lambda s: accept(s, token, doer_1)),
@@ -192,8 +193,9 @@ async def test_two_shared_device_accepts_at_fourteen_of_fifteen(
         await s.commit()
     pending = [await _commit_invite(reporter, at=oct_1 + timedelta(days=d)) for d in (10, 11)]
     at = oct_1 + timedelta(days=12)
-    # Both find a shared device and wait at the pair lock together.
-    _meet_before(monkeypatch, _invites, "advisory_xact_lock")
+    # Both start together and race through ``reporter_month`` (which, since D21, already
+    # serialises accepts of one reporter's invites) and the ``shared_device`` lock.
+    _meet_before(monkeypatch, _invites, "_invite_reporter")
 
     (_, t_1), (_, t_2) = pending
     results = await asyncio.gather(

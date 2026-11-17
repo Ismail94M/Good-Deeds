@@ -103,9 +103,11 @@ export function makeQr(overrides: Partial<QrCode> = {}): QrCode {
     display_id: 'GD-7K3M9Q0',
     token: '7K3M9Q0.123.abc',
     scan_url: 'http://localhost:5173/scan/7K3M9Q0.123.abc',
-    expires_at: '2026-11-11T12:00:00Z',
+    // Valid for two windows from now, like a fresh response.
+    expires_at: new Date(Date.now() + 60_000).toISOString(),
     refresh_after_seconds: 30,
     manual_code: '482913',
+    window_seconds: 30,
     ...overrides,
   }
 }

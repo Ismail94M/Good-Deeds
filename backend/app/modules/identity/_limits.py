@@ -30,6 +30,12 @@ class IdentityLimits(RuntimeConfig):
     rate_phone_verify_user: str
     rate_refresh_ip: str
     rate_oauth_ip: str
+    # Forgot password (migration 0011). Codes reuse otp_ttl_minutes / otp_max_attempts /
+    # otp_resend_seconds / otp_max_per_hour; per-phone limits are keyed by the phone's keyed hash.
+    rate_password_forgot_ip: str
+    rate_password_forgot_phone: str
+    rate_password_reset_ip: str
+    rate_password_reset_phone: str
 
 
 async def load_limits(session: AsyncSession) -> IdentityLimits:

@@ -62,7 +62,7 @@ A user can never verify their own deed.
 
 **Profile counts:** every profile shows two public counts, like followers/following: *Self-log Deeds* and *Verified Deeds*. Verified Deeds counts the user's **counted** verified reports, the same figure the leaderboard uses: 20 witnesses of one act count as 5 (the same-act cap), while 100 reports in separate places or times count as 100. Self-logs are never included in it.
 
-**Monthly reporting limit:** a reporter can submit at most 15 reports per calendar month (India time, resetting on the 1st), across all doers. Withdrawn reports still use up a slot; failed submissions don't.
+**Monthly reporting limits (PO decision 2026-11-16):** per calendar month (India time, resetting on the 1st), a reporter can submit at most 15 reports about the same doer, and at most 150 reports in total across all doers. Withdrawn reports still use up a slot; failed submissions don't. The app warns the reporter when they are close to either limit.
 
 **Invites are switched off for now** (2026-11-16). Only QR / ID + code reporting is live. The invite rules below apply when invites are switched back on; when they return, an invite-verified deed earns points but needs human review or another independent verification before it counts for prizes.
 
@@ -95,6 +95,36 @@ A user can never verify their own deed.
    - Self-logged deeds never appear in the feed.
    - Likes, comments, shares and follower counts never affect impact score, points, leaderboard rank or prizes.
    - Faces of people being helped are blurred by default. Posts showing vulnerable people need their consent or must hide their identity.
+   - **Feed visibility (PO decision 2026-11-16):**
+     - Every verified deed is published to the public feed automatically.
+     - Before submitting a report, the reporter is clearly told that verified deeds appear publicly.
+     - The doer or the reporter can hide the deed from the public feed at any time, and show it again.
+     - Hiding changes visibility only. It never changes verification status, profile counts, points or prize eligibility.
+     - Withdrawn, rejected, flagged or moderator-removed deeds disappear from the feed.
+     - Public output shows an area name (e.g. "Koramangala"), never exact GPS coordinates, phone numbers or other private information.
+     - Public visibility is stored and checked separately from verification and prize eligibility. Scoring never reads it.
+   - **Comments:**
+     - Any onboarded member can comment, subject to a length limit and a rate limit (config values) and a basic bad-word filter.
+     - Authors can delete their own comments.
+     - The doer and the reporter can delete any comment on their deed.
+     - Reporting comments and human review come with moderation (M7).
+   - **Feed is Home:** for logged-in users the feed is the Home page. Logged-out visitors see a welcome page.
+   - **Post card:**
+     - The doer comes first, with "recognised by {reporter}" on a smaller line.
+     - Then category, area name, time and a "Verified by a witness" badge.
+     - Then a photo carousel and the description.
+     - Then like, comment, share and save. "People helped" appears only on the detail page.
+   - **Saves are private:** listed in a "Saved" list on the user's Profile, with no save count shown and the doer never told.
+   - **Top this week:** ranked by likes + 3 × comments over the last 7 days (the weights are config values). It orders that tab only and never affects points, rank or prizes.
+   - **Sharing and public links (PO decision 2026-11-16):**
+     - Share targets are WhatsApp, Copy link and the device share menu.
+     - A shared link opens a public page for that one deed, showing its photos, description, doer, area and time.
+     - Public links only ever work for verified, visible deeds. They never expose self-logs, unverified or pending deeds, or hidden, withdrawn or removed deeds.
+     - Hiding a deed immediately disables its public link.
+     - A visitor who isn't logged in can view only that deed. They must sign up to like, comment, follow, or open other profiles and deeds.
+     - Public pages show no exact location, phone number or personal information.
+   - **Follows:** one-way and open, with no approval needed. Users can remove a follower. Profiles show follower and following counts.
+   - **Photos:** up to 4 per report or self-log (a config value). They can be taken with the camera or uploaded.
 6. **Self-log on profile:** users can log their own deeds privately, and the profile shows public Self-log Deeds and Verified Deeds counts (see section 5).
 7. **Notifications:** "You were recognized", "Your deed was verified", likes and comments, challenge and prize updates.
 8. **Monthly kindness challenges**, which can be sponsored.
@@ -289,7 +319,10 @@ A user can win a cash prize only if all of these are true:
 | Verified deeds per doer per day that earn points          | 10                                 |
 | Same-act cap                                              | 5 reports within 200 m and 2 hours |
 | Invite link expiry                                        | 7 days                             |
-| Reports per reporter per calendar month                   | 15                                 |
+| Reports per reporter–doer pair per calendar month (IST)   | 15 (PO decision 2026-11-16)        |
+| Reports per reporter per calendar month (IST), all doers  | 150 (PO decision 2026-11-16)       |
+| Photos per report or self-log                             | 4                                  |
+| Report photos can be changed after sending for            | 24 hours                           |
 | Invites per reporter per day                              | 5                                  |
 | Invite deed: how far back it can have happened            | 7 days                             |
 | Accepted invites per reporter–doer pair on a shared device | 15 per month                      |

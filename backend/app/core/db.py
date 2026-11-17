@@ -19,6 +19,11 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
+# Isolation stays at Postgres's default, READ COMMITTED. The monthly-limit checks (deeds
+# ``_reporter_limit``, invite accept) do unlocked pre-reads and then count again after taking the
+# ``reporter_month`` advisory lock; under READ COMMITTED each statement sees rows committed by the
+# previous lock holder. REPEATABLE READ or SERIALIZABLE would keep the transaction's first
+# snapshot, so the locked count could miss them. Don't raise the isolation level.
 engine = create_async_engine(get_settings().database_url, pool_pre_ping=True)
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 

@@ -1,8 +1,8 @@
 """Typed values of the ``deeds`` config namespace (docs/M2-DESIGN.md §2.1).
 
 Every key is required and has no default: the ``config_versions`` row (seeded as ``deeds`` v1 by
-migration 0004 and ``deeds`` v2 by migration 0007) is the only source of these values. Change
-them by publishing a new version.
+migration 0004, then v2 by 0007, v3 by 0008 and v4 by 0009) is the only source of these values.
+Change them by publishing a new version.
 """
 
 from pydantic import BaseModel, ConfigDict
@@ -31,8 +31,12 @@ class DeedLimits(RuntimeConfig):
 
     namespace = "deeds"
 
-    # Reporting (D16): deeds a reporter may create per IST calendar month, both paths
+    # Reporting (D16, D19): deeds a reporter may create per IST calendar month, both paths,
+    # in total and about any one doer
     reporter_monthly_limit: int
+    reporter_doer_monthly_limit: int
+    # Photo controls (D23): off until photo storage ships; only read by the options endpoint
+    photos_enabled: bool
     # Invites (B6); switched off while ``invites_enabled`` is false (D17)
     invites_enabled: bool
     invites_per_day: int
@@ -61,6 +65,7 @@ class DeedLimits(RuntimeConfig):
     rate_manual_witness: str
     rate_manual_ip: str
     rate_manual_target: str
+    rate_manual_target_daily: str
     rate_invite_create_ip: str
     rate_invite_preview_ip: str
     rate_invite_accept_user: str

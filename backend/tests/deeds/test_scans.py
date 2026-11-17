@@ -50,7 +50,14 @@ async def test_qr_scan_is_recorded(client: AsyncClient, session: AsyncSession) -
     )
     assert response.status_code == 201, response.text
     body = response.json()
-    assert set(body) == {"scan_id", "doer", "expires_at"}
+    assert set(body) == {
+        "scan_id",
+        "doer",
+        "expires_at",
+        "scanned_at",
+        "pair_reports_remaining",
+        "month_resets_at",
+    }
     assert body["doer"] == {"handle": doer.handle, "display_name": doer.display_name}
     expires = datetime.fromisoformat(body["expires_at"])
     assert before + timedelta(minutes=15) <= expires <= datetime.now(UTC) + timedelta(minutes=15)
@@ -132,7 +139,11 @@ async def test_invalid_bodies_are_422(
 
 async def test_bad_token_is_qr_invalid(client: AsyncClient, session: AsyncSession) -> None:
     witness, doer = await members(session, 2)
-    for token in ("garbage", (await token_for(session, doer))[:-1] + "0"):
+    real = await token_for(session, doer)
+    # Change the last character, always to a different one (it can already be "0").
+    tampered = real[:-1] + ("1" if real[-1] == "0" else "0")
+    assert tampered != real
+    for token in ("garbage", tampered):
         response = await _post_scan(client, witness, {"token": token, "location": location()})
         assert response.status_code == 404
         assert response.json()["code"] == "qr_invalid"
