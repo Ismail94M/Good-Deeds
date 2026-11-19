@@ -93,7 +93,21 @@ npm run lint && npm run typecheck && npm run format:check
 
 - On Windows, psycopg's async mode needs a selector event loop. `alembic/env.py` and `tests/conftest.py` already handle this. Do the same in any new entry point that runs asyncio on Windows.
 - The local directory `backend/alembic/` has the same name as the `alembic` package. Ruff is configured to treat `alembic` as third-party.
-- Object storage (photos/videos) is not set up yet. The MinIO image is no longer on Docker Hub, so an S3-compatible replacement will be chosen in M3.
+- Object storage (photos/videos) is not set up yet. Decision (2026-11-18): code against the S3-compatible API, Google Cloud Storage (asia-south1) at launch via its S3-interoperable XML API and HMAC keys, and a local S3-compatible container in development (the MinIO image is no longer on Docker Hub, so M3 picks a replacement).
+
+## Claude Code hooks
+
+Project hooks are in `.claude/settings.json`, and the scripts are in `.claude/hooks/` (Node). They only load when Claude Code is started in this folder.
+- **PreToolUse `guard.mjs`:**
+  - denies reading `.env` and other secret files, and printing environment variables;
+  - asks before any push, any destructive git or delete command, any DB-destructive command (`down -v`, `alembic downgrade`, DROP/DELETE/TRUNCATE…), edits to existing migrations, lockfiles, CI or the hooks themselves;
+  - never auto-approves.
+- **PostToolUse `format-lint.mjs`:** runs ruff or prettier and oxlint on the edited file only.
+- **Stop `validate.mjs`:** checks the changed code only, using lint, mypy/tsc, related pytest/vitest and the Vite build.
+  - It is skipped when nothing changed, when the changes already passed, or while background agents are running.
+  - It blocks once on failure.
+  - The full test suite stays in CI.
+- **SessionStart / PreCompact:** load and preserve the project status (milestone, open PO questions, git, standing rules). State lives in the gitignored `.claude/state/`.
 
 ## Specialist subagents
 
