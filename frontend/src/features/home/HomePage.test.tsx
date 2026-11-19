@@ -3,10 +3,12 @@ import { describe, expect, it } from 'vitest'
 import { makeMe, mockApi, NOT_ONBOARDED, renderApp, signedIn } from '../../test/utils'
 
 describe('HomePage', () => {
-  it('shows the tagline', () => {
+  it('shows the tagline to signed-out visitors', async () => {
     mockApi()
     renderApp('/')
-    expect(screen.getByRole('heading', { name: /make kindness visible/i })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: /make kindness visible/i }),
+    ).toBeInTheDocument()
   })
 
   it('reports a healthy API', async () => {
@@ -32,14 +34,13 @@ describe('HomePage', () => {
     expect(within(main).getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/login')
   })
 
-  it('welcomes signed-in users with quick links', async () => {
+  it('shows the feed to signed-in users instead of the welcome page', async () => {
     mockApi(signedIn(makeMe({ onboarding: NOT_ONBOARDED })))
     renderApp('/')
-    expect(await screen.findByText('Welcome, Asha!')).toBeInTheDocument()
-    expect(screen.getAllByRole('link', { name: 'My QR' }).length).toBeGreaterThan(0)
-    expect(screen.getByRole('link', { name: 'Finish setting up' })).toHaveAttribute(
-      'href',
-      '/onboarding',
-    )
+    // PLACEHOLDER (M3 F9): F10 replaces this with the real feed's assertions.
+    expect(await screen.findByRole('heading', { name: 'Good deeds' })).toBeInTheDocument()
+    expect(screen.getByRole('note')).toHaveAttribute('data-placeholder', 'F10')
+    expect(screen.queryByRole('heading', { name: /make kindness visible/i })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Sign up' })).toBeNull()
   })
 })

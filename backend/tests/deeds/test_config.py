@@ -9,7 +9,7 @@ from app.modules.deeds._limits import DeedLimits, load_limits
 
 
 async def test_seeded_deeds_row_validates_against_deed_limits(session: AsyncSession) -> None:
-    row = await session.get(ConfigVersion, ("deeds", 4))
+    row = await session.get(ConfigVersion, ("deeds", 5))
     assert row is not None
     limits = DeedLimits.model_validate(row.values)
     # Every seeded key is modelled, and nothing else.
@@ -23,7 +23,7 @@ async def test_seeded_deeds_row_validates_against_deed_limits(session: AsyncSess
     assert limits.rate_manual_target == "20/900"
     assert limits.reporter_monthly_limit == 150  # D19 raised it from 15
     assert limits.reporter_doer_monthly_limit == 15
-    assert limits.photos_enabled is False
+    assert limits.area_fallback_m == 1500
     assert limits.invites_enabled is False
     assert limits.has_category("animals")
     assert not limits.has_category("crypto")
@@ -70,29 +70,47 @@ async def test_deeds_v3_is_v2_plus_the_d19_d23_values(session: AsyncSession) -> 
 
 
 async def test_deeds_v4_adds_the_daily_manual_target_limit(session: AsyncSession) -> None:
-    """Migration 0009 (security L4) publishes v4 = v3 + ``rate_manual_target_daily``; v4 is the
-    active version on a fresh database."""
+    """Migration 0009 (security L4) publishes v4 = v3 + ``rate_manual_target_daily``."""
     v3 = await session.get(ConfigVersion, ("deeds", 3))
     v4 = await session.get(ConfigVersion, ("deeds", 4))
     assert v3 is not None and v4 is not None
     assert v4.values == {**v3.values, "rate_manual_target_daily": "60/86400"}
     assert v4.created_by is None and "L4" in v4.reason
-    assert await session.get(ConfigVersion, ("deeds", 5)) is None
-    version, limits = await load_limits(session)
-    assert version == 4
+    _, limits = await load_limits(session)
     assert (limits.rate_manual_target, limits.rate_manual_target_daily) == ("20/900", "60/86400")
     with pytest.raises(ValidationError):
         DeedLimits.model_validate(v3.values)
 
 
+async def test_deeds_v5_moves_photos_enabled_and_adds_area_fallback(session: AsyncSession) -> None:
+    """Migration 0013 (M3 D39, D41) publishes v5 = v4 minus ``photos_enabled`` (now in the
+    ``media`` namespace) plus ``area_fallback_m = 1500``; v5 is the active version on a fresh
+    database."""
+    v4 = await session.get(ConfigVersion, ("deeds", 4))
+    v5 = await session.get(ConfigVersion, ("deeds", 5))
+    assert v4 is not None and v5 is not None
+    expected = {k: v for k, v in v4.values.items() if k != "photos_enabled"}
+    assert v5.values == {**expected, "area_fallback_m": 1500}
+    assert v5.created_by is None and "D39" in v5.reason and "D41" in v5.reason
+    assert await session.get(ConfigVersion, ("deeds", 6)) is None
+    version, limits = await load_limits(session)
+    assert version == 5 and limits.area_fallback_m == 1500
+    # v4 still has photos_enabled and lacks area_fallback_m: the current model can't read it.
+    with pytest.raises(ValidationError):
+        DeedLimits.model_validate(v4.values)
+    # A snapshot that still carries photos_enabled is rejected (extra keys are forbidden).
+    with pytest.raises(ValidationError):
+        DeedLimits.model_validate({**v5.values, "photos_enabled": True})
+
+
 async def test_deed_limits_has_no_defaults(session: AsyncSession) -> None:
-    row = await session.get(ConfigVersion, ("deeds", 4))
+    row = await session.get(ConfigVersion, ("deeds", 5))
     assert row is not None
     for key in (
         "same_act_cap",
         "reporter_monthly_limit",
         "reporter_doer_monthly_limit",
-        "photos_enabled",
+        "area_fallback_m",
         "invites_enabled",
         "rate_manual_target_daily",
     ):

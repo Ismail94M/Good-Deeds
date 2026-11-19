@@ -1,0 +1,370 @@
+ward_code,official_name,proposed_display_name,note
+GBA-C001,Central 1 - Ramaswamy Palya,Ramaswamy Palya,
+GBA-C002,Central 2 - Jayamahal,Jayamahal,
+GBA-C003,Central 3 - Vasanth Nagar,Vasanth Nagar,
+GBA-C004,Central 4 - Sampangirama Nagar,Sampangirama Nagar,
+GBA-C005,Central 5 - Shivajinagar,Shivajinagar,
+GBA-C006,Central 6 - Bharathi Nagar,Bharathi Nagar,
+GBA-C007,Central 7 - K Kamaraj Ward,Halasuru,U: person name (K Kamaraj); ward lies by Halasuru/Ulsoor
+GBA-C008,Central 8 - Halasuru,Halasuru,
+GBA-C009,Central 9 - Hoysala Nagara Central,Indiranagar,U: 'Hoysala Nagara Central' is not East 5 Hoysala Nagar; centroid is HAL 2nd Stage / Indiranagar north
+GBA-C010,Central 10 - Cox Town,Cox Town,
+GBA-C011,Central 11 - Old Baiyappanahalli,Old Baiyappanahalli,
+GBA-C012,Central 12 - Kasturi Nagar,Kasturi Nagar,
+GBA-C013,Central 13 - Krishnaiahnapalya,Krishnaiahnapalya,
+GBA-C014,Central 14 - Nagavarapalya,Nagavarapalya,
+GBA-C015,Central 15 - Indiranagar,Indiranagar,
+GBA-C016,Central 16 - New Thippasandra,New Thippasandra,
+GBA-C017,Central 17 - Kaggadasapura,Kaggadasapura,
+GBA-C018,Central 18 - G.M Palya,GM Palya,spelling/format normalised
+GBA-C019,Central 19 - Jeevan Bhimanagar,Jeevan Bhimanagar,
+GBA-C020,Central 20 - Kodihalli,Kodihalli,
+GBA-C021,Central 21 - Konena Agrahara,Konena Agrahara,
+GBA-C022,Central 22 - Domluru,Domlur,spelling/format normalised
+GBA-C023,Central 23 - Jogpalya,Jogpalya,
+GBA-C024,Central 24 - Agaram,Agaram,U: kept official name; confirm it is a familiar locality
+GBA-C025,Central 25 - Ashokanagar,Ashokanagar,
+GBA-C026,Central 26 - Vannarpet,Vannarpet,
+GBA-C027,Central 27 - Ambedkarnagar,Ambedkarnagar,
+GBA-C028,Central 28 - Neelasandra,Neelasandra,
+GBA-C029,Central 29 - Austin Town,Austin Town,
+GBA-C030,Central 30 - Vinayakanagar,Vinayakanagar,
+GBA-C031,Central 31 - Shanthinagar,Shanthinagar,
+GBA-C032,Central 32 - SilverJubilee Park Ward,Sudhama Nagar,U: landmark name (Silver Jubilee Park); nearest familiar locality guessed
+GBA-C033,Central 33 - Dharmaraya Swamy Temple Ward,Chickpet,U: landmark name (Dharmaraya Swamy Temple); old-city area
+GBA-C034,Central 34 - D.V Gundappa Ward,VV Puram,U: person name (D.V. Gundappa); next to VV Puram
+GBA-C035,Central 35 - Hombegowda Nagara,Hombegowda Nagar,spelling/format normalised
+GBA-C036,Central 36 - Someshwara Nagara,Someshwara Nagar,spelling/format normalised
+GBA-C037,Central 37 - BHEL Ward,Lakkasandra,U: company/landmark name (BHEL); nearest familiar locality guessed
+GBA-C038,Central 38 - Kanakanapalya,Kanakanapalya,
+GBA-C039,Central 39 - Venkat Reddy Nagara,Wilson Garden,U: confirm whether 'Venkat Reddy Nagar' is itself a familiar locality
+GBA-C040,Central 40 - Ashoka Pillar,Jayanagar,"U: landmark name (Ashoka Pillar, Jayanagar 1st Block)"
+GBA-C041,Central 41 - V.V Puram,VV Puram,spelling/format normalised
+GBA-C042,Central 42 - Sunkenahalli,Sunkenahalli,
+GBA-C043,Central 43 - Devaraj Urs Ward,Chamarajpet,U: person name (Devaraj Urs); next to Chamarajpet
+GBA-C044,Central 44 - Chamarajpet,Chamarajpet,
+GBA-C045,Central 45 - K.R Market,Kalasipalya,U: landmark name (K.R. Market)
+GBA-C046,Central 46 - Cheluvadi Palya,Cheluvadi Palya,
+GBA-C047,Central 47 - IPD Salappa Ward,Binnypet,U: person name (IPD Salappa); next to Binnypet
+GBA-C048,Central 48 - Azad Nagar,Azad Nagar,
+GBA-C049,Central 49 - Kasturbha Nagar,Kasturba Nagar,spelling/format normalised
+GBA-C050,Central 50 - JJR Nagara,JJR Nagar,spelling/format normalised
+GBA-C051,Central 51 - Old Guddadahalli,Old Guddadahalli,
+GBA-C052,Central 52 - Padarayanapura,Padarayanapura,
+GBA-C053,Central 53 - Rayapuram,Rayapuram,
+GBA-C054,Central 54 - Binnypete,Binnypet,spelling/format normalised
+GBA-C055,Central 55 - Bhuvaneshwari Nagar,Bhuvaneshwari Nagar,
+GBA-C056,Central 56 - Gopalpura,Gopalpura,
+GBA-C057,Central 57 - Cottonpete,Cottonpet,spelling/format normalised
+GBA-C058,Central 58 - Chickpete,Chickpet,spelling/format normalised
+GBA-C059,Central 59 - Nehru Nagar,Nehru Nagar,
+GBA-C060,Central 60 - Seshadripuram,Seshadripuram,
+GBA-C061,Central 61 - Dattatreya Ward,Seshadripuram,U: temple name (Dattatreya); next to Seshadripuram
+GBA-C062,Central 62 - Swatantra Palya Ward,Srirampura,U: 'Swatantra Palya' believed to be the renamed Srirampura area; confirm
+GBA-C063,Central 63 - Okalipuram,Okalipuram,
+GBA-E001,East 1 - K Narayanapura,K Narayanapura,
+GBA-E002,East 2 - Horamavu,Horamavu,
+GBA-E003,East 3 - Chellakere,Chellakere,
+GBA-E004,East 4 - Babusab Palya,Babusab Palya,
+GBA-E005,East 5 - Hoysala Nagara East,Hoysala Nagar,directional suffix 'East' dropped
+GBA-E006,East 6 - Kalkere,Kalkere,
+GBA-E007,East 7 - K Chennasandra,K Chennasandra,
+GBA-E008,East 8 - Anandapura,Anandapura,
+GBA-E009,East 9 - Bhattarahalli,Bhattarahalli,
+GBA-E010,East 10 - Basavanapura,Basavanapura,
+GBA-E011,East 11 - Krishnanagar,Krishnanagar,
+GBA-E012,East 12 - Devasandra,Devasandra,
+GBA-E013,East 13 - Rajarajeshwari Temple ward,Devasandra,U: temple name (Rajarajeshwari Temple); this ward was 'Devasandra' in the 19 Nov 2025 map
+GBA-E014,East 14 - K.R Pura,KR Puram,spelling normalised (K.R Pura)
+GBA-E015,East 15 - Ramamurthy Nagara,Ramamurthy Nagar,spelling/format normalised
+GBA-E016,East 16 - Kotthur,Kotthur,
+GBA-E017,East 17 - Vijinapura,Vijinapura,
+GBA-E018,East 18 - Dooravaninagar,Dooravani Nagar,spelling/format normalised
+GBA-E019,East 19 - K.S. Nissar Ahmed Ward,Dooravani Nagar,U: person name (K.S. Nissar Ahmed)
+GBA-E020,East 20 - A Narayanapura,A Narayanapura,
+GBA-E021,East 21 - Uday Nagar,Uday Nagar,
+GBA-E022,East 22 - Mahadevapura,Mahadevapura,
+GBA-E023,East 23 - Sangama Ward,Vignan Nagar,U: generic name (Sangama)
+GBA-E024,East 24 - Vignananagara,Vignan Nagar,spelling/format normalised
+GBA-E025,East 25 - L.B Shastri Nagar,LB Shastri Nagar,spelling/format normalised
+GBA-E026,East 26 - Jagadish Nagar,Jagadish Nagar,
+GBA-E027,East 27 - Vibhootipura,Vibhootipura,
+GBA-E028,East 28 - Byrathi,Byrathi,
+GBA-E029,East 29 - Hoodi,Hoodi,
+GBA-E030,East 30 - Belathur,Belathur,
+GBA-E031,East 31 - Kadugodi,Kadugodi,
+GBA-E032,East 32 - Channasandra,Channasandra,
+GBA-E033,East 33 - S.M Krishna Ward,Whitefield,U: person name (S.M. Krishna)
+GBA-E034,East 34 - Kaveri Nagara,Kaveri Nagar,spelling/format normalised
+GBA-E035,East 35 - Garudachar Palya,Garudachar Palya,
+GBA-E036,East 36 - Bharath Aikya Ward,Mahadevapura,U: generic name (Bharath Aikya)
+GBA-E037,East 37 - Kundalahalli,Kundalahalli,
+GBA-E038,East 38 - Whitefield,Whitefield,
+GBA-E039,East 39 - Hagaduru,Hagadur,spelling/format normalised
+GBA-E040,East 40 - Varthur,Varthur,
+GBA-E041,East 41 - Munnenkolalu,Munnekollal,spelling/format normalised
+GBA-E042,East 42 - Priyadarshini Ward,Brookefield,U: person name (Priyadarshini)
+GBA-E043,East 43 - Dodda Nekkundi,Doddanekkundi,spelling/format normalised
+GBA-E044,East 44 - Ashwath Nagar,Ashwath Nagar,
+GBA-E045,East 45 - Marathahalli,Marathahalli,
+GBA-E046,East 46 - Yamalur,Yamalur,
+GBA-E047,East 47 - Bellanduru,Bellandur,spelling/format normalised
+GBA-E048,East 48 - Panathur,Panathur,
+GBA-E049,East 49 - Shivanasamudra Ward,Bellandur,U: generic name (Shivanasamudra)
+GBA-E050,East 50 - Gunjur,Gunjur,
+GBA-N001,North 1 - Raja Kempegowda ward,Yelahanka,U: person name (Raja Kempegowda); Yelahanka New Town
+GBA-N002,North 2 - Aerocity,Yelahanka,"U: 'Aerocity' is a ward label, not a familiar locality"
+GBA-N003,North 3 - Chowdeshwari ward,Yelahanka,U: temple/deity name (Chowdeshwari); Yelahanka old town
+GBA-N004,North 4 - Nyayanga Badavane,Judicial Layout,U: English name of Nyayanga Badavane
+GBA-N005,North 5 - Yelahanka Satellite Town,Yelahanka Satellite Town,
+GBA-N006,North 6 - Doddabettahalli,Doddabettahalli,
+GBA-N007,North 7 - Attur,Attur,
+GBA-N008,North 8 - Singapura,Singapura,
+GBA-N009,North 9 - Kuvempunagara,Kuvempunagar,spelling/format normalised
+GBA-N010,North 10 - Vidyaranyapura,Vidyaranyapura,
+GBA-N011,North 11 - Doddabommasandra,Doddabommasandra,
+GBA-N012,North 12 - Thindlu,Thindlu,
+GBA-N013,North 13 - Kodigehalli,Kodigehalli,
+GBA-N014,North 14 - Rajiv Gandhi Nagar,Rajiv Gandhi Nagar,
+GBA-N015,North 15 - Byatarayanapura,Byatarayanapura,
+GBA-N016,North 16 - Amruthahalli,Amruthahalli,
+GBA-N017,North 17 - Jakkur,Jakkur,
+GBA-N018,North 18 - Kempapura,Kempapura,
+GBA-N019,North 19 - Thanisandra,Thanisandra,
+GBA-N020,North 20 - Sampigehalli,Sampigehalli,
+GBA-N021,North 21 - Kogilu,Kogilu,
+GBA-N022,North 22 - Nagavara,Nagavara,
+GBA-N023,North 23 - Hennur,Hennur,
+GBA-N024,North 24 - HBR Layout,HBR Layout,
+GBA-N025,North 25 - Govindapura,Govindapura,
+GBA-N026,North 26 - Samadhana Nagar,Samadhana Nagar,
+GBA-N027,North 27 - K.G.Halli,KG Halli,spelling/format normalised
+GBA-N028,North 28 - Venkateshpuram,Venkateshpuram,
+GBA-N029,North 29 - Lingarajpura,Lingarajpura,
+GBA-N030,North 30 - Kacharakanahalli,Kacharakanahalli,
+GBA-N031,North 31 - Kalyan Nagar,Kalyan Nagar,
+GBA-N032,North 32 - Banaswadi,Banaswadi,
+GBA-N033,North 33 - HRBR Layout,HRBR Layout,
+GBA-N034,North 34 - Subbayanapalya,Subbayanapalya,
+GBA-N035,North 35 - Kammanahalli,Kammanahalli,
+GBA-N036,North 36 - Maruthi Seva Nagara,Maruthi Seva Nagar,spelling/format normalised
+GBA-N037,North 37 - Jeevanahalli,Jeevanahalli,
+GBA-N038,North 38 - Shampura,Shampura,
+GBA-N039,North 39 - Kaval Byrasandra,Kaval Byrasandra,
+GBA-N040,North 40 - Shakthi Nagar,Shakthi Nagar,
+GBA-N041,North 41 - Periyar Nagar,Periyar Nagar,
+GBA-N042,North 42 - Aruna Asif Ali Ward,DJ Halli,U: person name (Aruna Asif Ali); D.J. Halli / Tannery Road area
+GBA-N043,North 43 - Varalakshmi Nagar,Varalakshmi Nagar,
+GBA-N044,North 44 - Doddanna Nagar,Doddanna Nagar,
+GBA-N045,North 45 - Kushal Nagar,Kushal Nagar,
+GBA-N046,North 46 - Sagayapuram,Sagayapuram,
+GBA-N047,North 47 - Pulakeshi Nagar,Pulakeshi Nagar,
+GBA-N048,North 48 - S.K Garden,SK Garden,spelling/format normalised
+GBA-N049,North 49 - Jaya Chamarajendra Nagara,Jaya Chamarajendra Nagar,spelling/format normalised
+GBA-N050,North 50 - Dinnur,Dinnur,
+GBA-N051,North 51 - Manorayanapalya,Manorayanapalya,
+GBA-N052,North 52 - Vishwanatha Nagenahalli,Vishwanatha Nagenahalli,
+GBA-N053,North 53 - R.T Nagar,RT Nagar,spelling/format normalised
+GBA-N054,North 54 - Gangenahalli,Gangenahalli,
+GBA-N055,North 55 - Ganganagar,Ganganagar,
+GBA-N056,North 56 - Hebbal,Hebbal,
+GBA-N057,North 57 - Bhoopasandra,Bhoopasandra,
+GBA-N058,North 58 - Nagashettyhalli,Nagashettyhalli,
+GBA-N059,North 59 - Geddalahalli,Geddalahalli,
+GBA-N060,North 60 - Jalahalli,Jalahalli,
+GBA-N061,North 61 - HMT Ward,Jalahalli,U: company name (HMT)
+GBA-N062,North 62 - Brundavana Nagara,Brundavana Nagar,spelling/format normalised
+GBA-N063,North 63 - J.P PARK,Yeshwanthpur,U: landmark name (J.P. Park)
+GBA-N064,North 64 - Yeshwanthpura,Yeshwanthpur,spelling/format normalised
+GBA-N065,North 65 - Abbigere,Abbigere,
+GBA-N066,North 66 - Kammagondanahalli,Kammagondanahalli,
+GBA-N067,North 67 - Shettihalli,Shettihalli,
+GBA-N068,North 68 - Mallasandra,Mallasandra,
+GBA-N069,North 69 - Bagalagunte,Bagalagunte,
+GBA-N070,North 70 - Manjunatha Nagar,Manjunatha Nagar,
+GBA-N071,North 71 - Nele Maheshwaramma Temple Ward,Dasarahalli,U: temple name (Nele Maheshwaramma Temple)
+GBA-N072,North 72 - Dasarahalli,Dasarahalli,
+GBA-S001,South 1 - Padmanabhanagara,Padmanabhanagar,spelling/format normalised
+GBA-S002,South 2 - Kadirenahalli,Kadirenahalli,
+GBA-S003,South 3 - Yarab nagar,Yarab Nagar,U: this ward was 'Kumaraswamy Layout' in the 19 Nov 2025 map; renamed Dec 2025
+GBA-S004,South 4 - Banashankari Temple Ward,Banashankari,landmark (temple) dropped
+GBA-S005,South 5 - Kane Muneshwara Ward,Kumaraswamy Layout,U: deity/temple name (Kane Muneshwara)
+GBA-S006,South 6 - Gowdanapalya,Gowdanapalya,
+GBA-S007,South 7 - Byrasandra,Byrasandra,
+GBA-S008,South 8 - Tilak Nagara,Tilak Nagar,spelling/format normalised
+GBA-S009,South 9 - N.A.L Layout,NAL Layout,spelling/format normalised
+GBA-S010,South 10 - Abdul Kalam Nagar,Jayanagar,U: commemorative name (Abdul Kalam Nagar); confirm whether it is a known locality
+GBA-S011,South 11 - Jayanagar East,Jayanagar,directional suffix dropped
+GBA-S012,South 12 - Pattabhirama Nagara,Pattabhirama Nagar,spelling/format normalised
+GBA-S013,South 13 - Marenahalli South,JP Nagar,U: 'Marenahalli South' is a different place from West 75 Marenahalli
+GBA-S014,South 14 - J.P Nagar,JP Nagar,spelling/format normalised
+GBA-S015,South 15 - Shakambarinagara,Shakambarinagar,spelling/format normalised
+GBA-S016,South 16 - Sarakki,Sarakki,
+GBA-S017,South 17 - N.S Palya,NS Palya,spelling/format normalised
+GBA-S018,South 18 - Viswamanava Kuvempu Ward,BTM Layout,U: person name (Vishwamanava Kuvempu)
+GBA-S019,South 19 - New Tavarekere,New Tavarekere,
+GBA-S020,South 20 - Madiwala,Madiwala,
+GBA-S021,South 21 - Chikka Adugodi,Chikka Adugodi,
+GBA-S022,South 22 - S.G Palya,SG Palya,spelling/format normalised
+GBA-S023,South 23 - Lakkasandra,Lakkasandra,
+GBA-S024,South 24 - A Adugodi,Adugodi,'A' prefix dropped
+GBA-S025,South 25 - National Games Village,Koramangala,U: 'National Games Village' is a housing complex
+GBA-S026,South 26 - Ejipura,Ejipura,
+GBA-S027,South 27 - Sri Lakshmi Devi Ward,Koramangala,U: deity name (Sri Lakshmi Devi)
+GBA-S028,South 28 - Kormangala East,Koramangala,East/West halves merged; spelling fixed
+GBA-S029,South 29 - Kormangala West,Koramangala,East/West halves merged; spelling fixed
+GBA-S030,South 30 - Jakkasandra,Jakkasandra,
+GBA-S031,South 31 - Kasavanahalli,Kasavanahalli,
+GBA-S032,South 32 - Kudlu,Kudlu,
+GBA-S033,South 33 - Naganathapura,Naganathapura,
+GBA-S034,South 34 - Chikkathoguru,Chikkathoguru,
+GBA-S035,South 35 - Vishwapriya Nagara,Vishwapriya Nagar,spelling/format normalised
+GBA-S036,South 36 - Beguru,Beguru,
+GBA-S037,South 37 - Yelenahalli,Yelenahalli,
+GBA-S038,South 38 - Doddakammanahalli,Doddakammanahalli,
+GBA-S039,South 39 - Gottigere,Gottigere,
+GBA-S040,South 40 - Anjanapura,Anjanapura,
+GBA-S041,South 41 - Kothanur,Kothanur,
+GBA-S042,South 42 - RBI Layout,RBI Layout,
+GBA-S043,South 43 - Bheereshwara Nagar,Bheereshwara Nagar,
+GBA-S044,South 44 - Harinagar,Harinagar,
+GBA-S045,South 45 - Konanakunte,Konanakunte,
+GBA-S046,South 46 - Yelachenahalli,Yelachenahalli,
+GBA-S047,South 47 - Chandranagara,Chandranagar,spelling/format normalised
+GBA-S048,South 48 - Vasanthapura,Vasanthapura,
+GBA-S049,South 49 - Uttarahalli,Uttarahalli,
+GBA-S050,South 50 - Sarvabhouma Nagar,Sarvabhouma Nagar,
+GBA-S051,South 51 - Subramanyapura,Subramanyapura,
+GBA-S052,South 52 - Talagattapura,Talagattapura,
+GBA-S053,South 53 - Jaraganahalli,Jaraganahalli,
+GBA-S054,South 54 - Kengal Hanumanthaiah South,JP Nagar,U: person name (Kengal Hanumanthaiah)
+GBA-S055,South 55 - Puttenahalli,Puttenahalli,
+GBA-S056,South 56 - Doresanipalya,Doresanipalya,
+GBA-S057,South 57 - Hulimavu,Hulimavu,
+GBA-S058,South 58 - Arakere,Arakere,
+GBA-S059,South 59 - Vijaya Bank Layout,Vijaya Bank Layout,U: locality named after a bank; kept
+GBA-S060,South 60 - Bilekahalli,Bilekahalli,
+GBA-S061,South 61 - Kodi Chikkanahalli,Kodi Chikkanahalli,
+GBA-S062,South 62 - Devarachikkanahalli,Devarachikkanahalli,
+GBA-S063,South 63 - Bommanahalli,Bommanahalli,
+GBA-S064,South 64 - Hongasandra,Hongasandra,
+GBA-S065,South 65 - Garvebavi Palya,Garvebavi Palya,
+GBA-S066,South 66 - Singasandra,Singasandra,
+GBA-S067,South 67 - Bandepalya,Bandepalya,
+GBA-S068,South 68 - Mangammana Palya,Mangammana Palya,
+GBA-S069,South 69 - Hosapalya,Hosapalya,
+GBA-S070,South 70 - Iblur,Iblur,
+GBA-S071,South 71 - Agara,Agara,
+GBA-S072,South 72 - HSR Layout,HSR Layout,
+GBA-W001,West 1 - Nagasandra,Nagasandra,
+GBA-W002,West 2 - Chokkasandra,Chokkasandra,
+GBA-W003,West 3 - Nelagadaranahalli,Nelagadaranahalli,
+GBA-W004,West 4 - Parvathi Nagar,Parvathi Nagar,
+GBA-W005,West 5 - Rajeshwarinagar,Rajeshwarinagar,
+GBA-W006,West 6 - Shivapura,Shivapura,
+GBA-W007,West 7 - Rajagopala Nagara,Rajagopala Nagar,spelling/format normalised
+GBA-W008,West 8 - Hegganahalli,Hegganahalli,
+GBA-W009,West 9 - Srigandhanagar,Srigandhanagar,
+GBA-W010,West 10 - Sunkadakatte,Sunkadakatte,
+GBA-W011,West 11 - Dodda Bidarakallu,Dodda Bidarakallu,
+GBA-W012,West 12 - Andrahalli,Andrahalli,
+GBA-W013,West 13 - Nada prabhu Kempegowda Nagara,Herohalli,U: person name (Nadaprabhu Kempegowda)
+GBA-W014,West 14 - Herohalli,Herohalli,
+GBA-W015,West 15 - Byadarahalli,Byadarahalli,
+GBA-W016,West 16 - Ullal,Ullal,
+GBA-W017,West 17 - Nagadevanahalli,Nagadevanahalli,
+GBA-W018,West 18 - Kengal Hanumanthaiah West,Kengeri,U: person name (Kengal Hanumanthaiah)
+GBA-W019,West 19 - Shivanapalya,Shivanapalya,
+GBA-W020,West 20 - Kengeri Kote ward,Kengeri,'Kote ward' dropped
+GBA-W021,West 21 - Kengeri,Kengeri,
+GBA-W022,West 22 - Bangarappa Nagara,Bangarappa Nagar,spelling/format normalised
+GBA-W023,West 23 - Rajarajeshwari Nagara,Rajarajeshwari Nagar,spelling/format normalised
+GBA-W024,West 24 - Jnana Bharathi Ward,Jnanabharathi,"U: named after the university campus, also the locality name"
+GBA-W025,West 25 - Vinayaka Layout,Vinayaka Layout,
+GBA-W026,West 26 - Mallathahalli,Mallathahalli,
+GBA-W027,West 27 - Srigandada Kaval,Srigandada Kaval,
+GBA-W028,West 28 - Kottegepalya,Kottegepalya,
+GBA-W029,West 29 - Chowdeshwari Nagar,Chowdeshwari Nagar,
+GBA-W030,West 30 - Kempegowda Layout,Kempegowda Layout,
+GBA-W031,West 31 - Freedom Fighter Ward,Laggere,U: generic name (Freedom Fighter)
+GBA-W032,West 32 - Laggere,Laggere,
+GBA-W033,West 33 - Lakshmi Devi Nagar,Lakshmi Devi Nagar,
+GBA-W034,West 34 - Peenya,Peenya,
+GBA-W035,West 35 - Goraguntepalya,Goraguntepalya,
+GBA-W036,West 36 - Nalwadi Krishnaraja Wadiyar Ward,Yeshwanthpur,U: person name (Nalwadi Krishnaraja Wadiyar)
+GBA-W037,West 37 - Dr. Puneeth Rajkumar Ward,Nandini Layout,U: person name (Dr. Puneeth Rajkumar)
+GBA-W038,West 38 - Nandini Layout,Nandini Layout,
+GBA-W039,West 39 - Jai Maruthi Nagar,Jai Maruthi Nagar,
+GBA-W040,West 40 - Mahalakshmipuram,Mahalakshmipuram,
+GBA-W041,West 41 - Nagapura,Nagapura,
+GBA-W042,West 42 - Raja Mayura Varma Ward,Mahalakshmi Layout,U: person name (Raja Mayura Varma)
+GBA-W043,West 43 - Kethamaranahalli,Kethamaranahalli,
+GBA-W044,West 44 - Shankar Mutt,Mahalakshmi Layout,U: 'Shankar Mutt' is a building/institution
+GBA-W045,West 45 - Shakthi Ganapathi Nagara,Shakthi Ganapathi Nagar,spelling/format normalised
+GBA-W046,West 46 - Kamalanagara,Kamalanagar,spelling/format normalised
+GBA-W047,West 47 - Vrishabhavathi Nagar,Vrishabhavathi Nagar,
+GBA-W048,West 48 - Mathikere,Mathikere,
+GBA-W049,West 49 - Aramane Nagara,Aramane Nagar,spelling/format normalised
+GBA-W050,West 50 - Sadashiva Nagara,Sadashiva Nagar,spelling/format normalised
+GBA-W051,West 51 - Rajamahal,Rajamahal,
+GBA-W052,West 52 - Kodandarampura,Kodandarampura,
+GBA-W053,West 53 - Malleshwaram,Malleshwaram,
+GBA-W054,West 54 - Subedarpalya,Subedarpalya,
+GBA-W055,West 55 - Subramanyanagara,Subramanyanagar,spelling/format normalised
+GBA-W056,West 56 - Gayathri Nagara,Gayathri Nagar,spelling/format normalised
+GBA-W057,West 57 - Kuvempu Ward,Rajajinagar,U: person name (Kuvempu)
+GBA-W058,West 58 - Dayanand Nagara,Dayanand Nagar,spelling/format normalised
+GBA-W059,West 59 - Bandi Reddy Circle Ward,Rajajinagar,U: landmark name (Bandi Reddy Circle)
+GBA-W060,West 60 - Prakash Nagara,Prakash Nagar,spelling/format normalised
+GBA-W061,West 61 - Da.Ra. Bendre Ward,Rajajinagar,U: person name (Da.Ra. Bendre)
+GBA-W062,West 62 - Rama Mandira,Rajajinagar,U: temple name (Rama Mandira)
+GBA-W063,West 63 - Rajajinagara,Rajajinagar,spelling/format normalised
+GBA-W064,West 64 - Shivanagara,Shivanagar,spelling/format normalised
+GBA-W065,West 65 - Manjunath Nagara,Manjunath Nagar,spelling/format normalised
+GBA-W066,West 66 - Sane Guruvana Halli,Saneguruvanahalli,spelling/format normalised
+GBA-W067,West 67 - Basaveshwara Nagara,Basaveshwara Nagar,spelling/format normalised
+GBA-W068,West 68 - Kamakshipalya,Kamakshipalya,
+GBA-W069,West 69 - Agrahara Dasarahalli,Agrahara Dasarahalli,
+GBA-W070,West 70 - Dr Rajkumar Ward,Rajajinagar,U: person name (Dr Rajkumar)
+GBA-W071,West 71 - Thimmenahalli,Thimmenahalli,
+GBA-W072,West 72 - Kaveripura,Kaveripura,
+GBA-W073,West 73 - Dr. Vishnuvardhan Ward,Vijayanagar,U: person name (Dr. Vishnuvardhan)
+GBA-W074,West 74 - Pattegar Palya,Pattegar Palya,
+GBA-W075,West 75 - Marenahalli West,Marenahalli,directional suffix dropped; different place from South 13
+GBA-W076,West 76 - Moodalapalya,Moodalapalya,
+GBA-W077,West 77 - Maruthi Mandira Ward,Vijayanagar,U: temple name (Maruthi Mandira)
+GBA-W078,West 78 - Anubhava Nagara,Anubhava Nagar,spelling/format normalised
+GBA-W079,West 79 - Nagarbhavi,Nagarbhavi,
+GBA-W080,West 80 - Chandra Layout,Chandra Layout,
+GBA-W081,West 81 - Nayanda Halli,Nayandahalli,spelling/format normalised
+GBA-W082,West 82 - Attigupe,Attigupe,
+GBA-W083,West 83 - Hampi Nagar,Hampi Nagar,
+GBA-W084,West 84 - Hosahalli,Hosahalli,
+GBA-W085,West 85 - Adi Chunchanagiri Ward,Hosahalli,U: religious institution name (Adi Chunchanagiri)
+GBA-W086,West 86 - Vidyaranyanagara,Vidyaranyanagar,spelling/format normalised
+GBA-W087,West 87 - K.P Agrahara,KP Agrahara,spelling/format normalised
+GBA-W088,West 88 - Sangolli Rayanna Ward,KP Agrahara,U: person name (Sangolli Rayanna)
+GBA-W089,West 89 - Bapuji Nagara,Bapuji Nagar,spelling/format normalised
+GBA-W090,West 90 - Krishnadevaraya ward,Vijayanagar,U: person name (Krishnadevaraya)
+GBA-W091,West 91 - Gali Anjaneya Temple Ward,Bapuji Nagar,U: temple name (Gali Anjaneya Temple)
+GBA-W092,West 92 - Muneshwara Block,Muneshwara Block,
+GBA-W093,West 93 - Avalahalli,Avalahalli,
+GBA-W094,West 94 - Deepanjali Nagara,Deepanjali Nagar,spelling/format normalised
+GBA-W095,West 95 - Swamy Vivekananda Ward,Banashankari,U: person name (Swamy Vivekananda)
+GBA-W096,West 96 - Kathriguppe,Kathriguppe,
+GBA-W097,West 97 - Srinivasa Nagara,Srinivasa Nagar,spelling/format normalised
+GBA-W098,West 98 - Ashoka Nagara,Ashoka Nagar,spelling/format normalised
+GBA-W099,West 99 - T.R Shamanna Nagar,TR Shamanna Nagar,U: confirm familiar locality name
+GBA-W100,West 100 - Srinagar,Srinagar,
+GBA-W101,West 101 - Kempambudhi Ward,Hanumanthanagar,U: lake name (Kempambudhi)
+GBA-W102,West 102 - Hanumanthanagar,Hanumanthanagar,
+GBA-W103,West 103 - N.R Colony,NR Colony,spelling/format normalised
+GBA-W104,West 104 - Thyagarajnagar,Thyagarajnagar,
+GBA-W105,West 105 - Yediyuru,Yediyur,spelling/format normalised
+GBA-W106,West 106 - Devagiri Temple Ward,Banashankari,U: temple name (Devagiri Temple)
+GBA-W107,West 107 - Dharmagiri Ward,Banashankari,U: temple name (Dharmagiri)
+GBA-W108,West 108 - Ganesh Mandira Ward,Banashankari,U: temple name (Ganesh Mandira)
+GBA-W109,West 109 - Kamakya Layout,Kamakya Layout,
+GBA-W110,West 110 - Chikkalasandra,Chikkalasandra,
+GBA-W111,West 111 - Ittamadu,Ittamadu,
+GBA-W112,West 112 - Hosakerehalli,Hosakerehalli,

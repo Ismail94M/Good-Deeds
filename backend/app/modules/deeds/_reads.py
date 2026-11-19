@@ -178,5 +178,4 @@ async def options(
         max_location_accuracy_m=limits.max_location_accuracy_m,
         service_area_radius_km=limits.service_area.radius_km,
         same_act_cap=limits.same_act_cap,
-        photos_enabled=limits.photos_enabled,
     )

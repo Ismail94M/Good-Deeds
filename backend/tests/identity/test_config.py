@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from app.core.config import _DEV_SECRET, Settings
+from app.core.config import _DEV_SECRET, DEV_STORAGE_ACCESS_KEY, Settings
 
 GOOD_SECRET = "k" * 32
 
@@ -18,6 +18,9 @@ def _production(**overrides: Any) -> Settings:
         "cookie_secure": True,
         "sms_provider": "msg91",
         "cors_origins": ["https://gooddeeds.in", "https://www.gooddeeds.in"],
+        "storage_endpoint_url": "https://storage.googleapis.com",
+        "storage_access_key_id": "GOOG1EXAMPLEHMACKEY",
+        "storage_secret_access_key": "hmac-secret",
     }
     values.update(overrides)
     return Settings(_env_file=None, **values)
@@ -27,6 +30,10 @@ def test_valid_production_config_constructs() -> None:
     settings = _production()
     assert not settings.is_local
     assert settings.cookie_secure is True
+    # Browsers get URLs for the same endpoint unless a public one is set.
+    assert settings.storage_signing_endpoint_url == "https://storage.googleapis.com"
+    public = _production(storage_public_endpoint_url="https://media.gooddeeds.in")
+    assert public.storage_signing_endpoint_url == "https://media.gooddeeds.in"
 
 
 @pytest.mark.parametrize(
@@ -39,6 +46,11 @@ def test_valid_production_config_constructs() -> None:
         ({"cors_origins": ["*"]}, "GD_CORS_ORIGINS"),
         ({"cors_origins": ["https://gooddeeds.in", "http://gooddeeds.in"]}, "GD_CORS_ORIGINS"),
         ({"cors_origins": ["http://localhost:5173"]}, "GD_CORS_ORIGINS"),
+        ({"storage_endpoint_url": "http://storage:8333"}, "GD_STORAGE_ENDPOINT_URL"),
+        ({"storage_public_endpoint_url": "http://localhost:8333"}, "GD_STORAGE_PUBLIC"),
+        ({"storage_access_key_id": DEV_STORAGE_ACCESS_KEY}, "GD_STORAGE_ACCESS_KEY_ID"),
+        ({"storage_access_key_id": ""}, "GD_STORAGE_ACCESS_KEY_ID"),
+        ({"storage_secret_access_key": ""}, "GD_STORAGE_SECRET_ACCESS_KEY"),
     ],
 )
 def test_unsafe_production_config_rejected(overrides: dict[str, Any], message: str) -> None:
@@ -80,6 +92,8 @@ def test_defaults_are_production_and_refuse_to_start(monkeypatch: pytest.MonkeyP
         "GD_SECRET_KEY",
         "GD_SMS_PROVIDER",
         "GD_CORS_ORIGINS",
+        "GD_STORAGE_ACCESS_KEY_ID",
+        "GD_STORAGE_SECRET_ACCESS_KEY",
     ):
         monkeypatch.delenv(name, raising=False)
     with pytest.raises(ValidationError, match="env='production'"):

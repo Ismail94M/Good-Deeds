@@ -662,7 +662,15 @@ def _run(conn: Connection, module: ModuleType, step: str) -> None:
 
 
 # Keys added by migrations after 0008; the 0008 rollback rightly leaves them alone.
-LATER_KEYS = {"rate_manual_target_daily"}  # 0009
+LATER_KEYS = {"rate_manual_target_daily", "area_fallback_m"}  # 0009, 0013
+# Keys that 0008 adds but a later migration removed again (0013 moved ``photos_enabled`` to the
+# ``media`` namespace). Re-running 0008 on top of head brings them back, so they are compared
+# separately and dropped before validating against the current DeedLimits.
+REMOVED_LATER = {"photos_enabled"}
+
+
+def _without(values: dict[str, Any], keys: set[str]) -> dict[str, Any]:
+    return {k: v for k, v in values.items() if k not in keys}
 
 
 def test_migration_0008_downgrade_and_upgrade_round_trip(sync_conn: Connection) -> None:
@@ -684,8 +692,9 @@ def test_migration_0008_downgrade_and_upgrade_round_trip(sync_conn: Connection) 
     _run(sync_conn, m, "upgrade")
     up_version, up = _latest(sync_conn)
     assert up_version == down_version + 1
-    assert up == v3
-    DeedLimits.model_validate(up)
+    assert _without(up, REMOVED_LATER) == v3
+    assert up["photos_enabled"] is False
+    DeedLimits.model_validate(_without(up, REMOVED_LATER))
     _run(sync_conn, m, "upgrade")  # idempotent
     assert _latest(sync_conn)[0] == up_version
     # Nothing was rewritten.
@@ -710,8 +719,8 @@ def test_migration_0008_upgrade_builds_on_a_hand_published_version(
     )
     _run(sync_conn, m, "upgrade")
     _, up = _latest(sync_conn)
-    limits = DeedLimits.model_validate(up)
+    limits = DeedLimits.model_validate(_without(up, REMOVED_LATER))
     assert limits.same_act_cap == 7  # the hand-published value survives
     assert limits.reporter_monthly_limit == TOTAL
     assert limits.reporter_doer_monthly_limit == PAIR
-    assert limits.photos_enabled is False
+    assert up["photos_enabled"] is False

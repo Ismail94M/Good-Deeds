@@ -1,11 +1,18 @@
 import { useQuery } from '@tanstack/react-query'
-import { LinkButton, TextLink } from '../../components/ui'
+import { LinkButton, Loading } from '../../components/ui'
 import { getHealth } from '../../lib/api'
 import { useAuth } from '../auth/authContext'
+import { FeedPage } from '../feed/FeedPage'
 
+/** `/`: the feed for signed-in users (M3-DESIGN §6.2), the welcome page for everyone else. */
 export function HomePage() {
   const { user, isLoading } = useAuth()
+  if (isLoading) return <Loading />
+  if (user) return <FeedPage />
+  return <WelcomePage />
+}
 
+function WelcomePage() {
   return (
     <main className="mx-auto flex w-full max-w-xl flex-col gap-8 px-4 py-10 sm:py-16">
       <header className="space-y-3">
@@ -18,30 +25,12 @@ export function HomePage() {
         </p>
       </header>
 
-      {isLoading ? null : user ? (
-        <section className="space-y-4" aria-label="Your shortcuts">
-          <p className="text-xl font-semibold">Welcome, {user.display_name}!</p>
-          {!user.onboarding.complete && (
-            <p className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
-              You&apos;re nearly there. <TextLink to="/onboarding">Finish setting up</TextLink> to
-              get your QR code.
-            </p>
-          )}
-          <div className="grid grid-cols-2 gap-3">
-            <LinkButton to="/me/qr">My QR</LinkButton>
-            <LinkButton to="/profile" variant="secondary">
-              Profile
-            </LinkButton>
-          </div>
-        </section>
-      ) : (
-        <div className="grid grid-cols-2 gap-3">
-          <LinkButton to="/signup">Sign up</LinkButton>
-          <LinkButton to="/login" variant="secondary">
-            Sign in
-          </LinkButton>
-        </div>
-      )}
+      <div className="grid grid-cols-2 gap-3">
+        <LinkButton to="/signup">Sign up</LinkButton>
+        <LinkButton to="/login" variant="secondary">
+          Sign in
+        </LinkButton>
+      </div>
 
       <ApiStatus />
     </main>

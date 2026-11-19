@@ -10,6 +10,10 @@ constraint name, so names here are part of the contract.
 Precise locations are stored as ``geography(Point, 4326)`` and are never returned by the API in
 M2. Each location column has an explicit GiST index (``spatial_index=False`` on the type, so the
 index is a normal metadata ``Index`` that Alembic can compare).
+
+M3 (docs/M3-DESIGN.md §2.1, migration 0013): ``areas`` is reference data (Bangalore ward
+boundaries with a familiar display name), and ``deeds.area_id`` is resolved from the deed's own
+point in this module, so no other module ever sees coordinates (D39).
 """
 
 import uuid
@@ -28,6 +32,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    SmallInteger,
     String,
     UniqueConstraint,
     func,
@@ -41,6 +46,10 @@ from app.core.db import Base
 
 def _point() -> Geography:
     return Geography(geometry_type="POINT", srid=4326, spatial_index=False)
+
+
+def _multipolygon() -> Geography:
+    return Geography(geometry_type="MULTIPOLYGON", srid=4326, spatial_index=False)
 
 
 def _enum(cls: type[StrEnum], name: str, length: int = 20) -> Enum:
@@ -98,6 +107,30 @@ class VerificationEventKind(StrEnum):
     INVITE_EXPIRED = "invite_expired"
     WITHDRAWN = "withdrawn"
     REJECTED = "rejected"
+
+
+class Area(Base):
+    """A Bangalore area (one ward of the official boundary dataset). M3-DESIGN §2.1, D39.
+
+    Seeded by migration 0013 from ``deeds/data/bangalore_areas.geojson``. Only ``name`` is ever
+    shown; ``ward_code`` is kept for audit and re-imports and is never returned by any API.
+    On a shared border the lowest ``id`` wins, so ids are part of the seed.
+    """
+
+    __tablename__ = "areas"
+    __table_args__ = (
+        UniqueConstraint("ward_code", name="uq_areas_ward_code"),
+        CheckConstraint("length(btrim(name)) BETWEEN 1 AND 40", name="name_length"),
+        Index("ix_areas_boundary", "boundary", postgresql_using="gist"),
+    )
+
+    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=False)
+    name: Mapped[str] = mapped_column(String(80))
+    city: Mapped[str] = mapped_column(String(40))
+    boundary: Mapped[WKBElement] = mapped_column(_multipolygon())
+    # Dataset name, publisher, publication date and licence (attribution on /terms if needed).
+    source: Mapped[str] = mapped_column(String(120))
+    ward_code: Mapped[str] = mapped_column(String(20))
 
 
 class QrScan(Base):
@@ -286,6 +319,11 @@ class Deed(Base):
         Boolean, default=False, server_default="false"
     )
     limits_version: Mapped[int] = mapped_column(Integer)
+    # Coarse public area (M3 D39), resolved from ``location`` when the deed is created or
+    # accepted; null shows as "Bangalore". No index: lookups go from the deed's point to areas.
+    area_id: Mapped[int | None] = mapped_column(
+        SmallInteger, ForeignKey("areas.id", ondelete="RESTRICT")
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

@@ -28,6 +28,15 @@ services:
       GD_WEB_BASE_URL: http://localhost:5173
       # Read from the root .env file (see docs/SETUP-GOOGLE-SIGNIN.md). Empty hides the button.
       GD_GOOGLE_CLIENT_ID: ${GD_GOOGLE_CLIENT_ID:-}
+      # Local S3-compatible storage (SeaweedFS). The API and worker reach it as storage:8333;
+      # browsers use the URLs signed for localhost:8333. Dev keys: infra/seaweedfs/s3.json.
+      GD_STORAGE_ENDPOINT_URL: http://storage:8333
+      GD_STORAGE_PUBLIC_ENDPOINT_URL: http://localhost:8333
+      GD_STORAGE_REGION: us-east-1
+      GD_STORAGE_BUCKET: gooddeeds-media
+      GD_STORAGE_ACCESS_KEY_ID: gooddeeds-dev
+      GD_STORAGE_SECRET_ACCESS_KEY: gooddeeds-dev-secret-not-for-production
+      GD_STORAGE_ADDRESSING_STYLE: path
     depends_on:
       db:
         condition: service_healthy
@@ -43,6 +52,8 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      storage-init:
+        condition: service_completed_successfully
 
   worker:
     build: ./backend
@@ -53,6 +64,53 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      storage-init:
+        condition: service_completed_successfully
+
+  # Local stand-in for Google Cloud Storage (S3-compatible API). See docs/M3-DESIGN.md §4.3.
+  storage:
+    image: chrislusf/seaweedfs:4.48
+    command:
+      - server
+      - -dir=/data
+      - -master.telemetry=false
+      - -master.volumeSizeLimitMB=1024
+      - -s3
+      - -s3.port=8333
+      - -s3.config=/etc/seaweedfs/s3.json
+      # Fallback when a bucket has no CORS rules; the bucket's own rules come from storage-init.
+      - -s3.allowedOrigins=http://localhost:5173
+    ports:
+      - "8333:8333"
+    volumes:
+      - storage-data:/data
+      - ./infra/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8333/healthz || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+
+  # Creates the bucket and sets its CORS rules (http://localhost:5173), then exits.
+  storage-init:
+    image: amazon/aws-cli:2.37.9
+    environment:
+      AWS_ACCESS_KEY_ID: gooddeeds-dev
+      AWS_SECRET_ACCESS_KEY: gooddeeds-dev-secret-not-for-production
+      AWS_DEFAULT_REGION: us-east-1
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        aws --endpoint-url http://storage:8333 s3api head-bucket --bucket gooddeeds-media 2>/dev/null
+        || aws --endpoint-url http://storage:8333 s3api create-bucket --bucket gooddeeds-media;
+        aws --endpoint-url http://storage:8333 s3api put-bucket-cors --bucket gooddeeds-media
+        --cors-configuration file:///init/cors.json
+    volumes:
+      - ./infra/seaweedfs/cors.json:/init/cors.json:ro
+    depends_on:
+      storage:
+        condition: service_healthy
 
   web:
     build: ./frontend
@@ -69,3 +127,4 @@ services:
 
 volumes:
   db-data:
+  storage-data:

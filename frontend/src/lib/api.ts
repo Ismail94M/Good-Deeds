@@ -204,6 +204,7 @@ async function request<T>(
 
 export const apiGet = <T>(path: string) => request<T>('GET', path)
 export const apiPost = <T>(path: string, body?: unknown) => request<T>('POST', path, body)
+export const apiPut = <T>(path: string, body?: unknown) => request<T>('PUT', path, body)
 export const apiPatch = <T>(path: string, body?: unknown) => request<T>('PATCH', path, body)
 export const apiDelete = <T = void>(path: string) => request<T>('DELETE', path)
 
@@ -212,6 +213,16 @@ export function resetApiForTests(): void {
   accessToken = null
   refreshOutcome = null
   sessionExpiredListener = null
+}
+
+/** Build `?a=1&b=2` from defined, non-empty values (or '' when there are none). */
+export function queryString(params: Record<string, string | number | null | undefined>): string {
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') search.set(key, String(value))
+  }
+  const text = search.toString()
+  return text ? `?${text}` : ''
 }
 
 // ----------------------------------------------------------------- health

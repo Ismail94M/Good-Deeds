@@ -17,6 +17,8 @@ from fastapi import APIRouter
 MODULES: list[str] = [
     "identity",
     "deeds",  # M2: deeds, scans, same-act groups, invites, self-logs
+    "media",  # M3: photo uploads, pipeline, photo reports and decisions
+    "feed",  # M3: feed projection, likes, comments, saves, shares, follows, Top
 ]
 
 _OPTIONAL_PARTS = ("models", "handlers", "jobs")

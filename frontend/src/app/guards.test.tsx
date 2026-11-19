@@ -44,3 +44,44 @@ describe('route guards', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/me/qr'))
   })
 })
+
+describe('RequireRole (M3 admin pages, Q34)', () => {
+  const ADMIN_PATHS = [
+    '/admin/photo-reports',
+    '/admin/photo-reports/case-1',
+    '/admin/comment-reports',
+    '/admin/comment-reports/case-1',
+  ]
+
+  it.each(ADMIN_PATHS)('%s sends a signed-out visitor to login with next', async (path) => {
+    mockApi()
+    const { router } = renderApp(path)
+    await waitFor(() => expect(router.state.location.pathname).toBe('/login'))
+    expect(router.state.location.search).toBe(`?next=${encodeURIComponent(path)}`)
+  })
+
+  it.each(ADMIN_PATHS)('%s shows NotFound to a member', async (path) => {
+    mockApi(signedIn(makeMe({ role: 'member' })))
+    const { router } = renderApp(path)
+    expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe(path)
+  })
+
+  it.each([
+    ['moderator', '/admin/photo-reports', 'Photo reports'],
+    ['admin', '/admin/photo-reports/case-1', 'Review photo report'],
+    ['moderator', '/admin/comment-reports', 'Comment reports'],
+    ['admin', '/admin/comment-reports/case-1', 'Review comment report'],
+  ] as const)('lets a %s open %s', async (role, path, heading) => {
+    mockApi(signedIn(makeMe({ role })))
+    renderApp(path)
+    expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Page not found' })).toBeNull()
+  })
+
+  it('also checks onboarding-incomplete moderators by role only', async () => {
+    mockApi(signedIn(makeMe({ role: 'moderator', onboarding: NOT_ONBOARDED })))
+    renderApp('/admin/photo-reports')
+    expect(await screen.findByRole('heading', { name: 'Photo reports' })).toBeInTheDocument()
+  })
+})

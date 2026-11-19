@@ -261,7 +261,7 @@ class DeedOptions(BaseModel):
     service_area_radius_km: float
     # Reports of one act that count (Q20 extra-witness note: "the first 5 count").
     same_act_cap: int
-    photos_enabled: bool
+    # photos_enabled moved to GET /api/media/options (M3 D41).
 
 
 # --------------------------------------------------- edit and withdraw (B11)

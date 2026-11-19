@@ -1,8 +1,11 @@
 """Typed values of the ``deeds`` config namespace (docs/M2-DESIGN.md §2.1).
 
 Every key is required and has no default: the ``config_versions`` row (seeded as ``deeds`` v1 by
-migration 0004, then v2 by 0007, v3 by 0008 and v4 by 0009) is the only source of these values.
-Change them by publishing a new version.
+migration 0004, then v2 by 0007, v3 by 0008, v4 by 0009 and v5 by 0013) is the only source of
+these values. Change them by publishing a new version.
+
+v5 (docs/M3-DESIGN.md §2.1, D41): ``photos_enabled`` moved to the ``media`` namespace, and
+``area_fallback_m`` was added.
 """
 
 from pydantic import BaseModel, ConfigDict
@@ -35,8 +38,6 @@ class DeedLimits(RuntimeConfig):
     # in total and about any one doer
     reporter_monthly_limit: int
     reporter_doer_monthly_limit: int
-    # Photo controls (D23): off until photo storage ships; only read by the options endpoint
-    photos_enabled: bool
     # Invites (B6); switched off while ``invites_enabled`` is false (D17)
     invites_enabled: bool
     invites_per_day: int
@@ -54,6 +55,9 @@ class DeedLimits(RuntimeConfig):
     max_travel_speed_kmh: int
     travel_slack_m: int
     service_area: ServiceArea
+    # Area names (M3 D39): a point outside every area polygon takes the nearest area within
+    # this many metres, else shows "Bangalore"
+    area_fallback_m: int
     # Deed content
     description_min: int
     description_max: int

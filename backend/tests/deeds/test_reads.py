@@ -297,12 +297,11 @@ async def test_options_reflect_config_and_todays_invites(
         "max_location_accuracy_m",
         "service_area_radius_km",
         "same_act_cap",
-        "photos_enabled",
     }
     # The limits and copy values follow config (seeded values, apart from the two published).
     assert body["reporter_monthly_limit"] == 10
     assert body["reporter_doer_monthly_limit"] == 15
-    assert body["photos_enabled"] is False
+    assert "photos_enabled" not in body  # moved to GET /api/media/options (M3 D41)
     assert body["beneficiaries_max"] == 10000
     assert body["qr_occurred_max_age_minutes"] == 120
     assert body["max_location_accuracy_m"] == 500
@@ -333,7 +332,6 @@ async def test_options_limits_and_copy_values_follow_config(
         session,
         reporter_monthly_limit=40,
         reporter_doer_monthly_limit=4,
-        photos_enabled=True,
         max_location_accuracy_m=250,
         qr_occurred_max_age_minutes=90,
         beneficiaries_max=500,
@@ -343,7 +341,6 @@ async def test_options_limits_and_copy_values_follow_config(
     assert body["reporter_monthly_limit"] == 40
     assert body["reports_remaining_this_month"] == 40
     assert body["reporter_doer_monthly_limit"] == 4
-    assert body["photos_enabled"] is True
     assert body["max_location_accuracy_m"] == 250
     assert body["qr_occurred_max_age_minutes"] == 90
     assert body["beneficiaries_max"] == 500

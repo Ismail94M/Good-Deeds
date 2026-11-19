@@ -1,10 +1,13 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _DEV_SECRET = "dev-only-insecure-secret-change-me-0123456789"
 _LOCAL_ENVS = frozenset({"development", "test"})
+# Access key of the local SeaweedFS identity (infra/seaweedfs/s3.json); refused outside dev.
+DEV_STORAGE_ACCESS_KEY = "gooddeeds-dev"
 
 
 class Settings(BaseSettings):
@@ -46,6 +49,19 @@ class Settings(BaseSettings):
     facebook_app_id: str = ""
     facebook_app_secret: str = ""
 
+    # Object storage (photos), S3-compatible API only (app.core.storage). Production: Google
+    # Cloud Storage's XML API with HMAC keys; development: SeaweedFS (docker-compose).
+    # Endpoint the API and worker call.
+    storage_endpoint_url: str = "https://storage.googleapis.com"
+    # Endpoint put into signed URLs for browsers (signing is offline). Empty: same as above.
+    storage_public_endpoint_url: str = ""
+    # "auto" for GCS (Google's boto3 sample); "us-east-1" for SeaweedFS.
+    storage_region: str = "auto"
+    storage_bucket: str = "gooddeeds-media"
+    storage_access_key_id: str = ""
+    storage_secret_access_key: str = ""
+    storage_addressing_style: Literal["path", "virtual"] = "path"
+
     @property
     def is_local(self) -> bool:
         return self.env in _LOCAL_ENVS
@@ -63,9 +79,24 @@ class Settings(BaseSettings):
             problems.append("GD_SMS_PROVIDER must be a real provider, not 'console'")
         if any(o == "*" or not o.startswith("https://") for o in self.cors_origins):
             problems.append("GD_CORS_ORIGINS must list explicit https:// origins")
+        if not all(
+            url.startswith("https://")
+            for url in (self.storage_endpoint_url, self.storage_public_endpoint_url)
+            if url
+        ):
+            problems.append("GD_STORAGE_ENDPOINT_URL and GD_STORAGE_PUBLIC_ENDPOINT_URL need https")
+        if self.storage_access_key_id in ("", DEV_STORAGE_ACCESS_KEY):
+            problems.append("GD_STORAGE_ACCESS_KEY_ID must be a real key, not the development one")
+        if not self.storage_secret_access_key:
+            problems.append("GD_STORAGE_SECRET_ACCESS_KEY must be set")
         if problems:
             raise ValueError(f"Unsafe configuration for env={self.env!r}: " + "; ".join(problems))
         return self
+
+    @property
+    def storage_signing_endpoint_url(self) -> str:
+        """Endpoint used in URLs signed for browsers."""
+        return self.storage_public_endpoint_url or self.storage_endpoint_url
 
     @property
     def database_dsn(self) -> str:

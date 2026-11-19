@@ -40,7 +40,7 @@ Each milestone is built, tested and reviewed by the product owner before the nex
 - PO approval of the photo-guidelines page copy (M3 Q39).
 - PO approval of the community-guidelines page copy (M3 comment-removed notice).
 - Two-step login for moderator and admin accounts (they review photo reports from M3, PO decision Q34, 2026-11-19).
-- Area names: confirm the ward dataset is still the latest official one and its licence allows app use; add attribution to the Terms page if required (M3 Q28).
+- Area names (M3 Q28): get written confirmation from OpenCity / Greater Bengaluru Authority of the ward data's source and terms. PO decision 2026-11-19: use it meanwhile under OpenCity's "Public Domain" label, with a credit on the Terms page. Also confirm no newer ward delimitation and re-check the data file from a browser download.
 - Photo consent: confirm with legal whether a consent confirmation (and guardian consent for children) is needed at upload; it was removed from the M3 design for now (PO decision 2026-11-18).
 - Recycled numbers and SIM swaps (PO decision 2026-11-17, forgot-password security review M3): email the account owner on every password reset ("Your password was changed. Wasn't you? Tell us"), once an email service exists. Also hold prize claims and payout-detail changes for 7 days after a reset (built with prizes in M8).
 
