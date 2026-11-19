@@ -182,6 +182,18 @@ describe('FeedPage: Top and its period', () => {
     ).toBeInTheDocument()
   })
 
+  it('keeps the period when going Top → Nearby → Top', async () => {
+    setup({ 'GET /feed': top() })
+    const user = userEvent.setup()
+    const { router } = renderApp('/?tab=top')
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Period' }), 'month')
+    await user.click(screen.getByRole('tab', { name: 'Nearby' }))
+    expect(router.state.location.search).toBe('')
+    await user.click(screen.getByRole('tab', { name: 'Top' }))
+    expect(router.state.location.search).toBe('?tab=top&period=month')
+    expect(screen.getByRole('combobox', { name: 'Period' })).toHaveValue('month')
+  })
+
   it('opening /?tab=top&period=year keeps the year', async () => {
     const api = setup({ 'GET /feed': top() })
     renderApp('/?tab=top&period=year')

@@ -27,8 +27,28 @@ function parseTab(value: string | null): FeedTab {
   return FEED_TABS.includes(value as FeedTab) ? (value as FeedTab) : DEFAULT_FEED_TAB
 }
 
-function parsePeriod(value: string | null): TopPeriod {
-  return TOP_PERIODS.includes(value as TopPeriod) ? (value as TopPeriod) : DEFAULT_TOP_PERIOD
+function isPeriod(value: string | null): value is TopPeriod {
+  return TOP_PERIODS.includes(value as TopPeriod)
+}
+
+/** The last Top period picked in this tab's session, so Top → Nearby → Top keeps it. */
+const PERIOD_KEY = 'gd.feed.topPeriod'
+
+function rememberedPeriod(): TopPeriod {
+  try {
+    const value = window.sessionStorage.getItem(PERIOD_KEY)
+    return isPeriod(value) ? value : DEFAULT_TOP_PERIOD
+  } catch {
+    return DEFAULT_TOP_PERIOD
+  }
+}
+
+function rememberPeriod(period: TopPeriod) {
+  try {
+    window.sessionStorage.setItem(PERIOD_KEY, period)
+  } catch {
+    // Storage blocked: the period still lives in the URL while on Top.
+  }
 }
 
 function SparkleIcon() {
@@ -56,7 +76,8 @@ function SparkleIcon() {
 export function FeedPage() {
   const [params, setParams] = useSearchParams()
   const tab = parseTab(params.get('tab'))
-  const period = parsePeriod(params.get('period'))
+  const urlPeriod = params.get('period')
+  const period: TopPeriod = isPeriod(urlPeriod) ? urlPeriod : DEFAULT_TOP_PERIOD
   const options = useFeedOptions()
   const feed = useFeed(tab, period)
   const panelId = useId()
@@ -64,13 +85,19 @@ export function FeedPage() {
   const headingRef = useRef<HTMLHeadingElement>(null)
 
   const selectTab = (next: FeedTab) => {
+    // Also covers a period that came from a shared link.
+    if (tab === 'top') rememberPeriod(period)
     const search = new URLSearchParams()
     if (next !== DEFAULT_FEED_TAB) search.set('tab', next)
-    if (next === 'top' && period !== DEFAULT_TOP_PERIOD) search.set('period', period)
+    if (next === 'top') {
+      const keep = tab === 'top' ? period : rememberedPeriod()
+      if (keep !== DEFAULT_TOP_PERIOD) search.set('period', keep)
+    }
     setParams(search, { replace: true })
   }
 
   const selectPeriod = (event: ChangeEvent<HTMLSelectElement>) => {
+    if (isPeriod(event.target.value)) rememberPeriod(event.target.value)
     setParams({ tab: 'top', period: event.target.value }, { replace: true })
     headingRef.current?.focus()
   }

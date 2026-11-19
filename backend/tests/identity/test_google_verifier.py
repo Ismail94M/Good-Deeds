@@ -58,12 +58,16 @@ async def test_tolerates_server_clock_slightly_behind_google() -> None:
 @pytest.mark.parametrize(
     "overrides",
     [
-        {"iat": int(time.time()) + 300, "nbf": int(time.time()) + 300},
-        {"exp": int(time.time()) - 300},
+        # Time offsets (seconds from now) are resolved inside the test, not at import time,
+        # so a long test run can't turn the "future" token into a valid one.
+        {"iat": 300, "nbf": 300},
+        {"exp": -300},
         {"aud": "someone-else.apps.googleusercontent.com"},
         {"iss": "https://evil.example.com"},
     ],
 )
 async def test_rejects_bad_tokens(overrides: dict[str, Any]) -> None:
+    now = int(time.time())
+    claims = {k: now + v if k in ("iat", "nbf", "exp") else v for k, v in overrides.items()}
     with pytest.raises(OAuthError):
-        await _verifier().verify(_token(**overrides))
+        await _verifier().verify(_token(**claims))

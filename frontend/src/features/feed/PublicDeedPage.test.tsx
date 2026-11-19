@@ -1,4 +1,5 @@
 import { screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { makeMe, mockApi, renderApp, signedIn } from '../../test/utils'
 import { makePhoto, makePublic } from './testFixtures'
@@ -76,6 +77,34 @@ describe('PublicDeedPage', () => {
       screen.getByText('It may have been hidden or removed by the people involved.'),
     ).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Discover Good Deeds' })).toHaveAttribute('href', '/')
+  })
+
+  it('adds noindex, nofollow to the head while open and removes it after', async () => {
+    mockApi({ 'GET /public/deeds/d1': { body: makePublic() } })
+    const { unmount } = renderApp('/d/d1')
+    await screen.findByRole('article')
+    const robots = () => document.head.querySelectorAll('meta[name="robots"]')
+    expect(robots()).toHaveLength(1)
+    expect(robots()[0]).toHaveAttribute('content', 'noindex, nofollow')
+    unmount()
+    expect(robots()).toHaveLength(0)
+  })
+
+  it('offers Try again on other errors', async () => {
+    mockApi({
+      'GET /public/deeds/d1': [
+        {
+          status: 429,
+          body: { detail: 'Too many requests. Please wait a moment.', code: 'rate_limited' },
+        },
+        { body: makePublic() },
+      ],
+    })
+    const user = userEvent.setup()
+    renderApp('/d/d1')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Too many requests')
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByRole('article', { name: 'Deed by Ahmed Khan' })).toBeInTheDocument()
   })
 
   it('sends a signed-in visitor to /deeds/:id', async () => {

@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import AppError
 from app.core.security import constant_time_equal
 from app.main import app
-from app.modules.deeds import _invites
+from app.modules.deeds import _edits, _invites, _qr_deeds, _scans
 from app.modules.deeds.models import Deed, DeedStatus, Invite, InviteStatus, QrScan
 from app.modules.identity import _qr, service
 from app.modules.identity.models import DoerCode
@@ -26,6 +26,7 @@ from tests.deeds.helpers import (
     make_member,
     members,
     publish_limits,
+    qr_window_seconds,
     scan,
     scan_and_report,
     token_for,
@@ -201,13 +202,21 @@ async def test_reissue_boundaries_at_expiry_and_after_cancel(session: AsyncSessi
 
 
 async def test_consumed_scan_stays_used_after_its_deed_is_withdrawn(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    # The clock is frozen (QA, M3): 5 s into a 30 s QR window, at 12:00 IST. With the real clock
+    # the "previous window" token below sometimes fell into the first scan's window (when the
+    # test crossed a window boundary), or the IST day changed between the two scans.
+    window = await qr_window_seconds(session)
+    now = datetime(2026, 11, 20, 6, 30, 5, tzinfo=UTC)
+    assert now.timestamp() % window == 5
+    for module in (_scans, _qr_deeds, _edits):
+        monkeypatch.setattr(module, "utcnow", lambda: now)
     witness, doer = await members(session, 2)
-    s = await scan(session, witness, doer)
+    s = await scan(session, witness, doer, at=now)
     await session.commit()
     first = await client.post("/api/deeds", json=deed_body(s.scan_id), headers=witness.headers)
-    assert first.status_code == 201
+    assert first.status_code == 201, first.text
     deed_id = first.json()["id"]
     assert (
         await client.post(f"/api/deeds/{deed_id}/withdraw", headers=witness.headers)
@@ -215,8 +224,13 @@ async def test_consumed_scan_stays_used_after_its_deed_is_withdrawn(
     replay = await client.post("/api/deeds", json=deed_body(s.scan_id), headers=witness.headers)
     assert replay.status_code == 409 and replay.json()["code"] == "scan_used"
     # And a fresh scan the same IST day is refused too: withdrawal can't retry the checks.
-    # (A token from the previous window, so it isn't refused as the same window.)
-    earlier = datetime.now(UTC) - timedelta(seconds=30)
+    # (A token from the previous window, still inside grace, so it isn't refused as the same
+    # window.)
+    earlier = now - timedelta(seconds=window)
+    assert (
+        _qr.current_window(window, earlier.timestamp())
+        == _qr.current_window(window, now.timestamp()) - 1
+    )
     rescan = await client.post(
         "/api/scans",
         json={"token": await token_for(session, doer, earlier), "location": location()},

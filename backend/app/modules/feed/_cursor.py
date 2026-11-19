@@ -15,6 +15,9 @@ from app.core.errors import AppError
 
 DEFAULT_PAGE_SIZE = 20
 MAX_PAGE_SIZE = 50
+# feed_top_entries.rank is a SMALLINT; report case priorities are 1 to 3 (CHECK priority_range).
+MAX_RANK = 32767
+PRIORITIES = range(1, 4)
 
 
 def invalid_cursor() -> AppError:
@@ -56,7 +59,7 @@ def decode_top(cursor: str, period: str) -> tuple[uuid.UUID, int]:
         if kind != "top" or cursor_period != period:
             raise ValueError("not a cursor of this Top period")
         rank = int(rank_text)
-        if rank < 1:
+        if not 1 <= rank <= MAX_RANK:  # ranks are a SMALLINT column
             raise ValueError("rank")
         return uuid.UUID(snapshot_text), rank
     except (ValueError, binascii.Error, UnicodeDecodeError) as exc:
@@ -75,6 +78,8 @@ def decode_queue(cursor: str, queue: str) -> tuple[int, datetime, uuid.UUID]:
         at = datetime.fromisoformat(at_text)
         if kind != "queue" or cursor_queue != queue or at.tzinfo is None:
             raise ValueError("not a cursor of this queue")
+        if int(priority) not in PRIORITIES:
+            raise ValueError("priority")
         return int(priority), at, uuid.UUID(id_text)
     except (ValueError, binascii.Error, UnicodeDecodeError) as exc:
         raise invalid_cursor() from exc

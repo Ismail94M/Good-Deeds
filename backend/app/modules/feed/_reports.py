@@ -80,8 +80,17 @@ async def report_comment(
     if found is None or not found.viewable:
         raise comment_not_found()
 
-    # One open case per comment: serialise reports of the same comment.
+    # One open case per comment: serialise reports of the same comment. The author, doer and
+    # reporter delete under the same lock, so re-read the comment now that it's held: a deletion
+    # that won the race must not be left with an open case.
     await advisory_xact_lock(session, "comment_case", str(comment_id))
+    deleted_at = await session.scalar(
+        select(FeedComment.deleted_at)
+        .where(FeedComment.id == comment_id)
+        .execution_options(populate_existing=True)
+    )
+    if deleted_at is not None:
+        raise comment_not_found()
     priority = COMMENT_REPORT_PRIORITY[why]
     case = await session.scalar(
         select(CommentReportCase)

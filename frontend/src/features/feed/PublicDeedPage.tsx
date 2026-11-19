@@ -1,10 +1,11 @@
+import { useEffect } from 'react'
 import { Link, Navigate, useParams } from 'react-router'
 import { ErrorAlert, Loading } from '../../components/ui'
 import { ApiError, errorMessage } from '../../lib/api'
 import { useAuth } from '../auth/authContext'
 import { usePublicDeed } from './feedQueries'
 import { firstName } from './feedText'
-import { FeedMain, focusRing, primaryButton } from './feedUi'
+import { FeedMain, focusRing, primaryButton, secondaryButton } from './feedUi'
 import { DeedUnavailable } from './DeedPage'
 import { PublicPostCard } from './PostCard'
 
@@ -22,7 +23,19 @@ export function PublicDeedPage() {
   return <PublicDeed id={id} />
 }
 
+/** `<meta name="robots" content="noindex, nofollow">` while the share page is open (Q40). */
+function useNoIndex() {
+  useEffect(() => {
+    const meta = document.createElement('meta')
+    meta.name = 'robots'
+    meta.content = 'noindex, nofollow'
+    document.head.appendChild(meta)
+    return () => meta.remove()
+  }, [])
+}
+
 function PublicDeed({ id }: { id: string }) {
+  useNoIndex()
   const deed = usePublicDeed(id)
   const next = encodeURIComponent(`/deeds/${encodeURIComponent(id)}`)
   const joinHref = `/signup?next=${next}`
@@ -40,6 +53,13 @@ function PublicDeed({ id }: { id: string }) {
     return (
       <FeedMain>
         <ErrorAlert>{errorMessage(deed.error)}</ErrorAlert>
+        <button
+          type="button"
+          className={`${secondaryButton} self-start`}
+          onClick={() => void deed.refetch()}
+        >
+          Try again
+        </button>
       </FeedMain>
     )
   }

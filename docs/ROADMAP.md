@@ -37,6 +37,7 @@ Each milestone is built, tested and reviewed by the product owner before the nex
 - A support flow for changing a verified phone number (re-authentication + notify the old number).
 - Separate signing keys per purpose (JWT / QR / device / phone hash) with key IDs, so one can be rotated without invalidating the others.
 - A real SMS provider (MSG91 or Twilio, with DLT registration).
+- Web server / hosting: send `X-Robots-Tag: noindex, nofollow` on `/d/*` page responses (Q40; the app also adds a robots meta tag, and `/api/public/*` already sends the header). Set `og:image` in `frontend/index.html` to the absolute production URL of `/og-logo.png` (some preview crawlers ignore relative URLs).
 - PO approval of the photo-guidelines page copy (M3 Q39).
 - PO approval of the community-guidelines page copy (M3 comment-removed notice).
 - Two-step login for moderator and admin accounts (they review photo reports from M3, PO decision Q34, 2026-11-19).

@@ -8,7 +8,7 @@ imports ``feed``, D30) and passed in.
 import uuid
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import advisory_xact_lock
@@ -47,23 +47,24 @@ async def enforce_visitor_limits(limiter: RateLimiter, limits: MediaLimits, ip: 
     await limiter.hit(f"report:ipd:{ip}", limits.rate_report_ip_daily)
 
 
+def _live_photo(photo_id: uuid.UUID) -> Select[uuid.UUID | None, uuid.UUID]:
+    return select(Photo.deed_id, Photo.uploader_user_id).where(
+        Photo.id == photo_id,
+        Photo.status == PhotoStatus.READY,
+        Photo.takedown == PhotoTakedown.NONE,
+        Photo.purpose == PhotoPurpose.DEED,
+        Photo.object_move.is_(None),
+        Photo.deed_id.is_not(None),
+    )
+
+
 async def reportable_photo(
     session: AsyncSession, photo_id: uuid.UUID
 ) -> tuple[uuid.UUID, uuid.UUID]:
     """``(deed_id, uploader_id)`` of a photo that may be reported: ready, not taken down, on a
-    deed. Anything else (including every self-log photo) is 404."""
-    row = (
-        await session.execute(
-            select(Photo.deed_id, Photo.uploader_user_id).where(
-                Photo.id == photo_id,
-                Photo.status == PhotoStatus.READY,
-                Photo.takedown == PhotoTakedown.NONE,
-                Photo.purpose == PhotoPurpose.DEED,
-                Photo.object_move.is_(None),
-                Photo.deed_id.is_not(None),
-            )
-        )
-    ).first()
+    deed. Anything else (including every self-log photo) is 404. An unlocked first read (for
+    the router's visibility check); ``file_report`` checks again under the locks."""
+    row = (await session.execute(_live_photo(photo_id))).first()
     if row is None or row.deed_id is None:
         raise photo_not_found()
     return row.deed_id, row.uploader_user_id
@@ -92,7 +93,12 @@ async def file_report(
     priority = PHOTO_REPORT_PRIORITY[reason]
     ip_hash = keyed_hash("ip", ip)
 
+    # Lock order (as admin decisions): photo_case advisory lock -> photo row -> case row. The
+    # owner delete path locks the photo row too, so a report racing a removal either sees the
+    # photo gone (404) or finishes first and its case is then closed by the removal.
     await advisory_xact_lock(session, "photo_case", str(photo_id))
+    if (await session.execute(_live_photo(photo_id).with_for_update())).first() is None:
+        raise photo_not_found()
     case = await session.scalar(
         select(PhotoReportCase)
         .where(

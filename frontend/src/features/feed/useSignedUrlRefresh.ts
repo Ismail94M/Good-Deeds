@@ -5,6 +5,8 @@ import type { PhotoOut } from '../media/mediaApi'
 export const REFRESH_MARGIN_MS = 5 * 60_000
 /** At most one error-triggered refetch in this window, so a broken image can't loop. */
 const ERROR_REFETCH_GAP_MS = 30_000
+/** Browsers run a longer `setTimeout` at once (32-bit overflow), so cap the delay. */
+export const MAX_TIMER_MS = 2 ** 31 - 1
 
 /** The earliest `urls_expire_at` among these photos, in ms, or null. */
 export function earliestExpiry(photos: Iterable<PhotoOut>): number | null {
@@ -32,7 +34,10 @@ export function useSignedUrlRefresh(photos: PhotoOut[], refetch: () => unknown):
     if (expiry === null) return
     const delay = expiry - REFRESH_MARGIN_MS - Date.now()
     // Already inside the margin: refresh once now (the server signs at least 30 min ahead).
-    const timer = window.setTimeout(() => void refetchRef.current(), Math.max(0, delay))
+    const timer = window.setTimeout(
+      () => void refetchRef.current(),
+      Math.min(MAX_TIMER_MS, Math.max(0, delay)),
+    )
     return () => window.clearTimeout(timer)
   }, [expiry])
 
