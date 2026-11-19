@@ -20,6 +20,7 @@ const SCAN: ScanOut = {
   scanned_at: '2026-11-15T10:00:00Z',
   pair_reports_remaining: 3,
   month_resets_at: '2026-12-01T00:00:00+05:30',
+  area_name: 'Koramangala',
 }
 
 const INVITE: InviteOut = {
@@ -50,6 +51,7 @@ const DEED: DeedOut = {
   same_act: { report_count: 1, counts_for_points: true },
   prize_rank_eligible: true,
   has_location: true,
+  area_name: 'Koramangala',
   can_edit: true,
   can_withdraw: true,
   invite: null,
@@ -250,7 +252,6 @@ describe('deedsApi: deeds', () => {
       qr_occurred_max_age_minutes: 120,
       max_location_accuracy_m: 500,
       service_area_radius_km: 40,
-      photos_enabled: false,
     }
     mockApi({ 'GET /deeds/options': { body: options } })
     await expect(deedsApi.options()).resolves.toEqual(options)

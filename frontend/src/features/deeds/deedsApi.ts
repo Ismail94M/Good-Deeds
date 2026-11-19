@@ -53,6 +53,8 @@ export type ScanOut = {
   pair_reports_remaining: number
   /** 00:00 IST on the 1st of next month, with the `+05:30` offset. Never compute it locally. */
   month_resets_at: string
+  /** The scan location's area (ward name), or "Bangalore" (M3-DESIGN §3.1). Never coordinates. */
+  area_name: string
 }
 
 /** `GET /scans/{id}`: the POST shape plus whether a deed has already used the scan. */
@@ -121,6 +123,8 @@ export type DeedOut = {
   same_act: SameActOut | null
   prize_rank_eligible: boolean
   has_location: boolean
+  /** The deed's area (ward name), or "Bangalore" (M3-DESIGN §3.1). Never coordinates. */
+  area_name: string
   /** True only for the reporter, while pending or verified. */
   can_edit: boolean
   can_withdraw: boolean
@@ -172,8 +176,6 @@ export type DeedOptions = {
   qr_occurred_max_age_minutes: number
   max_location_accuracy_m: number
   service_area_radius_km: number
-  /** Render photo sections only when true (D23; false throughout M2). */
-  photos_enabled: boolean
   /**
    * Reports per act that count (D2/D15). Not sent by the M2 API yet; the Q20 note falls back
    * to `DEFAULT_SAME_ACT_CAP` until it is.

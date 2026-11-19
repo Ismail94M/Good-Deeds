@@ -4,6 +4,8 @@ import { Link, useLocation, useParams } from 'react-router'
 import { ErrorAlert, Loading } from '../../components/ui'
 import { ApiError, errorMessage } from '../../lib/api'
 import { useAuth } from '../auth/authContext'
+import { feedApi, feedKeys } from '../feed/feedApi'
+import { DeedPhotos } from '../media/OwnerPhotos'
 import { formatOccurredAt, formatShortDate } from '../report/format'
 import { useDeedOptions } from './deedQueries'
 import { DEFAULT_SAME_ACT_CAP, deedsApi, deedsKeys } from './deedsApi'
@@ -35,8 +37,9 @@ export type DeedDetailState = { notice?: string } | null
 
 /**
  * `/me/deeds/:id` (F6 canvas): the private owner view of one deed. The reporter gets Edit and
- * Withdraw while allowed, and the withdrawn notice. No photos (D23) and no "Hide from feed"
- * row in M2.
+ * Withdraw while allowed, and the withdrawn notice. M3: photos with review outcomes, remove and
+ * add (`DeedPhotos`, M3-DESIGN §6.3), and a "Shown in feed" / "Hidden from feed" chip for verified
+ * deeds (read from the feed's deed detail).
  */
 export function DeedDetailPage() {
   const { id = '' } = useParams()
@@ -50,6 +53,15 @@ export function DeedDetailPage() {
     queryFn: () => deedsApi.deed(id),
     retry: false,
   })
+
+  const verified = query.data?.status === 'verified'
+  const feedDeed = useQuery({
+    queryKey: feedKeys.deed(id),
+    queryFn: () => feedApi.deed(id),
+    enabled: verified,
+    retry: false,
+  })
+  const visibility = verified ? feedDeed.data?.visibility : null
 
   if (query.isPending) return <Loading label="Loading this deed…" />
   if (query.isError) {
@@ -105,6 +117,7 @@ export function DeedDetailPage() {
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge status={deed.status} />
         {deed.last_edited_at && <Chip>Edited</Chip>}
+        {visibility && <Chip>{visibility.listed ? 'Shown in feed' : 'Hidden from feed'}</Chip>}
       </div>
       <div className="flex flex-col gap-1">
         <F6Title>{whoLine(deed, viewer)}</F6Title>
@@ -113,6 +126,7 @@ export function DeedDetailPage() {
         </p>
       </div>
       <p className="break-words whitespace-pre-line text-slate-800">{deed.description}</p>
+      <DeedPhotos deed={deed} viewer={viewer} />
       {viewer === 'doer' && isExtraWitness(deed) && (
         <p className="rounded-lg bg-brand-50 px-3 py-2.5 text-sm text-brand-900">
           {extraWitnessNote(cap)}
@@ -155,7 +169,7 @@ export function DeedDetailPage() {
           </svg>
           <span>
             You withdrew this report on {formatShortDate(deed.withdrawn_at)}. It no longer counts
-            for {doerName}.
+            for {doerName} and it has left the public feed.
           </span>
         </div>
       )}

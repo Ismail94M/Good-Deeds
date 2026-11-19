@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { getPosition, permissionState } from '../../lib/geolocation'
 import { makeMe, mockApi, renderApp, signedIn, type Reply } from '../../test/utils'
 import type { DeedOptions, ScanDetail } from '../deeds/deedsApi'
+import { makeMediaOptions } from '../media/testFixtures'
 import {
   AHMED,
   GOOD_FIX,
@@ -200,8 +201,10 @@ describe('deed form: notice, photos and labels', () => {
     expect(buttons.at(-1)).toHaveAccessibleName('Send report')
   })
 
-  it('renders no photo controls even when photos are switched on (M2 has none, D23)', async () => {
-    setupForm({ options: makeOptions({ photos_enabled: true }) })
+  it('renders no photo controls when /media/options has photos switched off', async () => {
+    setupForm({
+      extra: { 'GET /media/options': { body: makeMediaOptions({ photos_enabled: false }) } },
+    })
     renderApp(PATH)
     await screen.findByText('Recognising')
     expect(screen.queryByRole('button', { name: /Take photo|Upload/i })).not.toBeInTheDocument()

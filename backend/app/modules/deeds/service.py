@@ -6,22 +6,41 @@ pending deed. Self-logs are not exposed: they are private and never read by othe
 """
 
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.deeds.models import Deed, DeedStatus, SameActGroup, VerificationMethod
+from app.modules.deeds._areas import DEFAULT_AREA_NAME
+from app.modules.deeds._limits import load_limits
+from app.modules.deeds.events import DeedRejected, DeedVerified, DeedWithdrawn
+from app.modules.deeds.models import (
+    Area,
+    Deed,
+    DeedStatus,
+    SameActGroup,
+    SelfLog,
+    VerificationMethod,
+)
 
 __all__ = [
+    "DEFAULT_AREA_NAME",
+    "DeedRejected",  # events other modules subscribe to (M3 feed projection, §5)
     "DeedStatus",
+    "DeedVerified",
     "DeedView",
+    "DeedWithdrawn",
     "SameActGroupView",
     "VerificationMethod",
+    "area_name",
+    "category_labels",
     "deeds_for_doer",
     "get_deed",
+    "get_deeds",
     "same_act_group_view",
+    "self_log_owner",
 ]
 
 
@@ -46,6 +65,9 @@ class DeedView:
     prize_rank_eligible: bool
     has_location: bool
     limits_version: int
+    # Coarse public area (M3 D39); None shows as "Bangalore" (use ``area_name``). Never
+    # coordinates and never the dataset's ward code.
+    area_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -68,7 +90,16 @@ class SameActGroupView:
     verified_deed_ids: tuple[uuid.UUID, ...]
 
 
-def _view(deed: Deed) -> DeedView:
+def area_name(view: DeedView) -> str:
+    """The area to show for a deed: its area's display name, else "Bangalore"."""
+    return view.area_name or DEFAULT_AREA_NAME
+
+
+def _with_area() -> Select[Deed, str]:
+    return select(Deed, Area.name).outerjoin(Area, Area.id == Deed.area_id)
+
+
+def _view(deed: Deed, area: str | None = None) -> DeedView:
     return DeedView(
         id=deed.id,
         status=deed.status,
@@ -88,12 +119,36 @@ def _view(deed: Deed) -> DeedView:
         prize_rank_eligible=deed.prize_rank_eligible,
         has_location=deed.location is not None,
         limits_version=deed.limits_version,
+        area_name=area,
     )
 
 
+async def category_labels(session: AsyncSession) -> dict[str, str]:
+    """Display label of each category slug in the active ``deeds`` config (M3 §3.4b #11)."""
+    _, limits = await load_limits(session)
+    return {c.slug: c.label for c in limits.categories}
+
+
 async def get_deed(session: AsyncSession, deed_id: uuid.UUID) -> DeedView | None:
-    deed = await session.get(Deed, deed_id)
-    return None if deed is None else _view(deed)
+    row = (await session.execute(_with_area().where(Deed.id == deed_id))).first()
+    return None if row is None else _view(row[0], row[1])
+
+
+async def get_deeds(
+    session: AsyncSession, deed_ids: Iterable[uuid.UUID]
+) -> dict[uuid.UUID, DeedView]:
+    """Views of the deeds found, by id, in one query (joined with their area). Unknown ids are
+    left out; callers filter by status themselves."""
+    ids = set(deed_ids)
+    if not ids:
+        return {}
+    rows = await session.execute(_with_area().where(Deed.id.in_(ids)))
+    return {deed.id: _view(deed, area) for deed, area in rows}
+
+
+async def self_log_owner(session: AsyncSession, self_log_id: uuid.UUID) -> uuid.UUID | None:
+    """The owner of a self-log, or None if it doesn't exist. No content: self-logs are private."""
+    return await session.scalar(select(SelfLog.user_id).where(SelfLog.id == self_log_id))
 
 
 async def deeds_for_doer(
@@ -106,11 +161,11 @@ async def deeds_for_doer(
 ) -> list[DeedView]:
     """Deeds about a doer, newest ``occurred_at`` first (verified only by default). Pending
     deeds have no doer yet, so they never appear here."""
-    stmt = select(Deed).where(Deed.doer_user_id == doer_id, Deed.status.in_(statuses))
+    stmt = _with_area().where(Deed.doer_user_id == doer_id, Deed.status.in_(statuses))
     if occurred_before is not None:
         stmt = stmt.where(Deed.occurred_at < occurred_before)
-    rows = await session.scalars(stmt.order_by(Deed.occurred_at.desc(), Deed.id).limit(limit))
-    return [_view(d) for d in rows]
+    rows = await session.execute(stmt.order_by(Deed.occurred_at.desc(), Deed.id).limit(limit))
+    return [_view(deed, area) for deed, area in rows]
 
 
 async def same_act_group_view(

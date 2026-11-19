@@ -1,24 +1,29 @@
 import { Link } from 'react-router'
 import type { Category, DeedOut, UserSummary } from '../deeds/deedsApi'
+import { formatDeadline } from '../media/mediaText'
 import { firstName, formatOccurredAt } from './format'
 import { CheckIcon, primaryButton, ReportMain, ScreenTitle, secondaryButton } from './reportUi'
 
 /**
  * After Send (F3 canvas, M-Success / M-SuccessExtra): "Deed verified" when the report counts,
  * "Saved as an extra witness" when the act already has its counted reports
- * (`same_act.counts_for_points` false). No Photos row in M2 (D23).
+ * (`same_act.counts_for_points` false). With photos (M3-DESIGN §6.3): "Your photos will appear in
+ * a few moments.", or, when attaching failed, where to add them until the window closes.
  */
 export function ReportResult({
   deed,
   doer,
   reporterName,
   categories,
+  photos = null,
 }: {
   deed: DeedOut
   /** From the scan; the deed's own `doer` is preferred when present. */
   doer: UserSummary
   reporterName: string | null
   categories: Category[]
+  /** What happened to the photos picked on the form; null when none were picked. */
+  photos?: PhotoResult | null
 }) {
   const who = deed.doer ?? doer
   const counts = deed.same_act?.counts_for_points ?? true
@@ -63,6 +68,7 @@ export function ReportResult({
             ? `${thanks}It now counts on ${who.display_name}’s profile.`
             : `Others already reported this act. Your report backs theirs up, but it doesn’t count a second time on ${firstName(who.display_name)}’s profile.`}
         </p>
+        {photos && <PhotoResultLine photos={photos} />}
         <dl className="mt-2 grid w-full grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2.5 rounded-2xl border border-slate-200 bg-white px-4.5 py-4 text-left text-[15px]">
           <dt className="text-slate-600">Who</dt>
           <dd className="font-semibold break-words">{who.display_name}</dd>
@@ -83,5 +89,29 @@ export function ReportResult({
         </div>
       </div>
     </ReportMain>
+  )
+}
+
+/** Photos attached after Send; `failed` when some or all of them didn't make it (§6.3). */
+export type PhotoResult = {
+  attached: number
+  failed: boolean
+  /** `reported_at + photo_edit_window_hours`: until when My deeds can add photos. */
+  addUntil: string
+}
+
+function PhotoResultLine({ photos }: { photos: PhotoResult }) {
+  const until = formatDeadline(photos.addUntil)
+  return (
+    <div role="status" className="flex max-w-[420px] flex-col gap-1 text-slate-700">
+      {photos.attached > 0 && <p>Your photos will appear in a few moments.</p>}
+      {photos.failed && (
+        <p className="font-medium text-amber-800">
+          {photos.attached > 0
+            ? `Some photos didn’t upload. You can add them from My deeds until ${until}.`
+            : `Your deed was sent, but the photos didn’t upload. You can add them from My deeds until ${until}.`}
+        </p>
+      )}
+    </div>
   )
 }

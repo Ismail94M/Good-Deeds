@@ -599,6 +599,8 @@ Settled by the main session so frontend and backend build to the same shapes:
 7. **New `GET /api/feed/options`** (CurrentUser): `{comment_max_chars, top_badge_ranks, top_periods: [{id: "week"|"month"|"year", days}], comment_report_reasons: [{id, label, priority}], report_details_max}`. `GET /api/media/options` gains `decision_note_max` (for the admin note box).
 8. **Routes:** `/admin/comment-reports` and `/admin/comment-reports/:caseId` behind `RequireRole(['moderator','admin'])`.
 9. **`RequireRole` when signed out:** redirect to `/login?next=…` (like `RequireAuth`); NotFound only for a signed-in user without the role.
+11. **Category label (from F10):** `PostOut`, `PostDetail` and `PublicDeed` also carry `category_label` (the display label from the deeds category options), because not-onboarded users and visitors can't call `GET /api/deeds/options`.
+12. **Share recording:** `POST …/shares` stays for onboarded members; a visitor's or not-onboarded user's share isn't recorded (analytics only, M8).
 10. **Upload PUT:** browsers can't set `Content-Length`; the client checks the file size equals the signed length before the PUT, and the store still enforces the signed length.
 
 ### 3.5 Who may do what (summary)

@@ -25,7 +25,7 @@ describe('profile counts', () => {
       'GET /users/asha/deed-counts': { body: { self_logged: 2, verified: 5 } },
     })
     renderApp('/u/asha')
-    const counts = await screen.findByRole('group', { name: 'Deed counts' })
+    const counts = await screen.findByRole('group', { name: 'Counts' })
     expect(await within(counts).findByText('5')).toBeVisible()
     expect(within(counts).queryByRole('link')).not.toBeInTheDocument()
   })

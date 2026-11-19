@@ -72,6 +72,8 @@ class ScanOut(BaseModel):
     scanned_at: datetime
     pair_reports_remaining: int
     month_resets_at: datetime
+    # M3 (§3.1): the area of the scan location ("Bangalore" when none), never coordinates.
+    area_name: str
 
 
 class ScanDetail(ScanOut):
@@ -147,6 +149,8 @@ class DeedOut(BaseModel):
     same_act: SameActOut | None
     prize_rank_eligible: bool
     has_location: bool
+    # M3 (§3.1, D39): the deed's area name, "Bangalore" when it has none. Never coordinates.
+    area_name: str
     can_edit: bool
     can_withdraw: bool
     # Reporter only.

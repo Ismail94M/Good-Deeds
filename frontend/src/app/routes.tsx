@@ -1,4 +1,5 @@
 import type { RouteObject } from 'react-router'
+import { AdminLayout } from '../features/admin/AdminLayout'
 import { CommentReportReviewPage } from '../features/admin/CommentReportReviewPage'
 import { CommentReportsPage } from '../features/admin/CommentReportsPage'
 import { PhotoReportReviewPage } from '../features/admin/PhotoReportReviewPage'
@@ -89,10 +90,15 @@ export const routes: RouteObject[] = [
         // Report review (M3-DESIGN §6.2): moderators and admins (Q34); others see NotFound.
         element: <RequireRole roles={ADMIN_ROLES} />,
         children: [
-          { path: '/admin/photo-reports', element: <PhotoReportsPage /> },
-          { path: '/admin/photo-reports/:caseId', element: <PhotoReportReviewPage /> },
-          { path: '/admin/comment-reports', element: <CommentReportsPage /> },
-          { path: '/admin/comment-reports/:caseId', element: <CommentReportReviewPage /> },
+          {
+            element: <AdminLayout />,
+            children: [
+              { path: '/admin/photo-reports', element: <PhotoReportsPage /> },
+              { path: '/admin/photo-reports/:caseId', element: <PhotoReportReviewPage /> },
+              { path: '/admin/comment-reports', element: <CommentReportsPage /> },
+              { path: '/admin/comment-reports/:caseId', element: <CommentReportReviewPage /> },
+            ],
+          },
         ],
       },
       { path: '/d/:id', element: <PublicDeedPage /> },

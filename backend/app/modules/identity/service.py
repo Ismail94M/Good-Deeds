@@ -546,6 +546,44 @@ def require_role(*roles: Role):  # type: ignore[no-untyped-def]
     return check
 
 
+async def set_role(
+    session: AsyncSession,
+    user: User,
+    role: Role,
+    *,
+    actor_id: uuid.UUID | None = None,
+    reason: str,
+) -> bool:
+    """Change a user's role (M3 D43: only the CLI calls this; there is no HTTP route). Writes
+    ``audit_log`` (``role.changed``) and bumps ``token_version``, so access tokens issued with the
+    old role stop working at once. Returns False (and writes nothing) when the role is unchanged.
+    The caller commits."""
+    reason = reason.strip()
+    if not reason:
+        raise ValueError("a reason is required")
+    old = user.role
+    if old == role:
+        return False
+    user.role = role
+    user.token_version += 1
+    record_audit(
+        session,
+        entity_type="user",
+        entity_id=str(user.id),
+        action="role.changed",
+        actor_id=actor_id,
+        old_value={"role": old.value},
+        new_value={"role": role.value},
+        reason=reason,
+    )
+    await session.flush()
+    return True
+
+
+# Moderators and admins (M3 D43, Q34): photo and comment report review.
+ReviewerUser = Annotated[User, Depends(require_role(Role.MODERATOR, Role.ADMIN))]
+
+
 def device_id_header(
     x_device_id: Annotated[str | None, Header(max_length=100)] = None,
 ) -> str | None:

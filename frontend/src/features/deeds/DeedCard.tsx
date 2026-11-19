@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { useUnreadOutcome } from '../media/outcomeSeen'
 import { formatCardDate } from '../report/format'
 import type { Category, DeedOut } from './deedsApi'
 import { categoryLabel, extraWitnessNote, isExtraWitness, whoLine } from './deedText'
@@ -13,7 +14,8 @@ import {
 /**
  * One deed in My deeds (F6 canvas): status badge, date (" · Edited"), who line (opens the
  * detail), category and description (3 lines). Recognised for adds the Q20 extra-witness note
- * on reports that don't count; I reported adds Edit and Withdraw when allowed. No photos (D23).
+ * on reports that don't count; I reported adds Edit and Withdraw when allowed, and a dot when a
+ * photo review outcome is unread on this device (M3-DESIGN §6.3, _interim_).
  */
 export function DeedCard({
   deed,
@@ -29,6 +31,7 @@ export function DeedCard({
   onWithdraw: (deed: DeedOut) => void
 }) {
   const showActions = viewer === 'reporter' && (deed.can_edit || deed.can_withdraw)
+  const unread = useUnreadOutcome(deed, viewer === 'reporter')
   return (
     <article className="flex flex-col gap-1.5 rounded-2xl border border-slate-200 bg-white px-4 py-3.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -44,6 +47,12 @@ export function DeedCard({
           className={`flex min-h-11 items-center rounded text-[17px] font-bold text-slate-900 hover:text-brand-700 ${focusRing}`}
         >
           {whoLine(deed, viewer)}
+          {unread && (
+            <>
+              <span aria-hidden className="ml-2 size-2.5 shrink-0 rounded-full bg-brand-700" />
+              <span className="sr-only"> (new photo review update)</span>
+            </>
+          )}
         </Link>
       </h2>
       <p className="text-sm font-semibold text-brand-900">

@@ -57,6 +57,7 @@ async def test_qr_scan_is_recorded(client: AsyncClient, session: AsyncSession) -
         "scanned_at",
         "pair_reports_remaining",
         "month_resets_at",
+        "area_name",  # M3 §3.1
     }
     assert body["doer"] == {"handle": doer.handle, "display_name": doer.display_name}
     expires = datetime.fromisoformat(body["expires_at"])

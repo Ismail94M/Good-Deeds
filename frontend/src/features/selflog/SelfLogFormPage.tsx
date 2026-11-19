@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useId, useState, type FormEvent } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { useLocation, useNavigate, useParams } from 'react-router'
 import { ErrorAlert, FieldError, Loading } from '../../components/ui'
 import { errorMessage } from '../../lib/api'
 import { GeolocationError, getPosition, type Location } from '../../lib/geolocation'
@@ -17,6 +17,11 @@ import {
 } from '../deeds/deedsApi'
 import { DescriptionField } from '../deeds/DescriptionField'
 import { BackLink, F6Main, F6Title, focusRing, LockIcon, primaryButtonClass } from '../deeds/deedUi'
+import { mediaApi, type AttachPhoto } from '../media/mediaApi'
+import { useMediaOptions, useSelfLogPhotos } from '../media/mediaQueries'
+import { SelfLogPhotoGrid } from '../media/OwnerPhotos'
+import { PhotoPicker } from '../media/PhotoPicker'
+import { usePhotoUploads } from '../media/usePhotoUploads'
 import {
   DEFAULT_DESCRIPTION_MIN,
   fromInputs,
@@ -27,11 +32,22 @@ import {
 
 const LOCATION_BLOCKED = 'Location is blocked in your browser.'
 const LOCATION_FAILED = 'We couldn’t find your location. Try again in a moment.'
+const PHOTO_HELP = 'Only you can see these photos.'
+const PHOTOS_NOT_ADDED =
+  'Your self-log was saved, but the photos didn’t upload. Please add them again below.'
+const PHOTO_FAILED_ON_SAVE = 'A photo didn’t upload. Retry it or remove it, then save.'
+
+/** Passed in navigation state after a new self-log saved without its photos. */
+export type SelfLogFormState = { notice?: string } | null
+
+type SaveBody = { create: SelfLogCreate } | { update: SelfLogUpdate } | null
+type SaveInput = { body: SaveBody; attach: AttachPhoto[] }
 
 /**
  * `/me/self-logs/new` and `/me/self-logs/:id/edit` (F6 canvas): category, what you did, when
  * (any past date and time), and an optional current location. Private, no points, no verify
- * button and no photos in M2 (D3, D23).
+ * button. M3: private photos (no blur tool), uploaded while the form is filled in and attached
+ * after the save (M3-DESIGN §6.3).
  */
 export function SelfLogFormPage() {
   const { id } = useParams()
@@ -88,6 +104,7 @@ export function SelfLogFormPage() {
 
 function SelfLogForm({ options, existing }: { options: DeedOptions; existing: SelfLogOut | null }) {
   const navigate = useNavigate()
+  const notice = (useLocation().state as SelfLogFormState)?.notice ?? null
   const queryClient = useQueryClient()
   const { user } = useAuth()
   const whenHelpId = useId()
@@ -104,17 +121,65 @@ function SelfLogForm({ options, existing }: { options: DeedOptions; existing: Se
   const [locating, setLocating] = useState(false)
   const [locationError, setLocationError] = useState<string | null>(null)
 
+  const [photoError, setPhotoError] = useState<string | null>(null)
+  const [waiting, setWaiting] = useState(false)
+  const media = useMediaOptions()
+  const mediaOptions = media.data?.photos_enabled ? media.data : undefined
+  const photos = useSelfLogPhotos(existing?.id ?? null)
+  const existingPhotos = photos.data?.photos ?? []
+  const uploads = usePhotoUploads({
+    purpose: 'self_log',
+    options: mediaOptions,
+    slots: (mediaOptions?.photos_per_owner ?? 0) - existingPhotos.length,
+  })
+
   const save = useMutation({
-    mutationFn: (body: { create: SelfLogCreate } | { update: SelfLogUpdate }) =>
-      'create' in body
-        ? deedsApi.createSelfLog(body.create)
-        : deedsApi.updateSelfLog(existing?.id ?? '', body.update),
-    onSuccess: () => {
+    mutationFn: async ({ body, attach }: SaveInput) => {
+      let id = existing?.id ?? ''
+      if (body) {
+        const log =
+          'create' in body
+            ? await deedsApi.createSelfLog(body.create)
+            : await deedsApi.updateSelfLog(id, body.update)
+        id = log.id
+      }
+      let photosFailed = false
+      if (attach.length > 0) {
+        try {
+          await mediaApi.attachToSelfLog(id, { photos: attach })
+        } catch {
+          photosFailed = true
+        }
+      }
+      return { id, photosFailed }
+    },
+    onSuccess: ({ id, photosFailed }) => {
       void queryClient.invalidateQueries({ queryKey: deedsKeys.selfLogs })
       if (user) void queryClient.invalidateQueries({ queryKey: deedsKeys.counts(user.handle) })
-      navigate('/me/self-logs')
+      if (!photosFailed) {
+        uploads.clear()
+        navigate('/me/self-logs')
+      } else if (!existing) {
+        navigate(`/me/self-logs/${encodeURIComponent(id)}/edit`, {
+          state: { notice: PHOTOS_NOT_ADDED } satisfies SelfLogFormState,
+        })
+      } else {
+        setPhotoError(
+          'Your changes were saved, but the photos didn’t upload. Tap Save to try again.',
+        )
+      }
     },
   })
+
+  const photosHeadingId = useId()
+  const existingGrid =
+    existing && existingPhotos.length > 0 ? (
+      <SelfLogPhotoGrid
+        selfLogId={existing.id}
+        photos={existingPhotos}
+        onImageError={() => void photos.refetch()}
+      />
+    ) : null
 
   const descriptionMin = options.description_min ?? DEFAULT_DESCRIPTION_MIN
   const validate = () =>
@@ -144,10 +209,29 @@ function SelfLogForm({ options, existing }: { options: DeedOptions; existing: Se
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
+    setPhotoError(null)
     const found = validate()
     if (Object.keys(found).length > 0 || !category) {
       setShowErrors(true)
       return
+    }
+    if (uploads.failedCount > 0) {
+      setPhotoError(PHOTO_FAILED_ON_SAVE)
+      return
+    }
+    const submit = (body: SaveBody) => {
+      if (!body && uploads.items.length === 0) {
+        navigate('/me/self-logs')
+        return
+      }
+      // Save waits for running uploads, then attaches them.
+      setWaiting(uploads.busy)
+      void uploads.settled().then(() => {
+        setWaiting(false)
+        const { attach, failed } = uploads.snapshot()
+        if (failed > 0) setPhotoError(PHOTO_FAILED_ON_SAVE)
+        else save.mutate({ body, attach })
+      })
     }
     const occurredAt = (fromInputs(date, time) as Date).toISOString()
     if (!existing) {
@@ -157,7 +241,7 @@ function SelfLogForm({ options, existing }: { options: DeedOptions; existing: Se
         occurred_at: occurredAt,
       }
       if (location) create.location = location
-      save.mutate({ create })
+      submit({ create })
       return
     }
     const update: SelfLogUpdate = {}
@@ -166,11 +250,7 @@ function SelfLogForm({ options, existing }: { options: DeedOptions; existing: Se
     if (Date.parse(occurredAt) !== Date.parse(existing.occurred_at)) update.occurred_at = occurredAt
     if (location) update.location = location
     else if (existing.has_location && !storedLocation) update.location = null
-    if (Object.keys(update).length === 0) {
-      navigate('/me/self-logs')
-      return
-    }
-    save.mutate({ update })
+    submit(Object.keys(update).length === 0 ? null : { update })
   }
 
   const inputClass = `min-h-12 w-full rounded-lg border bg-white px-2.5 text-base text-slate-900 ${focusRing} ${
@@ -180,6 +260,14 @@ function SelfLogForm({ options, existing }: { options: DeedOptions; existing: Se
   return (
     <F6Main>
       <BackLink to="/me/self-logs" label="Cancel" />
+      {notice && (
+        <p
+          role="alert"
+          className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-[15px] text-amber-800"
+        >
+          {notice}
+        </p>
+      )}
       <div className="flex flex-col gap-1.5">
         <F6Title>{existing ? 'Edit self-log' : 'Log a deed'}</F6Title>
         <p className="flex items-center gap-2 text-slate-600">
@@ -283,14 +371,35 @@ function SelfLogForm({ options, existing }: { options: DeedOptions; existing: Se
           </div>
         )}
 
+        {mediaOptions ? (
+          <PhotoPicker
+            uploads={uploads}
+            options={mediaOptions}
+            existingCount={existingPhotos.length}
+            existing={existingGrid}
+            blur={false}
+            help={PHOTO_HELP}
+          />
+        ) : (
+          existingGrid && (
+            <section aria-labelledby={photosHeadingId} className="flex flex-col gap-2.5">
+              <h2 id={photosHeadingId} className="font-semibold text-slate-900">
+                Photos
+              </h2>
+              {existingGrid}
+            </section>
+          )
+        )}
+
         {save.error && <ErrorAlert>{errorMessage(save.error)}</ErrorAlert>}
+        {photoError && <ErrorAlert>{photoError}</ErrorAlert>}
         <div className="flex flex-col gap-2.5">
           <button
             type="submit"
-            disabled={save.isPending || locating}
+            disabled={save.isPending || locating || waiting}
             className={`${primaryButtonClass} min-h-13 text-[17px]`}
           >
-            {save.isPending ? 'Saving…' : 'Save self-log'}
+            {waiting ? 'Uploading photos…' : save.isPending ? 'Saving…' : 'Save self-log'}
           </button>
         </div>
       </form>

@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import AppError, Conflict
 from app.core.events import emit
 from app.modules.deeds import _plausibility as plaus
+from app.modules.deeds._areas import resolve_area_id
 from app.modules.deeds._common import constraint_name, ist_day, lat_lng, point_ewkt, utcnow
 from app.modules.deeds._grouping import assign_group, upgrade_prize_rank
 from app.modules.deeds._limits import DeedLimits
@@ -129,6 +130,8 @@ async def create_qr_deed(
     lat, lng = lat_lng(QrScan.location)
     row = (await session.execute(select(lat, lng).where(QrScan.id == scan.id))).one()
     location = point_ewkt(row[0], row[1])
+    # D39: the area is resolved here, in our own database; a failed lookup leaves it null.
+    area_id = await resolve_area_id(session, location, limits.area_fallback_m)
 
     assignment = await assign_group(
         session,
@@ -160,6 +163,7 @@ async def create_qr_deed(
         # QR-verified deeds count for prizes immediately (D9 / Q13).
         prize_rank_eligible=True,
         limits_version=limits_version,
+        area_id=area_id,
     )
     session.add(deed)
     try:

@@ -39,6 +39,8 @@ export type PostOut = {
   doer: UserRef
   reporter: UserRef
   category: string
+  /** Display label from the deeds category options (§3.4b 11); the slug is the fallback. */
+  category_label: string
   area_name: string
   occurred_at: string
   published_at: string
@@ -69,7 +71,7 @@ export type Visibility = {
 
 export type PostDetail = PostOut & {
   beneficiaries_count: number | null
-  verification: 'qr_scan'
+  verification: 'qr_scan' | 'invite_accept'
   /** Null unless the caller is the doer or reporter. */
   visibility: Visibility | null
 }
@@ -111,6 +113,8 @@ export type PublicDeed = {
   doer: UserRef
   reporter: UserRef
   category: string
+  /** Display label from the deeds category options (§3.4b 11); the slug is the fallback. */
+  category_label: string
   area_name: string
   occurred_at: string
   description: string

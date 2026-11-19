@@ -25,7 +25,6 @@ export function makeOptions(overrides: Partial<DeedOptions> = {}): DeedOptions {
     qr_occurred_max_age_minutes: 120,
     max_location_accuracy_m: 500,
     service_area_radius_km: 40,
-    photos_enabled: false,
     ...overrides,
   }
 }
@@ -41,6 +40,7 @@ export function makeScan(overrides: Partial<ScanOut> = {}): ScanOut {
     expires_at: new Date(now + 15 * 60_000).toISOString(),
     pair_reports_remaining: 12,
     month_resets_at: '2026-12-01T00:00:00+05:30',
+    area_name: 'Koramangala',
     ...overrides,
   }
 }
@@ -67,6 +67,7 @@ export function makeDeed(overrides: Partial<DeedOut> = {}): DeedOut {
     same_act: { report_count: 1, counts_for_points: true },
     prize_rank_eligible: true,
     has_location: true,
+    area_name: 'Koramangala',
     can_edit: true,
     can_withdraw: true,
     invite: null,

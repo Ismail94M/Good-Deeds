@@ -32,6 +32,7 @@ from app.core.events import emit
 from app.core.ratelimit import RateLimiter
 from app.core.security import new_opaque_token, sha256_hex
 from app.modules.deeds import _plausibility as plaus
+from app.modules.deeds._areas import resolve_area_id
 from app.modules.deeds._common import (
     constraint_name,
     ist_day,
@@ -427,12 +428,15 @@ async def accept(
     if deed.status != DeedStatus.PENDING:  # the invite status should have caught this
         raise _invite_cancelled() if deed.status == DeedStatus.WITHDRAWN else _invite_expired()
 
-    # 6. Verify and group (§3.4).
+    # 6. Verify and group (§3.4); the area (D39) is resolved from the deed's point at
+    # acceptance (a failed lookup leaves it null).
+    location = await _deed_location(session, deed)
+    area_id = await resolve_area_id(session, location, limits.area_fallback_m)
     assignment = await assign_group(
         session,
         doer_id=accepter_id,
         reporter_id=reporter_id,
-        location=await _deed_location(session, deed),
+        location=location,
         # L7-A: group by when the report was made (server time), not the reporter's
         # backdatable "When?" and not the acceptance time, which can be days later.
         grouped_at=deed.reported_at,
@@ -446,6 +450,7 @@ async def accept(
     deed.same_act_group_id = assignment.group.id
     deed.counts_for_points = assignment.counts_for_points
     deed.prize_rank_eligible = False
+    deed.area_id = area_id
     try:
         async with session.begin_nested():
             await session.flush()

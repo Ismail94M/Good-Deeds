@@ -1,6 +1,7 @@
 import { screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { makeMe, mockApi, NOT_ONBOARDED, renderApp, signedIn } from '../test/utils'
+import { makeCommentReportDetail, makePhotoReportDetail } from '../features/admin/testFixtures'
 
 describe('route guards', () => {
   it('sends logged-out visitors to login and remembers where they were going', async () => {
@@ -73,7 +74,11 @@ describe('RequireRole (M3 admin pages, Q34)', () => {
     ['moderator', '/admin/comment-reports', 'Comment reports'],
     ['admin', '/admin/comment-reports/case-1', 'Review comment report'],
   ] as const)('lets a %s open %s', async (role, path, heading) => {
-    mockApi(signedIn(makeMe({ role })))
+    mockApi({
+      ...signedIn(makeMe({ role })),
+      'GET /admin/photo-reports/case-1': { body: makePhotoReportDetail() },
+      'GET /admin/comment-reports/case-1': { body: makeCommentReportDetail() },
+    })
     renderApp(path)
     expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Page not found' })).toBeNull()

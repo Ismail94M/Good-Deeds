@@ -35,11 +35,16 @@ describe('HomePage', () => {
   })
 
   it('shows the feed to signed-in users instead of the welcome page', async () => {
-    mockApi(signedIn(makeMe({ onboarding: NOT_ONBOARDED })))
+    mockApi({
+      ...signedIn(makeMe({ onboarding: NOT_ONBOARDED })),
+      'GET /feed': { body: { items: [], next_cursor: null } },
+    })
     renderApp('/')
-    // PLACEHOLDER (M3 F9): F10 replaces this with the real feed's assertions.
     expect(await screen.findByRole('heading', { name: 'Good deeds' })).toBeInTheDocument()
-    expect(screen.getByRole('note')).toHaveAttribute('data-placeholder', 'F10')
+    expect(await screen.findByRole('tab', { name: 'Nearby' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
     expect(screen.queryByRole('heading', { name: /make kindness visible/i })).toBeNull()
     expect(screen.queryByRole('link', { name: 'Sign up' })).toBeNull()
   })

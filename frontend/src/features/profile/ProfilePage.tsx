@@ -14,6 +14,7 @@ import { useAuth } from '../auth/authContext'
 import { identityApi, type Me } from '../auth/identityApi'
 import { collectErrors, validateDisplayName, validateHandle } from '../auth/validation'
 import { initials } from '../report/format'
+import { useSocial } from '../feed/feedQueries'
 import { DeedCounts } from './DeedCounts'
 
 const BIO_MAX = 280
@@ -68,6 +69,7 @@ export function ProfilePage() {
         </p>
       )}
       <DeedCounts handle={user.handle} own />
+      <ConnectionsLine handle={user.handle} />
       <div className="grid grid-cols-2 gap-2">
         <Link
           to="/me/self-logs/new"
@@ -102,6 +104,30 @@ export function ProfilePage() {
         }}
       />
     </main>
+  )
+}
+
+/** "{n} followers · {n} following · Saved" (M3-DESIGN §6.3, own profile only). */
+function ConnectionsLine({ handle }: { handle: string }) {
+  const social = useSocial(handle)
+  const n = (value: number | undefined) => (social.isError ? '–' : (value ?? '…'))
+  const link = `rounded font-semibold text-brand-700 hover:text-brand-900 underline-offset-2 hover:underline inline-flex min-h-11 items-center ${focusRing}`
+  const followers = social.data?.followers
+  const following = social.data?.following
+  return (
+    <p className="-mt-2 flex flex-wrap items-center justify-center gap-x-2 text-[15px] text-slate-600">
+      <Link to="/me/connections?tab=followers" className={link}>
+        {n(followers)} {followers === 1 ? 'follower' : 'followers'}
+      </Link>
+      <span aria-hidden>·</span>
+      <Link to="/me/connections?tab=following" className={link}>
+        {n(following)} following
+      </Link>
+      <span aria-hidden>·</span>
+      <Link to="/me/saved" className={link}>
+        Saved
+      </Link>
+    </p>
   )
 }
 

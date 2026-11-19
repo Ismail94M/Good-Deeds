@@ -374,7 +374,7 @@ describe('deed detail', () => {
 
     expect(
       await screen.findByText(
-        'You withdrew this report on 16 Nov. It no longer counts for Ahmed Khan.',
+        'You withdrew this report on 16 Nov. It no longer counts for Ahmed Khan and it has left the public feed.',
       ),
     ).toBeVisible()
     expect(screen.getByText('Withdrawn')).toBeVisible()

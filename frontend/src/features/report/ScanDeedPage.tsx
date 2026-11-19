@@ -4,7 +4,18 @@ import { useNavigate, useParams } from 'react-router'
 import { Loading } from '../../components/ui'
 import { useCountdown } from '../../lib/useCountdown'
 import { useAuth } from '../auth/authContext'
-import { deedsApi, deedsKeys, type DeedOut, type ScanDetail } from '../deeds/deedsApi'
+import {
+  deedsApi,
+  deedsKeys,
+  type DeedOut,
+  type QrDeedRequest,
+  type ScanDetail,
+} from '../deeds/deedsApi'
+import { mediaApi, type AttachPhoto } from '../media/mediaApi'
+import { useMediaOptions } from '../media/mediaQueries'
+import { addUntil } from '../media/mediaText'
+import { PhotoPicker } from '../media/PhotoPicker'
+import { usePhotoUploads } from '../media/usePhotoUploads'
 import { CancelReportDialog } from './CancelReportDialog'
 import { DeedForm } from './DeedForm'
 import {
@@ -16,15 +27,37 @@ import {
 import { copyFor, errorCopy, errorKey, FORM_ERROR_KEYS, type ErrorKey } from './errorCopy'
 import { firstName } from './format'
 import { ReportErrorView } from './ReportErrorView'
-import { ReportResult } from './ReportResult'
+import { ReportResult, type PhotoResult } from './ReportResult'
 import { BackButton, ReportMain } from './reportUi'
 
 const FORM_KEYS: ReadonlySet<ErrorKey> = new Set(FORM_ERROR_KEYS)
 
+const PHOTO_HELP =
+  'Good deeds are meant to be shared proudly. If someone would rather not be shown, blur their face or remove the photo.'
+
+type SendInput = { request: QrDeedRequest; attach: AttachPhoto[]; skipped: boolean }
+type SendOutput = { deed: DeedOut; photos: Omit<PhotoResult, 'addUntil'> | null }
+
+/**
+ * Create the deed, then attach the uploaded photos (M3-DESIGN §4.1). A failed attach never
+ * fails the send: the deed exists, and the result tells the witness to add photos from My deeds.
+ */
+async function sendDeed({ request, attach, skipped }: SendInput): Promise<SendOutput> {
+  const deed = await deedsApi.createDeed(request)
+  if (attach.length === 0) return { deed, photos: skipped ? { attached: 0, failed: true } : null }
+  try {
+    await mediaApi.attachToDeed(deed.id, { photos: attach })
+    return { deed, photos: { attached: attach.length, failed: skipped } }
+  } catch {
+    return { deed, photos: { attached: 0, failed: true } }
+  }
+}
+
 /**
  * `/report/scan/:scanId`: the deed form, then the result (M2-DESIGN §5.3). Loads the scan with
  * `GET /api/scans/{id}`, so the form survives a reload; a used scan shows `scan_used`, and the
- * form is replaced by `scan_expired` when its countdown reaches 0.
+ * form is replaced by `scan_expired` when its countdown reaches 0. Photos (M3) upload while the
+ * form is filled in; Send waits for running uploads, then attaches them after the deed is made.
  */
 export function ScanDeedPage() {
   const { scanId = '' } = useParams()
@@ -43,13 +76,22 @@ export function ScanDeedPage() {
   const [showErrors, setShowErrors] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [sendError, setSendError] = useState<unknown>(null)
-  const [result, setResult] = useState<DeedOut | null>(null)
+  const [result, setResult] = useState<SendOutput | null>(null)
   const [confirmCancel, setConfirmCancel] = useState(false)
+  const [waiting, setWaiting] = useState(false)
+
+  const media = useMediaOptions()
+  const mediaOptions = media.data?.photos_enabled ? media.data : undefined
+  const uploads = usePhotoUploads({
+    purpose: 'deed',
+    options: mediaOptions,
+    slots: mediaOptions?.photos_per_owner ?? 0,
+  })
 
   const send = useMutation({
-    mutationFn: deedsApi.createDeed,
-    onSuccess: (deed) => {
-      setResult(deed)
+    mutationFn: sendDeed,
+    onSuccess: (output) => {
+      setResult(output)
       // The scan is used now: Back to this page must show scan_used, not the form (§5.3).
       queryClient.setQueryData<ScanDetail>(deedsKeys.scan(scanId), (scan) =>
         scan ? { ...scan, consumed: true } : scan,
@@ -67,9 +109,16 @@ export function ScanDeedPage() {
   const secondsLeft = useCountdown(scan ? Date.parse(scan.expires_at) : null)
 
   if (result && scan) {
+    const windowHours = mediaOptions?.photo_edit_window_hours ?? 24
     return (
       <ReportResult
-        deed={result}
+        deed={result.deed}
+        photos={
+          result.photos && {
+            ...result.photos,
+            addUntil: addUntil(result.deed.reported_at, windowHours),
+          }
+        }
         doer={scan.doer}
         reporterName={user?.display_name ?? null}
         categories={options.data?.categories ?? []}
@@ -109,7 +158,14 @@ export function ScanDeedPage() {
       setShowErrors(true)
       return
     }
-    send.mutate(toQrDeedRequest(scanQuery.data, values))
+    const request = toQrDeedRequest(scanQuery.data, values)
+    // Send waits for running uploads, then attaches whatever finished.
+    setWaiting(uploads.busy)
+    void uploads.settled().then(() => {
+      setWaiting(false)
+      const { attach, failed } = uploads.snapshot()
+      send.mutate({ request, attach, skipped: failed > 0 })
+    })
   }
 
   return (
@@ -124,6 +180,12 @@ export function ScanDeedPage() {
         showErrors={showErrors}
         formError={formError}
         sending={send.isPending}
+        uploadingPhotos={waiting}
+        photos={
+          mediaOptions && (
+            <PhotoPicker uploads={uploads} options={mediaOptions} blur help={PHOTO_HELP} />
+          )
+        }
         onSubmit={onSubmit}
       />
       {confirmCancel && (

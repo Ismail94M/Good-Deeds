@@ -1,4 +1,4 @@
-import type { FormEvent } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import { CategoryPills } from '../deeds/CategoryPills'
 import type { DeedOptions, ScanDetail } from '../deeds/deedsApi'
 import { DescriptionField } from '../deeds/DescriptionField'
@@ -20,8 +20,8 @@ import { EARLIER_CHOICES, validateDeedForm, type DeedFormValues } from './deedFo
 /**
  * The deed form on `/report/scan/:scanId` (F3 canvas, row 4): who, the send-within countdown,
  * the pair warning, category, description, people helped, when, the public-feed notice (D22)
- * and Send. Photos are not rendered while `photos_enabled` is false (D23); M2 has no photo
- * controls at all. The values live in the page, so they survive an error screen.
+ * the photos section (M3, only when `/media/options` has `photos_enabled`; the page owns the
+ * uploads) and Send. The values live in the page, so they survive an error screen.
  */
 export function DeedForm({
   scan,
@@ -32,6 +32,8 @@ export function DeedForm({
   showErrors,
   formError,
   sending,
+  uploadingPhotos = false,
+  photos,
   onSubmit,
 }: {
   scan: ScanDetail
@@ -42,6 +44,10 @@ export function DeedForm({
   showErrors: boolean
   formError: string | null
   sending: boolean
+  /** Send was pressed while photos were still uploading: it waits for them (§6.3). */
+  uploadingPhotos?: boolean
+  /** The photo section (M3-DESIGN §6.3), or nothing when photos are off. */
+  photos?: ReactNode
   onSubmit: () => void
 }) {
   const doer = scan.doer
@@ -77,6 +83,11 @@ export function DeedForm({
           </p>
           <p className="text-[19px] leading-tight font-bold break-words">{doer.display_name}</p>
           <p className="text-sm break-words text-[#586579]">@{doer.handle}</p>
+          {scan.area_name && (
+            <p className="text-sm break-words text-emerald-700">
+              Verified just now · {scan.area_name}
+            </p>
+          )}
         </div>
         <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[13px] font-semibold text-emerald-700">
           <CheckIcon className="size-3.5" />
@@ -177,6 +188,8 @@ export function DeedForm({
           </p>
         </fieldset>
 
+        {photos}
+
         <div className="flex items-start gap-2.5 rounded-xl bg-brand-50 px-3.5 py-3 text-sm text-brand-900">
           <svg
             aria-hidden
@@ -206,10 +219,10 @@ export function DeedForm({
         <div className="flex flex-col gap-2.5">
           <button
             type="submit"
-            disabled={sending}
+            disabled={sending || uploadingPhotos}
             className={`${primaryButton} min-h-13 text-[17px]`}
           >
-            {sending ? 'Sending…' : 'Send report'}
+            {uploadingPhotos ? 'Uploading photos…' : sending ? 'Sending…' : 'Send report'}
           </button>
           <p className="text-center text-sm text-[#586579]">
             It goes on {first}’s profile as soon as you send it.

@@ -16,6 +16,7 @@ from app.core.errors import Conflict, Gone, NotFound
 from app.core.ratelimit import RateLimiter
 from app.core.security import keyed_hash
 from app.modules.deeds import _plausibility as plaus
+from app.modules.deeds._areas import area_names, display_name, resolve_area_id
 from app.modules.deeds._common import (
     constraint_name,
     ist_day,
@@ -269,10 +270,23 @@ async def create_scan(
         scanned_at=scan.scanned_at,
         pair_reports_remaining=pair_remaining,
         month_resets_at=ist_month(now)[1],
+        area_name=await _area_name(session, point_ewkt(loc.lat, loc.lng), limits),
     )
 
 
+async def _area_name(session: AsyncSession, location: str | None, limits: DeedLimits) -> str:
+    """The area of a scan point (the deed will get the same one). Never coordinates."""
+    area_id = await resolve_area_id(session, location, limits.area_fallback_m)
+    return display_name(area_id, await area_names(session, [area_id]))
+
+
 # --------------------------------------------------- read
+
+
+async def _scan_point(session: AsyncSession, scan_id: uuid.UUID) -> str:
+    lat, lng = lat_lng(QrScan.location)
+    row = (await session.execute(select(lat, lng).where(QrScan.id == scan_id))).one()
+    return point_ewkt(row[0], row[1])
 
 
 def scan_not_found() -> NotFound:
@@ -313,5 +327,6 @@ async def get_scan(
             session, witness_id, scan.doer_user_id, limits, now
         ),
         month_resets_at=ist_month(now)[1],
+        area_name=await _area_name(session, await _scan_point(session, scan.id), limits),
         consumed=scan.consumed_at is not None,
     )

@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import NotFound
 from app.modules.deeds import _cursor
+from app.modules.deeds._areas import area_names
 from app.modules.deeds._common import ist_day, ist_month, utcnow
 from app.modules.deeds._invites import invite_out
 from app.modules.deeds._limits import DeedLimits
@@ -50,6 +51,7 @@ async def _deed_outs(
         d.doer_user_id for d in deeds if d.doer_user_id is not None
     }
     summaries = await identity.public_summaries(session, user_ids)
+    areas = await area_names(session, (d.area_id for d in deeds))
     group_ids = {d.same_act_group_id for d in deeds if d.same_act_group_id is not None}
     groups: dict[uuid.UUID, SameActGroup] = {}
     if group_ids:
@@ -72,6 +74,7 @@ async def _deed_outs(
                 group=groups.get(deed.same_act_group_id) if deed.same_act_group_id else None,
                 invite=invite_out(invite) if invite is not None else None,
                 summaries=summaries,
+                areas=areas,
             )
         )
     return out

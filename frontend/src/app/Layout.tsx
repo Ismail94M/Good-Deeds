@@ -13,6 +13,11 @@ function navClass({ isActive }: { isActive: boolean }) {
 
 const YEAR = new Date().getFullYear()
 
+/** `/d/abc` → `/deeds/abc`: after signing in from a shared link, open the member page. */
+function sharedDeedNext(pathname: string): string {
+  return `/deeds/${pathname.slice('/d/'.length)}`
+}
+
 const headerLink = `inline-flex min-h-11 items-center gap-1 font-semibold text-brand-700 hover:text-brand-900 ${focusRing}`
 
 function PlusIcon() {
@@ -86,6 +91,22 @@ export function Layout() {
                   </NavLink>
                 </li>
               </ul>
+            ) : pathname.startsWith('/d/') ? (
+              // Shared deed page (F7 §3): Sign in and Join, both returning to the deed.
+              <div className="flex items-center gap-1">
+                <Link
+                  to={`/login?next=${encodeURIComponent(sharedDeedNext(pathname))}`}
+                  className={`${headerLink} px-3`}
+                >
+                  Sign in
+                </Link>
+                <LinkButton
+                  to={`/signup?next=${encodeURIComponent(sharedDeedNext(pathname))}`}
+                  className="px-4 text-[15px]"
+                >
+                  Join
+                </LinkButton>
+              </div>
             ) : pathname === '/signup' ? (
               <p className="text-sm text-slate-500">
                 <span className="hidden sm:inline">Have an account? </span>

@@ -1,4 +1,4 @@
-/** M3 routes (M3-DESIGN §6.2): guards and the F9 placeholders the later tasks replace. */
+/** M3 routes (M3-DESIGN §6.2): guards for the feed, deed, saved and connections pages. */
 
 import { screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
@@ -7,9 +7,9 @@ import { makeMe, mockApi, NOT_ONBOARDED, renderApp, signedIn } from '../test/uti
 const notOnboarded = () => makeMe({ phone_e164: null, onboarding: NOT_ONBOARDED })
 
 const AUTH_ROUTES = [
-  ['/deeds/d1', 'F11'],
-  ['/me/saved', 'F13'],
-  ['/me/connections?tab=following', 'F13'],
+  ['/deeds/d1', 'This deed isn’t available'],
+  ['/me/saved', 'Saved'],
+  ['/me/connections?tab=following', 'Asha'],
 ] as const
 
 describe('M3 RequireAuth routes', () => {
@@ -20,10 +20,14 @@ describe('M3 RequireAuth routes', () => {
     expect(router.state.location.search).toBe(`?next=${encodeURIComponent(path)}`)
   })
 
-  it.each(AUTH_ROUTES)('%s is open before onboarding (D44)', async (path, task) => {
-    mockApi(signedIn(notOnboarded()))
+  it.each(AUTH_ROUTES)('%s is open before onboarding (D44)', async (path, heading) => {
+    mockApi({
+      ...signedIn(notOnboarded()),
+      'GET /me/saved': { body: { items: [], next_cursor: null } },
+      'GET /me/following': { body: { items: [], next_cursor: null } },
+    })
     renderApp(path)
-    expect(await screen.findByRole('note')).toHaveAttribute('data-placeholder', task)
+    expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument()
   })
 })
 
@@ -38,9 +42,9 @@ describe('M3 public routes', () => {
   })
 
   it('shows the public deed page to a signed-out visitor', async () => {
-    mockApi()
+    mockApi({ 'GET /public/deeds/d1': { status: 404, body: { code: 'deed_unavailable' } } })
     const { router } = renderApp('/d/d1')
-    expect(await screen.findByRole('note')).toHaveAttribute('data-placeholder', 'F12')
+    expect(await screen.findByRole('heading', { name: 'This deed isn’t available' })).toBeVisible()
     expect(router.state.location.pathname).toBe('/d/d1')
   })
 

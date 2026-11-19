@@ -5,6 +5,7 @@
  */
 
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ApiError } from '../../lib/api'
 import {
   DEFAULT_TOP_PERIOD,
   feedApi,
@@ -18,6 +19,12 @@ import {
 
 const firstPage = null as string | null
 const nextCursor = (page: { next_cursor: string | null }) => page.next_cursor
+
+/** Retry network and server errors (up to 3 times), never a 4xx such as a 404 for a hidden deed. */
+export function retryUnlessClientError(failureCount: number, error: unknown): boolean {
+  if (error instanceof ApiError && error.status >= 400 && error.status < 500) return false
+  return failureCount < 3
+}
 
 // ----------------------------------------------------------------- reads
 
@@ -42,7 +49,11 @@ export function useFeed(tab: FeedTab, period: TopPeriod = DEFAULT_TOP_PERIOD) {
 
 /** `PostDetail` for `/deeds/:id`. */
 export function useFeedDeed(deedId: string) {
-  return useQuery({ queryKey: feedKeys.deed(deedId), queryFn: () => feedApi.deed(deedId) })
+  return useQuery({
+    queryKey: feedKeys.deed(deedId),
+    queryFn: () => feedApi.deed(deedId),
+    retry: retryUnlessClientError,
+  })
 }
 
 /** Live comments on a deed, oldest first. */
@@ -60,12 +71,17 @@ export function usePublicDeed(deedId: string) {
   return useQuery({
     queryKey: feedKeys.publicDeed(deedId),
     queryFn: () => feedApi.publicDeed(deedId),
+    retry: retryUnlessClientError,
   })
 }
 
 /** Follower and following counts, and whether I follow them. */
 export function useSocial(handle: string) {
-  return useQuery({ queryKey: feedKeys.social(handle), queryFn: () => feedApi.social(handle) })
+  return useQuery({
+    queryKey: feedKeys.social(handle),
+    queryFn: () => feedApi.social(handle),
+    retry: retryUnlessClientError,
+  })
 }
 
 /** A person's listed deeds as the doer, newest first. */

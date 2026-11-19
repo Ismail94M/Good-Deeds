@@ -31,7 +31,7 @@ describe('ProfilePage', () => {
     )
   })
 
-  it('has Log a deed, My QR and the activity links, but no follower line', async () => {
+  it('has Log a deed, My QR and the activity links', async () => {
     mockApi({ ...signedIn(makeMe()), ...COUNTS })
     renderApp('/profile')
     expect(await screen.findByRole('link', { name: 'Log a deed' })).toHaveAttribute(
@@ -48,7 +48,7 @@ describe('ProfilePage', () => {
     expect(
       within(activity).getByRole('link', { name: /Self-logs Your private diary of good deeds/ }),
     ).toHaveAttribute('href', '/me/self-logs')
-    expect(screen.queryByText(/followers|following|Saved/)).not.toBeInTheDocument()
+    // M3 adds the "{n} followers · {n} following · Saved" line (tested in feed/Connections.test).
   })
 
   it('shows a dash when the counts can’t load', async () => {

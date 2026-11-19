@@ -9,7 +9,14 @@ import { AuthProvider } from '../features/auth/AuthProvider'
 import type { Me, QrCode } from '../features/auth/identityApi'
 
 export type Reply = { status?: number; body?: unknown }
-export type MockRequest = { method: string; path: string; body: unknown; headers: Headers }
+export type MockRequest = {
+  method: string
+  path: string
+  /** The query string's parameters (the handler key ignores them). */
+  query: URLSearchParams
+  body: unknown
+  headers: Headers
+}
 type Handler = Reply | Reply[] | ((req: MockRequest) => Reply | Promise<Reply>)
 
 export function json(status: number, body?: unknown): Response {
@@ -39,12 +46,13 @@ export function mockApi(handlers: Record<string, Handler> = {}) {
 
   const spy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
-    const path = url.replace(/^\/api/, '').split('?')[0]
+    const [path, search = ''] = url.replace(/^\/api/, '').split('?')
     const method = (init?.method ?? 'GET').toUpperCase()
     const rawBody = init?.body
     const req: MockRequest = {
       method,
       path,
+      query: new URLSearchParams(search),
       body: typeof rawBody === 'string' ? JSON.parse(rawBody) : undefined,
       headers: new Headers(init?.headers),
     }
