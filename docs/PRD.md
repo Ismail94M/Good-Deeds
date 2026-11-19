@@ -90,24 +90,46 @@ A user can never verify their own deed.
 5. **Kindness feed:**
    - Scrollable feed of photo, short video and text posts of good deeds reported by others, like Instagram/Facebook.
    - Like, comment, share (inside the app and out to WhatsApp, Instagram and other apps), follow people, and save posts.
-   - Feed tabs: Nearby (Bangalore), Following, Top this week.
-   - Each post shows its status: Verified or Pending. Pending posts never show the doer's name.
+   - Feed tabs: Nearby (Bangalore), Following, Top (with a period dropdown: this week, this month, this year).
+   - **Following** shows deeds where someone you follow is the doer or the reporter (PO decision Q25, 2026-11-18). Every card clearly labels who did the deed and who reported it, so credit and recognition stay fair.
+   - Only verified deeds appear in the feed (PO decision Q23, 2026-11-18). A pending deed (invite link) stays private until the doer accepts it.
    - Self-logged deeds never appear in the feed.
    - Likes, comments, shares and follower counts never affect impact score, points, leaderboard rank or prizes.
-   - Faces of people being helped are blurred by default. Posts showing vulnerable people need their consent or must hide their identity.
+   - **Photos (PO decision 2026-11-18):** photos only in v1, at most 4 per post; short videos are deferred to a later milestone. Faces are NOT blurred automatically: doers can proudly show their faces. Anyone can report a photo; an admin decides whether it is removed. The photo pipeline must allow optional privacy features later.
+     - **No consent tick for now (PO decision 2026-11-18, replaces the earlier tick):** the upload records who uploaded each photo and when. Revisit before launch with legal advice (children's photos under DPDP).
+     - **Thumbnails:** attached photos show as small thumbnails, 4 in a row, on the deed form.
+     - **Optional blur:** photos are shown as taken. Only if someone did not agree can the uploader tap "Blur a face" on that person, or remove the photo.
+     - **No unblurred original is kept (PO decision Q31, 2026-11-19):** the blur is applied once on the server, and the unblurred photo is deleted as soon as processing ends. Nobody (not the uploader, an admin or support) can get it back from us. The blur is final: to change it, the uploader removes the photo and adds it again from their phone within the 24-hour window; after that, removing the photo is the only option.
+     - **The uploader can remove their own photos at any time (PO decision Q30, 2026-11-19);** adding photos stays limited to 24 hours after sending. Removing never changes the deed, its verification, points, the leaderboard or prizes.
+     - **Removed photos stop at once (PO decision 2026-11-19):** whether the doer, the uploader or an admin removes a photo, links already shared for it stop working immediately. An admin-removed photo is held privately so it can be restored; a restore gives it new links.
+     - **Who reviews photo reports (PO decision Q34, 2026-11-19):** moderators and admins. Roles are given only by the engineering team with a server command, recorded in the audit log with a reason. Nobody reviews a report about a deed they did, reported or uploaded photos to. Moderators get only what is explicitly opened to them; later admin areas are admin-only. Moderator and admin accounts need two-step login before launch.
+     - **The uploader is told the outcome (PO decision Q39, 2026-11-19):** once a photo report is decided, the uploader sees the result on that deed in My deeds for 30 days, both "removed" (with the reason and a link to the photo guidelines) and "kept", with a dot on the deed card until they open it. Reports still under review are never shown. The photo-guidelines page text is approved by the PO before launch.
+     - **Viewers never see that a photo was removed (PO decision Q33, 2026-11-19):** the deed simply shows its remaining photos (or none), with no placeholder or "removed" label, whoever removed it. Only the uploader is told, in My deeds.
+     - **Admin-removed photos are kept for 90 days (PO decision Q32, 2026-11-19):** only admins can see a held photo, and it can be restored during those 90 days. After that it is deleted for good; the record of the decision stays, without the image. The period is a config value.
+     - **The doer can remove photos of their deed (PO decision Q29, 2026-11-19):** the doer can remove any photo on a deed about them, whoever uploaded it, without a report or an admin. Only that photo goes; the other photos and the deed stay. The removal is permanent everywhere (feed, deed page, shared page) and links to it stop working at once; the uploader can't put it back. The uploader sees a neutral notice such as "Ahmed removed 1 photo from this deed." An internal audit record (who, when, which deed, no image) is kept. It never changes the deed, who reported it, its verification, points, the leaderboard or prizes. Nobody else gains the right to remove another person's photos.
+     - **Reporting:** anyone (members, and visitors on a shared deed page) can report a photo with a reason. A report never hides the photo automatically; every report is recorded and waits for human review by an authorised admin. Review order (PO decision Q44, 2026-11-19): reports about children first; then privacy and harmful or distressing images, with equal priority; then everything else. Only an admin can remove or restore a reported photo. The uploader is told the outcome when the review is done. A photo report never changes the deed, its verification or points. Reporting is rate-limited.
    - **Feed visibility (PO decision 2026-11-16):**
      - Every verified deed is published to the public feed automatically.
+     - **Before phone verification (PO decision Q42, 2026-11-19):** a signed-in user who hasn't verified their phone can read the feed, deed pages, comments and profiles. Liking, commenting, saving, following and reporting comments ask them to finish setting up first. Anyone can still report a photo, so safety reports never wait.
+     - **Public-feed notice (PO decision Q41, 2026-11-19):** when M3 launches, every user sees a one-time card at the top of the feed: "Deeds people record about you now appear in the public feed with your name and the area. You can hide any of them from the deed's page." It also covers deeds recorded before M3. It shows once per person, on any device.
      - Before submitting a report, the reporter is clearly told that verified deeds appear publicly.
-     - The doer or the reporter can hide the deed from the public feed at any time, and show it again.
+     - The doer or the reporter can hide the deed from the public feed at any time. Each person's hide is separate (PO decision Q24, 2026-11-18): the deed is in the feed only when neither has hidden it, and only the person who hid it can show it again. If Ahmed hides his deed, Priya cannot make it public again, and if Priya hides it, Ahmed cannot either; neither can override the other. Hiding affects public feed visibility only, never verification, counts, points or leaderboard credit.
      - Hiding changes visibility only. It never changes verification status, profile counts, points or prize eligibility.
      - Withdrawn, rejected, flagged or moderator-removed deeds disappear from the feed.
      - Public output shows an area name (e.g. "Koramangala"), never exact GPS coordinates, phone numbers or other private information.
+     - **Area names (PO decision Q28, 2026-11-19):** they come from the latest officially published Greater Bengaluru ward boundaries (with a suitable licence; attribution on the Terms page if the licence asks). Each ward shows a familiar, simplified name, never a ward number, and nothing more precise than the ward: no street, building or landmark names, no addresses, no coordinates in any card or API. The deed's location is matched to a ward on our own server and is never sent to an outside map, geocoding or address service. A location outside every ward and more than 1.5 km from the nearest one, or any failure to match, shows just "Bangalore" rather than a guess.
      - Public visibility is stored and checked separately from verification and prize eligibility. Scoring never reads it.
    - **Comments:**
      - Any onboarded member can comment, subject to a length limit and a rate limit (config values) and a basic bad-word filter.
-     - Authors can delete their own comments.
-     - The doer and the reporter can delete any comment on their deed.
-     - Reporting comments and human review come with moderation (M7).
+     - **No links or phone numbers in comments (PO decision Q37, 2026-11-19):** a comment containing a link or a phone number is not posted; the person sees a friendly message and can edit it. This stops spam and keeps private numbers off public pages. Each rule can be switched off in config.
+     - **Bad-word filter languages (PO decision Q35, 2026-11-19):** English only at M3 launch. Each language has its own word list and rules, and which languages are on is a config setting, so Hindi, Kannada and others can be added later without major code changes. The filter catches common spelling tricks (look-alike characters such as "1d10t", spaced-out or repeated letters). A blocked comment gets the friendly "Please keep it kind" message without naming the word.
+     - **Deleting and reporting comments (PO decision Q38, 2026-11-19):**
+       - Authors can delete their own comments; the text is erased for good at once.
+       - The doer and the reporter can delete any comment on their deed. The comment disappears for everyone at once; its text is kept privately for 30 days (moderators and admins only), then erased.
+       - Other members can't delete anyone else's comments.
+       - Members can report a comment (from M3; moved forward from M7). A report never hides the comment automatically.
+       - Moderators and admins review comment reports and can remove a comment for a policy violation, with a required note. Removed text is kept privately for 30 days, so a mistaken removal can be restored and repeat abuse spotted, then erased. Nobody reviews a report about their own comment or a deed they did or reported.
+       - The author of a comment removed by a moderator or admin sees a one-time notice in the app: "Your comment on Ahmed's deed was removed because it broke our community guidelines", with a link to the community guidelines (PO decision 2026-11-19). The notice never names who reported it.
    - **Feed is Home:** for logged-in users the feed is the Home page. Logged-out visitors see a welcome page.
    - **Post card:**
      - The doer comes first, with "recognised by {reporter}" on a smaller line.
@@ -115,15 +137,20 @@ A user can never verify their own deed.
      - Then a photo carousel and the description.
      - Then like, comment, share and save. "People helped" appears only on the detail page.
    - **Saves are private:** listed in a "Saved" list on the user's Profile, with no save count shown and the doer never told.
-   - **Top this week:** ranked by likes + 3 × comments over the last 7 days (the weights are config values). It orders that tab only and never affects points, rank or prizes.
+   - **Top (PO decision 2026-11-19):** one Top tab with a dropdown: **Top this week (last 7 days)**, **Top this month (last 30 days)**, **Top this year (last 365 days)**.
+     - The periods are rolling windows, not calendar months or years, and the labels say so.
+     - Only deeds published inside the selected window can appear. A deed published earlier never appears, even if it gets new likes or comments.
+     - Every period uses the same score: the deed's total likes + 3 × its total comments (the weights and window lengths are config values). Likes from the deed's own doer and reporter count zero in this score (PO decision Q43, 2026-11-19): they can like their deed, and their likes are shown in the like count, but they never move it up in Top. Equal scores: the newer deed ranks higher.
+     - It orders the Top tab only and never affects impact points, verified-deed scores, rank, prizes or the leaderboard. Privacy, moderation and visibility rules apply as everywhere in the feed.
    - **Sharing and public links (PO decision 2026-11-16):**
      - Share targets are WhatsApp, Copy link and the device share menu.
      - A shared link opens a public page for that one deed, showing its photos, description, doer, area and time.
+     - **Link previews and search (PO decision Q40, 2026-11-19):** the preview in WhatsApp and other apps is generic (the Good Deeds logo and "A good deed was shared with you"), the same for every deed, with no name, photo or text, and the pre-filled share message is generic too. Public deed pages ask search engines not to list them. Other services keep their own copies of previews and search results, which we couldn't take back after a hide or photo removal.
      - Public links only ever work for verified, visible deeds. They never expose self-logs, unverified or pending deeds, or hidden, withdrawn or removed deeds.
      - Hiding a deed immediately disables its public link.
      - A visitor who isn't logged in can view only that deed. They must sign up to like, comment, follow, or open other profiles and deeds.
      - Public pages show no exact location, phone number or personal information.
-   - **Follows:** one-way and open, with no approval needed. Users can remove a follower. Profiles show follower and following counts.
+   - **Follows:** one-way and open, with no approval needed. Users can remove a follower. Profiles show follower and following counts. **Lists are private (PO decision Q36, 2026-11-19):** other people see only the counts; each person sees their own Followers and Following lists. This can be revisited once blocking exists (M7) or as a privacy setting.
    - **Photos:** up to 4 per report or self-log (a config value). They can be taken with the camera or uploaded.
 6. **Self-log on profile:** users can log their own deeds privately, and the profile shows public Self-log Deeds and Verified Deeds counts (see section 5).
 7. **Notifications:** "You were recognized", "Your deed was verified", likes and comments, challenge and prize updates.
@@ -159,13 +186,13 @@ A user can never verify their own deed.
 
 - **User:** id, display name, city/area, verified phone, device fingerprint, account created_at, roles (member, moderator, admin), prize_eligible flag, status
 - **DoerCode:** user_id, rotating QR token, created/revoked timestamps
-- **Deed:** id, doer_user_id (empty until accepted), reporter_user_id, category, description, media (people helped are blurred or excluded), location (coordinates, shown publicly as coarse area), occurred_at, reported_at, beneficiaries_count (anonymous), status (pending / verified / unverified / rejected / removed), verification_method (qr_scan / invite_accept), same_act_group_id, counts_for_points (true for the first 5 in a group, false after, unless promoted after a withdrawal), prize_rank_eligible, withdrawn_at
+- **Deed:** id, doer_user_id (empty until accepted), reporter_user_id, category, description, media (photos shown as taken; optional face blur by the uploader), location (coordinates, shown publicly as coarse area), occurred_at, reported_at, beneficiaries_count (anonymous), status (pending / verified / unverified / rejected / removed), verification_method (qr_scan / invite_accept), same_act_group_id, counts_for_points (true for the first 5 in a group, false after, unless promoted after a withdrawal), prize_rank_eligible, withdrawn_at
 - **SameActGroup:** id, doer_user_id, centre location, time window, report_count
 - **VerificationEvent:** deed_id, method (qr_scan / invite_accept / moderator), actor_id, location/time evidence, result, timestamp
 - **Invite:** id, deed_id, reporter_user_id, single-use token, sent_via, expires_at, accepted_by, accepted_phone, accepted_at
 - **SelfLog:** id, user_id, category, description, occurred_at, optional location, created_at. Private to the owner; only the count is public. Never in the feed.
 - **DeedRevision:** deed_id, changed fields (old and new values), editor, timestamp. Append-only.
-- **Post:** id, deed_id, media, caption, status (verified / pending), created_at
+- **Post:** id, deed_id, media, caption, created_at (verified deeds only)
 - **Like:** post_id, user_id, created_at
 - **Comment:** post_id, user_id, content, created_at
 - **Share:** post_id, user_id, target (in_app / whatsapp / instagram / other), created_at
@@ -242,7 +269,7 @@ Deed count, points, badges, likes and prize history are shown separately on the 
 
 ## 10. Evaluation workflow
 
-1. **Submit:** a reporter submits a deed about someone else → basic checks (time, location plausibility, reporter is not the doer, invite limits) → same-act check (same doer within 200 metres and 2 hours of an existing report) → if it matches, link it to that SameActGroup; if the group already has 3 counted reports, mark this one as not earning doer points → deed saved and shown in the feed as Pending.
+1. **Submit:** a reporter submits a deed about someone else → basic checks (time, location plausibility, reporter is not the doer, invite limits) → same-act check (same doer within 200 metres and 2 hours of an existing report) → if it matches, link it to that SameActGroup; if the group already has 5 counted reports, mark this one as not earning doer points → deed saved. It appears in the feed only once it is verified.
 2. **Verify:** a QR scan verifies instantly. If the doer was invited by link, the deed stays pending (no doer name shown) until the doer signs up through the link, verifies a phone number different from the reporter's, and accepts it. If the link is not accepted within 7 days, the deed becomes unverified and is never scored.
 3. **Verified** → DeedVerified event → post marked Verified → rule-based points calculated (live) and AI evaluation run (shadow).
 4. **Fraud checks:** reciprocal, ring, concentration and invite-anomaly checks run → anything suspicious creates a FlagCase.
@@ -322,7 +349,8 @@ A user can win a cash prize only if all of these are true:
 | Reports per reporter–doer pair per calendar month (IST)   | 15 (PO decision 2026-11-16)        |
 | Reports per reporter per calendar month (IST), all doers  | 150 (PO decision 2026-11-16)       |
 | Photos per report or self-log                             | 4                                  |
-| Report photos can be changed after sending for            | 24 hours                           |
+| Admin-removed photos kept (restorable) for                | 90 days, then deleted for good (Q32) |
+| Report photos can be added after sending for              | 24 hours (removing own photos: any time, Q30) |
 | Invites per reporter per day                              | 5                                  |
 | Invite deed: how far back it can have happened            | 7 days                             |
 | Accepted invites per reporter–doer pair on a shared device | 15 per month                      |
@@ -351,7 +379,7 @@ A user can win a cash prize only if all of these are true:
 - **Backend:** Python 3.12, FastAPI, SQLAlchemy 2.0 + Alembic, Pydantic v2. Modular monolith.
 - **Database:** PostgreSQL 16 + PostGIS.
 - **Background jobs:** Procrastinate (Postgres-based queue), fed by a transactional outbox of domain events.
-- **Media:** S3-compatible object storage (MinIO locally).
+- **Media:** S3-compatible object storage: Google Cloud Storage in Mumbai (asia-south1) at launch through its S3-compatible API, and an S3-compatible container locally (the MinIO image is no longer published; see `docs/M3-DESIGN.md`).
 - **AI:** provider-agnostic `ImpactEvaluator` interface; shadow mode at launch.
 
 ## 15. Compliance notes (to confirm with legal / CA before launch)
@@ -359,4 +387,4 @@ A user can win a cash prize only if all of these are true:
 - **Minimum age 18** for v1 accounts. This also simplifies prize eligibility.
 - **DPDP Act 2023:** clear consent at sign-up for phone number, location, device fingerprint and photos/videos; a privacy notice; data access and deletion requests.
 - **Prize tax:** winnings are subject to TDS (Section 194B). Collect PAN and payout (KYC) details on `PrizePayout` before paying winners.
-- **People in photos:** faces of people being helped are blurred by default (§6.5).
+- **People in photos:** no automatic blurring; no consent tick at upload for now (who uploaded and when is recorded); optional blurring of a chosen face; reports reviewed by an admin before any removal (§6.5, PO decisions 2026-11-18). Before launch, confirm with legal whether consent (especially guardian consent for children) must be collected at upload, and the review time limits.

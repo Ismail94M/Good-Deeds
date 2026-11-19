@@ -1,0 +1,47 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-11-18T09:00:00Z"},
+  "title": "Good Deeds — M3 Photos, consent & reports",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 390, "h": 1400, "title": "Interactive prototype (mobile) — press Play", "is_interactive": true},
+
+    "M-FormPhotos.dc.html": {"x": 0, "y": 1800, "w": 390, "h": 1400, "title": "Mobile · Deed form — photos added"},
+    "M-BlurEditor.dc.html": {"x": 470, "y": 1800, "w": 390, "h": 900, "title": "Mobile · Blur a face (optional)"},
+    "M-FormReady.dc.html": {"x": 940, "y": 1800, "w": 390, "h": 1400, "title": "Mobile · Ready to send (one face blurred)"},
+
+    "M-ReportMenu.dc.html": {"x": 0, "y": 3600, "w": 390, "h": 1100, "title": "Mobile · Post menu — Report photo"},
+    "M-ReportSheet.dc.html": {"x": 470, "y": 3600, "w": 390, "h": 1100, "title": "Mobile · Report a photo — choose a reason"},
+    "M-ReportSent.dc.html": {"x": 940, "y": 3600, "w": 390, "h": 1100, "title": "Mobile · Report sent"},
+    "M-PublicReport.dc.html": {"x": 1410, "y": 3600, "w": 390, "h": 1100, "title": "Mobile · Shared link — visitor reports a photo"},
+
+    "M-OutcomeRemoved.dc.html": {"x": 0, "y": 5100, "w": 390, "h": 1100, "title": "Mobile · Uploader — photo removed after review"},
+    "M-OutcomeKept.dc.html": {"x": 470, "y": 5100, "w": 390, "h": 1100, "title": "Mobile · Uploader — review complete, photo stays"},
+    "M-AdminQueue.dc.html": {"x": 940, "y": 5100, "w": 390, "h": 1100, "title": "Mobile · Admin — photo reports"},
+
+    "D-FormPhotos.dc.html": {"x": 0, "y": 6600, "w": 1440, "h": 1300, "title": "Desktop · Deed form — photos and consent"},
+    "D-ReportSheet.dc.html": {"x": 1520, "y": 6600, "w": 1440, "h": 1100, "title": "Desktop · Report a photo"},
+    "D-AdminQueue.dc.html": {"x": 3040, "y": 6600, "w": 1440, "h": 1000, "title": "Desktop · Admin — photo reports queue"},
+    "D-AdminReview.dc.html": {"x": 0, "y": 8100, "w": 1440, "h": 1150, "title": "Desktop · Admin — review a report"},
+    "D-AdminRemoveConfirm.dc.html": {"x": 1520, "y": 8100, "w": 1440, "h": 1150, "title": "Desktop · Admin — remove photo, confirm"},
+    "D-AdminDone.dc.html": {"x": 3040, "y": 8100, "w": 1440, "h": 1150, "title": "Desktop · Admin — removed (can restore)"}
+  },
+  "order": [
+    "Main.dc.html",
+    "M-FormPhotos.dc.html", "M-BlurEditor.dc.html", "M-FormReady.dc.html",
+    "M-ReportMenu.dc.html", "M-ReportSheet.dc.html", "M-ReportSent.dc.html", "M-PublicReport.dc.html",
+    "M-OutcomeRemoved.dc.html", "M-OutcomeKept.dc.html", "M-AdminQueue.dc.html",
+    "D-FormPhotos.dc.html", "D-ReportSheet.dc.html", "D-AdminQueue.dc.html",
+    "D-AdminReview.dc.html", "D-AdminRemoveConfirm.dc.html", "D-AdminDone.dc.html"
+  ],
+  "notes": {
+    "t-proto": {"x": 0, "y": -300, "text": "M3 · Photos, consent and photo reports — prototype", "kind": "title1", "maxW": 1800},
+    "t-form": {"x": 0, "y": 1500, "text": "1 · Adding photos: small thumbnails, optional blur", "kind": "title1", "maxW": 1800},
+    "t-report": {"x": 0, "y": 3300, "text": "2 · Reporting a photo (members and visitors)", "kind": "title1", "maxW": 1800},
+    "t-outcome": {"x": 0, "y": 4800, "text": "3 · Uploader is told the outcome · admin queue", "kind": "title1", "maxW": 1330},
+    "t-desk": {"x": 0, "y": 6300, "text": "Desktop · 1440 px", "kind": "title1", "maxW": 4480},
+    "behaviour": {"x": 470, "y": 0, "w": 640, "fill": "blue", "size": "m", "text": "Photo decisions (product owner, 2026-11-18 — PRD §6.5)\n\n• Photos only, up to 4 per post. Video comes later.\n• Good deeds are shared proudly: photos are shown as taken. Nothing is blurred automatically.\n• No consent tick for now (PO, 2026-11-18). Who uploaded each photo, and when, is recorded.\n• Blur is optional: only if someone would rather not be shown, the reporter drags a blur over that face, or removes the photo.\n• Anyone can report a photo — members, and visitors on a shared link. A report never hides the photo: it stays up until an admin decides.\n• Reports about children and serious privacy concerns are reviewed first. Only an admin can remove or restore a photo. Every decision needs a note and is audit-logged.\n• The uploader is told the outcome on the deed in My deeds (proper notifications come in M6). They are not told about open reports, or who reported.\n• A photo report never changes the deed, its verification, counts or points.\n\nPress Play and switch the prototype bar between Priya (reporter), Rahul (viewer) and Admin. Admin decisions show up in Priya's My deeds."}
+  },
+  "designSystems": []
+}

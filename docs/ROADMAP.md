@@ -37,9 +37,14 @@ Each milestone is built, tested and reviewed by the product owner before the nex
 - A support flow for changing a verified phone number (re-authentication + notify the old number).
 - Separate signing keys per purpose (JWT / QR / device / phone hash) with key IDs, so one can be rotated without invalidating the others.
 - A real SMS provider (MSG91 or Twilio, with DLT registration).
+- PO approval of the photo-guidelines page copy (M3 Q39).
+- PO approval of the community-guidelines page copy (M3 comment-removed notice).
+- Two-step login for moderator and admin accounts (they review photo reports from M3, PO decision Q34, 2026-11-19).
+- Area names: confirm the ward dataset is still the latest official one and its licence allows app use; add attribution to the Terms page if required (M3 Q28).
+- Photo consent: confirm with legal whether a consent confirmation (and guardian consent for children) is needed at upload; it was removed from the M3 design for now (PO decision 2026-11-18).
 - Recycled numbers and SIM swaps (PO decision 2026-11-17, forgot-password security review M3): email the account owner on every password reset ("Your password was changed. Wasn't you? Tell us"), once an email service exists. Also hold prize claims and payout-detail changes for 7 days after a reset (built with prizes in M8).
 
-**M2 Deeds & Verification**
+**M2 Deeds & Verification** ✅ done
 - Security requirements from the M1 review:
   - The **manual ID fallback must not be static**: show a short rotating code next to the QR (derived from the same signed window) and require the ID plus that code.
   - Make each `(token window, witness)` and `(doer, witness, day)` single-use, with unique constraints.
@@ -60,15 +65,15 @@ Each milestone is built, tested and reviewed by the product owner before the nex
 - Full decisions: `docs/M2-DESIGN.md`.
 
 **M3 Feed & Social**
-- Posts with presigned photo/video upload and a face-blur job.
-- Feed tabs: Nearby, Following, Top this week.
-- Pending posts hide the doer.
+- Posts with presigned photo upload: photos only, at most 4 per post; video deferred (PO decision 2026-11-18). No automatic face blurring; no consent tick for now (upload is recorded, revisit with legal before launch); small 4-in-a-row thumbnails; optional "Blur a face"; photo reports always wait for admin review (children first, then privacy and harmful images, then the rest; Q44), only an admin removes or restores, the uploader is told the outcome, and the deed and points are never affected (PRD §6.5). Design approved 2026-11-18: `docs/design/m3-photos`. The doer can remove any photo on a deed about them, permanently, with a neutral notice to the uploader and an audit record; nothing else changes (PO decision Q29, 2026-11-19). The uploader can remove their own photos at any time; adding stays within 24 hours (Q30). Any removal (doer, uploader, admin) stops already-shared photo links at once.
+- Feed tabs: Nearby, Following, Top. Top has a dropdown: this week / this month / this year, rolling 7 / 30 / 365-day windows over deeds published in the window, likes + 3 × comments, display only (PO decision Q26, 2026-11-19).
+- Only verified deeds appear in the feed (PO decision Q23, 2026-11-18); pending invite deeds stay private.
 - Likes, comments, shares (Web Share API + WhatsApp link), follows, saves.
-- Verified deeds are auto-published. The doer or reporter can hide one from the feed (visibility only). Withdrawn or invalidated deeds leave the feed. Area names only, never GPS. Comments have length and rate limits and a bad-word filter. Open follows (PO decisions 2026-11-16, PRD §6.5).
-- Before M3: choose a photo storage provider (Azure Blob / S3 / Google Cloud Storage).
+- Verified deeds are auto-published. The doer or reporter can hide one from the feed (visibility only). Withdrawn or invalidated deeds leave the feed. Area names only, never GPS: ward-level names from the latest official Greater Bengaluru ward boundaries, matched on our server, "Bangalore" when outside or unmatched (PO decision Q28, 2026-11-19). Comments have length and rate limits and a bad-word filter (English only at launch; per-language packs so Hindi, Kannada and others can be enabled later by config, PO decision Q35, 2026-11-19). Links and phone numbers are refused in comments (Q37). Comment reporting and moderator/admin removal are in M3; authors' deleted comments are erased at once, doer/reporter and moderation deletions keep the text privately for 30 days (Q38, 2026-11-19). Open follows (PO decisions 2026-11-16, PRD §6.5).
+- Photo storage (PO decision 2026-11-18): Google Cloud Storage in the Mumbai region (asia-south1) at launch. The code talks to storage through the provider-neutral S3-compatible interface, so switching provider is a settings change. Local development uses a free S3-compatible stand-in container.
 
 **M4 Scoring, Points & Leaderboard**
-- Rule-based scoring: category base points, keyword/regex text rules, fixed photo bonus.
+- Rule-based scoring: category base points, keyword/regex text rules, fixed photo bonus. Removing a photo (by the doer, the uploader or an admin) never changes points: the M4 design must make the photo bonus and evidence caps independent of later photo removals (PO decision Q29, 2026-11-19).
 - Ledger with diminishing pair returns, a daily cap of 10, the reporter daily cap, and reporter points excluded from prize rank.
 - Configurable rank score.
 - Badges and monthly Kindness Hero.
@@ -85,7 +90,7 @@ Each milestone is built, tested and reviewed by the product owner before the nex
 - Monthly challenges, including sponsored ones, and participation tracking.
 
 **M7 Moderation**
-- Report a post.
+- Report a post. (Comment reporting and removal were moved into M3, PO decision Q38.)
 - AI pre-screen (flags only, never auto-removes).
 - Human takedown and user blocking.
 
