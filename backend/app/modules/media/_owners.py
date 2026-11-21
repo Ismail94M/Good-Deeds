@@ -464,6 +464,9 @@ async def remove_photo(
     photo.status = PhotoStatus.DELETED
     photo.deleted_at = now
     photo.deleted_by = user_id
+    # A pending admin hold or restore no longer applies: every object is deleted below
+    # (SEC2 L6), and a move must never copy a deleted photo's variants back.
+    photo.object_move = None
     if by_doer:
         photo.takedown = PhotoTakedown.DOER_REMOVED
 

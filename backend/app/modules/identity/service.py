@@ -553,6 +553,7 @@ async def set_role(
     *,
     actor_id: uuid.UUID | None = None,
     reason: str,
+    operator: str | None = None,
 ) -> bool:
     """Change a user's role (M3 D43: only the CLI calls this; there is no HTTP route). Writes
     ``audit_log`` (``role.changed``) and bumps ``token_version``, so access tokens issued with the
@@ -561,6 +562,7 @@ async def set_role(
     reason = reason.strip()
     if not reason:
         raise ValueError("a reason is required")
+    operator = operator.strip() if operator else None
     old = user.role
     if old == role:
         return False
@@ -573,7 +575,8 @@ async def set_role(
         action="role.changed",
         actor_id=actor_id,
         old_value={"role": old.value},
-        new_value={"role": role.value},
+        # Who ran the command (the CLI has no signed-in actor, so ``actor_id`` stays null).
+        new_value={"role": role.value, **({"operator": operator} if operator else {})},
         reason=reason,
     )
     await session.flush()

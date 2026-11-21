@@ -128,7 +128,7 @@ A user can never verify their own deed.
        - The doer and the reporter can delete any comment on their deed. The comment disappears for everyone at once; its text is kept privately for 30 days (moderators and admins only), then erased.
        - Other members can't delete anyone else's comments.
        - Members can report a comment (from M3; moved forward from M7). A report never hides the comment automatically.
-       - Moderators and admins review comment reports and can remove a comment for a policy violation, with a required note. Removed text is kept privately for 30 days, so a mistaken removal can be restored and repeat abuse spotted, then erased. Nobody reviews a report about their own comment or a deed they did or reported.
+       - Moderators and admins review comment reports and can remove a comment for a policy violation, with a required note. Removed text is kept privately for 30 days, so a mistaken removal can be restored and repeat abuse spotted, then erased; the author deleting a removed comment does not erase it early (PO decision L3, 2026-11-21). If a moderator later restores a comment its author deleted after the removal, it stays deleted as the author's own and its text is erased then. Nobody reviews a report about their own comment or a deed they did or reported.
        - The author of a comment removed by a moderator or admin sees a one-time notice in the app: "Your comment on Ahmed's deed was removed because it broke our community guidelines", with a link to the community guidelines (PO decision 2026-11-19). The notice never names who reported it.
    - **Feed is Home:** for logged-in users the feed is the Home page. Logged-out visitors see a welcome page.
    - **Post card:**
@@ -140,7 +140,7 @@ A user can never verify their own deed.
    - **Top (PO decision 2026-11-19):** one Top tab with a dropdown: **Top this week (last 7 days)**, **Top this month (last 30 days)**, **Top this year (last 365 days)**.
      - The periods are rolling windows, not calendar months or years, and the labels say so.
      - Only deeds published inside the selected window can appear. A deed published earlier never appears, even if it gets new likes or comments.
-     - Every period uses the same score: the deed's total likes + 3 × its total comments (the weights and window lengths are config values). Likes from the deed's own doer and reporter count zero in this score (PO decision Q43, 2026-11-19): they can like their deed, and their likes are shown in the like count, but they never move it up in Top. Equal scores: the newer deed ranks higher.
+     - Every period uses the same score: the deed's total likes + 3 × its total comments (the weights and window lengths are config values). Likes from the deed's own doer and reporter count zero in this score (PO decision Q43, 2026-11-19): they can like their deed, and their likes are shown in the like count, but they never move it up in Top. The same holds for their comments (PO decision L1, 2026-11-21): shown and counted in the comment count, zero weight in Top. Equal scores: the newer deed ranks higher.
      - It orders the Top tab only and never affects impact points, verified-deed scores, rank, prizes or the leaderboard. Privacy, moderation and visibility rules apply as everywhere in the feed.
    - **Sharing and public links (PO decision 2026-11-16):**
      - Share targets are WhatsApp, Copy link and the device share menu.

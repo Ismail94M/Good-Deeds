@@ -8,6 +8,7 @@ _DEV_SECRET = "dev-only-insecure-secret-change-me-0123456789"
 _LOCAL_ENVS = frozenset({"development", "test"})
 # Access key of the local SeaweedFS identity (infra/seaweedfs/s3.json); refused outside dev.
 DEV_STORAGE_ACCESS_KEY = "gooddeeds-dev"
+DEV_STORAGE_SECRET_KEY = "gooddeeds-dev-secret-not-for-production"
 
 
 class Settings(BaseSettings):
@@ -87,8 +88,10 @@ class Settings(BaseSettings):
             problems.append("GD_STORAGE_ENDPOINT_URL and GD_STORAGE_PUBLIC_ENDPOINT_URL need https")
         if self.storage_access_key_id in ("", DEV_STORAGE_ACCESS_KEY):
             problems.append("GD_STORAGE_ACCESS_KEY_ID must be a real key, not the development one")
-        if not self.storage_secret_access_key:
-            problems.append("GD_STORAGE_SECRET_ACCESS_KEY must be set")
+        if self.storage_secret_access_key in ("", DEV_STORAGE_SECRET_KEY):
+            problems.append(
+                "GD_STORAGE_SECRET_ACCESS_KEY must be a real secret, not the development one"
+            )
         if problems:
             raise ValueError(f"Unsafe configuration for env={self.env!r}: " + "; ".join(problems))
         return self

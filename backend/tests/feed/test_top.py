@@ -53,6 +53,7 @@ async def _post(
     likes: int = 0,
     top_likes: int | None = None,
     comments: int = 0,
+    top_comments: int | None = None,
 ) -> Any:
     deed_id = await verified_deed(
         session, people[0], people[1], verified_at=NOW - timedelta(days=days_ago)
@@ -63,6 +64,7 @@ async def _post(
         like_count=likes,
         top_like_count=likes if top_likes is None else top_likes,
         comment_count=comments,
+        top_comment_count=comments if top_comments is None else top_comments,
     )
     return deed_id
 
@@ -76,6 +78,8 @@ async def test_score_uses_top_likes_and_comments_with_config_weights(
     many_comments = await _post(session, people, days_ago=1, comments=4)  # 12
     # Self-likes (Q43): like_count 50, but only 1 like from others counts.
     self_liked = await _post(session, people, days_ago=1, likes=50, top_likes=1)  # 1
+    # Self-comments (L1): comment_count 20, but no comment from others counts.
+    self_commented = await _post(session, people, days_ago=1, comments=20, top_comments=0)  # 0
     limits = await _limits(session)
     for period in TopPeriod:
         snap = await _top.compute_snapshot(session, period, limits, now=NOW)
@@ -83,6 +87,7 @@ async def test_score_uses_top_likes_and_comments_with_config_weights(
             (many_comments, 12),
             (many_likes, 10),
             (self_liked, 1),
+            (self_commented, 0),
         ]
         assert snap.weights == {"like": 1, "comment": 3}
 
@@ -94,6 +99,7 @@ async def test_score_uses_top_likes_and_comments_with_config_weights(
             (many_likes, 50),
             (many_comments, 8),
             (self_liked, 5),
+            (self_commented, 0),
         ]
 
 

@@ -17,7 +17,7 @@ from collections.abc import Mapping
 from datetime import datetime, timedelta
 from typing import Literal, Protocol
 
-from sqlalchemy import func, select, tuple_
+from sqlalchemy import ColumnElement, func, or_, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import record_audit
@@ -137,6 +137,61 @@ async def _reports_by_case(
     return out
 
 
+# --------------------------------------------------- conflict of interest (D43, SEC2 M1, L11)
+
+# Every deed status: a doer's own deed is excluded whatever its state.
+_ALL_DEED_STATUSES = tuple(deeds.DeedStatus)
+# Upper bound for the doer's deeds read below (one indexed query; far above any real count).
+_MAX_OWN_DEEDS = 100_000
+
+
+async def _own_deed_ids(session: AsyncSession, actor_id: uuid.UUID) -> set[uuid.UUID]:
+    """Deeds the actor is the doer of. Deeds they reported are covered by the uploader check:
+    only a deed's reporter can attach photos to it (§3.3 #5)."""
+    views = await deeds.deeds_for_doer(
+        session, actor_id, statuses=_ALL_DEED_STATUSES, limit=_MAX_OWN_DEEDS
+    )
+    return {v.id for v in views}
+
+
+def _uninvolved(actor_id: uuid.UUID, own_deeds: set[uuid.UUID]) -> list[ColumnElement[bool]]:
+    """Filters on ``PhotoReportCase`` (joined to ``Photo``) leaving out every case the actor is
+    part of: their photo, a deed they did (or reported), or a case they filed a report in."""
+    filed = (
+        select(PhotoReport.id)
+        .where(PhotoReport.case_id == PhotoReportCase.id, PhotoReport.reporter_user_id == actor_id)
+        .exists()
+    )
+    conditions: list[ColumnElement[bool]] = [Photo.uploader_user_id != actor_id, ~filed]
+    if own_deeds:
+        conditions.append(or_(Photo.deed_id.is_(None), Photo.deed_id.not_in(own_deeds)))
+    return conditions
+
+
+async def _involved(
+    session: AsyncSession,
+    actor_id: uuid.UUID,
+    photo: Photo,
+    view: deeds.DeedView | None,
+    *,
+    case_ids: list[uuid.UUID] | None,
+) -> bool:
+    """Whether the actor uploaded the photo, did or reported its deed, or filed a report in one
+    of ``case_ids`` (None: any case on the photo)."""
+    if actor_id == photo.uploader_user_id:
+        return True
+    if view is not None and actor_id in (view.reporter_id, view.doer_id):
+        return True
+    if view is None and photo.deed_id is not None:
+        return True  # no deed to check against: refuse rather than guess
+    stmt = select(PhotoReport.id).where(
+        PhotoReport.photo_id == photo.id, PhotoReport.reporter_user_id == actor_id
+    )
+    if case_ids is not None:
+        stmt = stmt.where(PhotoReport.case_id.in_(case_ids))
+    return (await session.scalar(stmt.limit(1))) is not None
+
+
 # --------------------------------------------------- queue (#11)
 
 
@@ -145,13 +200,17 @@ async def list_cases(
     storage: ObjectStorage,
     *,
     queue: Queue,
+    actor_id: uuid.UUID,
     limits: MediaLimits,
     cursor: str | None = None,
     limit: int = _cursor.DEFAULT_PAGE_SIZE,
     now: datetime | None = None,
 ) -> CasePage:
+    """The queue for ``actor_id``: cases they are part of are left out of the items and the
+    counts (SEC2 M1)."""
     now = now or utcnow()
-    stmt = select(PhotoReportCase)
+    visible = _uninvolved(actor_id, await _own_deed_ids(session, actor_id))
+    stmt = select(PhotoReportCase).join(Photo, Photo.id == PhotoReportCase.photo_id).where(*visible)
     if queue == "open":
         stmt = stmt.where(PhotoReportCase.status == ReportCaseStatus.OPEN)
         if cursor:
@@ -177,7 +236,11 @@ async def list_cases(
 
     count_rows = await session.execute(
         select(PhotoReportCase.status, func.count())
-        .where(PhotoReportCase.status.in_((ReportCaseStatus.OPEN, ReportCaseStatus.RESOLVED)))
+        .join(Photo, Photo.id == PhotoReportCase.photo_id)
+        .where(
+            PhotoReportCase.status.in_((ReportCaseStatus.OPEN, ReportCaseStatus.RESOLVED)),
+            *visible,
+        )
         .group_by(PhotoReportCase.status)
     )
     counts = {status: int(n) for status, n in count_rows}
@@ -245,10 +308,13 @@ async def case_detail(
     storage: ObjectStorage,
     case_id: uuid.UUID,
     *,
+    actor_id: uuid.UUID,
     listed: bool,
     limits: MediaLimits,
     now: datetime | None = None,
 ) -> CaseDetail:
+    """404 ``case_not_found`` for an actor who is part of the case (SEC2 M1), the same answer
+    as for a case that doesn't exist."""
     now = now or utcnow()
     case = await session.scalar(
         select(PhotoReportCase)
@@ -263,6 +329,8 @@ async def case_detail(
     assert photo is not None and photo.deed_id is not None
     view = await deeds.get_deed(session, photo.deed_id)
     assert view is not None
+    if await _involved(session, actor_id, photo, view, case_ids=[case.id]):
+        raise case_not_found()
     reports = (await _reports_by_case(session, [case.id]))[case.id]
     decisions = list(
         await session.scalars(
@@ -356,11 +424,15 @@ _GONE = UserRef(handle="", display_name="")
 # --------------------------------------------------- decisions (#13, #14)
 
 
-def _check_conflict(actor_id: uuid.UUID, photo: Photo, view: deeds.DeedView | None) -> None:
-    involved = {photo.uploader_user_id}
-    if view is not None:
-        involved |= {view.reporter_id, *([view.doer_id] if view.doer_id else [])}
-    if actor_id in involved:
+async def _check_conflict(
+    session: AsyncSession,
+    actor_id: uuid.UUID,
+    photo: Photo,
+    view: deeds.DeedView | None,
+    *,
+    case_ids: list[uuid.UUID] | None,
+) -> None:
+    if await _involved(session, actor_id, photo, view, case_ids=case_ids):
         raise Forbidden(
             "Another admin needs to review this one: you're part of this deed.",
             code="conflict_of_interest",
@@ -455,7 +527,7 @@ async def decide(
     if case.status != ReportCaseStatus.OPEN:
         raise Conflict("This report has already been decided.", code="case_not_open")
     view = await deeds.get_deed(session, photo.deed_id) if photo.deed_id else None
-    _check_conflict(actor_id, photo, view)
+    await _check_conflict(session, actor_id, photo, view, case_ids=[case.id])
 
     reason: PhotoReportReason | None = None
     if data.action == "remove":
@@ -508,7 +580,8 @@ async def restore(
     if photo.takedown != PhotoTakedown.ADMIN_REMOVED or photo.objects_purged_at is not None:
         raise Conflict("This photo can't be restored.", code="not_restorable")
     view = await deeds.get_deed(session, photo.deed_id)
-    _check_conflict(actor_id, photo, view)
+    # Any report the actor filed on this photo, in any case (a restore undoes a removal).
+    await _check_conflict(session, actor_id, photo, view, case_ids=None)
     last_case = await session.scalar(
         select(PhotoReportCase.id)
         .where(PhotoReportCase.photo_id == photo.id)

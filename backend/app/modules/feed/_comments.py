@@ -3,17 +3,23 @@
 - List: live comments, oldest first, on a deed the caller may see.
 - Post: trimmed; empty, too long, unkind, a link or a phone number is refused (422) with a message
   that never names the matched word; ``comment_count += 1``; ``CommentPosted``.
+- Counters (L1): every live comment counts in ``comment_count``; only comments by someone other
+  than the deed's doer and reporter count in ``top_comment_count`` (the Top score). Both change in
+  the same UPDATE (``count_change``), so every delete, removal or restore reverses exactly what
+  the post did.
 - Delete: the author, or the deed's doer or reporter (anyone else 404, moderators and admins
   included: they remove comments only through a report decision, B27). An author's deletion
   erases the text at once; a doer's or reporter's keeps it for ``deleted_comment_retention_days``
   (moderators only), then ``erase_deleted_batch`` erases it. ``comment_count`` drops once, even if
-  deleted twice. An open report case on the comment is closed.
+  deleted twice. An author may still erase text the doer or reporter deleted, but not text
+  moderation removed (L3): that stays for the retention period so a restore still works. An open
+  report case on the comment is closed.
 """
 
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select, tuple_, update
+from sqlalchemy import case, select, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import advisory_xact_lock
@@ -51,6 +57,31 @@ _PROBLEMS: dict[str, tuple[str, str]] = {
 
 def comment_not_found() -> NotFound:
     return NotFound("We couldn't find that comment.", code="comment_not_found")
+
+
+def count_change(author_id: uuid.UUID, step: int) -> dict[object, object]:
+    """``comment_count`` always; ``top_comment_count`` only for an author who is neither the
+    doer nor the reporter (read from the row being updated, so it is one statement; L1)."""
+    others = case(
+        (FeedPost.doer_id == author_id, 0),
+        (FeedPost.reporter_id == author_id, 0),
+        else_=step,
+    )
+    return {
+        FeedPost.comment_count: FeedPost.comment_count + step,
+        FeedPost.top_comment_count: FeedPost.top_comment_count + others,
+    }
+
+
+async def change_counts(
+    session: AsyncSession, deed_id: uuid.UUID, author_id: uuid.UUID, step: int
+) -> None:
+    await session.execute(
+        update(FeedPost)
+        .where(FeedPost.deed_id == deed_id)
+        .values(count_change(author_id, step))
+        .execution_options(synchronize_session=False)
+    )
 
 
 async def _outs(
@@ -135,12 +166,7 @@ async def post_comment(
     comment = FeedComment(deed_id=deed_id, author_id=author_id, body=text, created_at=now)
     session.add(comment)
     await session.flush()
-    await session.execute(
-        update(FeedPost)
-        .where(FeedPost.deed_id == deed_id)
-        .values(comment_count=FeedPost.comment_count + 1)
-        .execution_options(synchronize_session=False)
-    )
+    await change_counts(session, deed_id, author_id, +1)
     emit(session, CommentPosted(deed_id=deed_id, comment_id=comment.id, author_id=author_id))
     return (await _outs(session, [comment], author_id, found.post))[0]
 
@@ -193,8 +219,17 @@ async def delete_comment(
     else:
         raise comment_not_found()
     if comment.deleted_at is not None:
-        # Deleting twice is fine; an author may still erase text a doer or reporter deleted.
-        if role == CommentDeletedRole.AUTHOR and comment.body is not None:
+        # Deleting twice is fine; an author may still erase text a doer or reporter deleted, but
+        # not text moderation removed: it is kept for the retention period (evidence and
+        # restore), then erased by ``erase_deleted_batch``. The request is recorded, so a later
+        # restore leaves it deleted as the author's own (L3). The response is the same.
+        if role != CommentDeletedRole.AUTHOR:
+            return
+        if comment.deleted_role == CommentDeletedRole.MODERATION:
+            if comment.author_deleted_at is None:
+                comment.author_deleted_at = now
+                await session.flush()
+        elif comment.body is not None:
             comment.body = None  # who deleted it first stays recorded
             await session.flush()
         return
@@ -204,12 +239,7 @@ async def delete_comment(
     if role == CommentDeletedRole.AUTHOR:
         comment.body = None
     await session.flush()
-    await session.execute(
-        update(FeedPost)
-        .where(FeedPost.deed_id == comment.deed_id)
-        .values(comment_count=FeedPost.comment_count - 1)
-        .execution_options(synchronize_session=False)
-    )
+    await change_counts(session, comment.deed_id, comment.author_id, -1)
     await close_open_report_cases(session, comment.id, now)
 
 

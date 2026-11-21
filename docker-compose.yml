@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: gooddeeds
       POSTGRES_DB: gooddeeds
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
@@ -81,7 +81,7 @@ services:
       # Fallback when a bucket has no CORS rules; the bucket's own rules come from storage-init.
       - -s3.allowedOrigins=http://localhost:5173
     ports:
-      - "8333:8333"
+      - "127.0.0.1:8333:8333"
     volumes:
       - storage-data:/data
       - ./infra/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro

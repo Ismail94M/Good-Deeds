@@ -4,8 +4,13 @@
 - Queue: open cases by priority then oldest; resolved ones newest first.
 - Decide (``keep`` / ``remove``) only an open case, with a note of 5 to ``decision_note_max``
   characters. ``remove`` deletes the comment for everyone (``deleted_role = 'moderation'``,
-  ``comment_count - 1``) and keeps its text for ``deleted_comment_retention_days``.
-- Restore only a moderation removal whose text is still kept, within that period.
+  ``comment_count - 1``, and ``top_comment_count - 1`` unless the author is the doer or reporter,
+  L1) and keeps its text for ``deleted_comment_retention_days``; the author's own delete no longer
+  erases it (L3).
+- Restore only a moderation removal whose text is still kept, within that period. If the author
+  deleted the comment after the removal (``author_deleted_at``), the restore undoes only the
+  moderation: the comment stays deleted as the author's own, its text erased, counts unchanged
+  (L3).
 - Conflict of interest: the comment's author and the deed's doer and reporter can't decide or
   restore (403 ``conflict_of_interest``).
 - Every decision writes one append-only ``comment_decisions`` row, one ``audit_log`` row and one
@@ -18,7 +23,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 from pydantic import BaseModel
-from sqlalchemy import func, select, tuple_, update
+from sqlalchemy import ColumnElement, func, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import record_audit
@@ -27,7 +32,7 @@ from app.core.errors import AppError, Conflict, Forbidden, NotFound
 from app.core.events import emit
 from app.modules.deeds import service as deeds
 from app.modules.feed import _cursor
-from app.modules.feed._comments import comment_not_found
+from app.modules.feed._comments import change_counts, comment_not_found
 from app.modules.feed._limits import FeedLimits
 from app.modules.feed._reports import EXCERPT_CHARS
 from app.modules.feed._shared_limits import SharedReportLimits
@@ -126,12 +131,18 @@ async def _reports_by_case(
 
 async def list_cases(
     session: AsyncSession,
+    viewer_id: uuid.UUID,
     *,
     queue: Queue,
     cursor: str | None = None,
     limit: int = _cursor.DEFAULT_PAGE_SIZE,
 ) -> CommentCasePage:
-    stmt = select(CommentReportCase)
+    stmt = (
+        select(CommentReportCase)
+        .join(FeedComment, FeedComment.id == CommentReportCase.comment_id)
+        .join(FeedPost, FeedPost.deed_id == CommentReportCase.deed_id)
+        .where(*_not_party(viewer_id))
+    )
     if queue == "open":
         stmt = stmt.where(CommentReportCase.status == ReportCaseStatus.OPEN)
         if cursor:
@@ -160,7 +171,12 @@ async def list_cases(
         status: int(n)
         for status, n in await session.execute(
             select(CommentReportCase.status, func.count())
-            .where(CommentReportCase.status.in_((ReportCaseStatus.OPEN, ReportCaseStatus.RESOLVED)))
+            .join(FeedComment, FeedComment.id == CommentReportCase.comment_id)
+            .join(FeedPost, FeedPost.deed_id == CommentReportCase.deed_id)
+            .where(
+                CommentReportCase.status.in_((ReportCaseStatus.OPEN, ReportCaseStatus.RESOLVED)),
+                *_not_party(viewer_id),
+            )
             .group_by(CommentReportCase.status)
         )
     }
@@ -227,6 +243,7 @@ def _restorable_until(comment: FeedComment, limits: FeedLimits) -> datetime | No
 async def case_detail(
     session: AsyncSession,
     case_id: uuid.UUID,
+    viewer_id: uuid.UUID,
     *,
     limits: FeedLimits,
     now: datetime | None = None,
@@ -250,8 +267,12 @@ async def case_detail(
         .execution_options(populate_existing=True)
     )
     assert comment is not None and post is not None  # FKs
-    view = await deeds.get_deed(session, case.deed_id)
     reports = (await _reports_by_case(session, [case.id]))[case.id]
+    # Parties to the case (author, doer, reporter, a filer) never see it (security review M1).
+    parties = {comment.author_id, post.doer_id, post.reporter_id}
+    if viewer_id in parties | {r.reporter_user_id for r in reports}:
+        raise case_not_found()
+    view = await deeds.get_deed(session, case.deed_id)
     decisions = list(
         await session.scalars(
             select(CommentDecision)
@@ -326,8 +347,38 @@ async def case_detail(
 # --------------------------------------------------- #16 decide, #17 restore
 
 
-def _check_conflict(actor_id: uuid.UUID, comment: FeedComment, post: FeedPost) -> None:
-    if actor_id in (comment.author_id, post.doer_id, post.reporter_id):
+def _not_party(viewer_id: uuid.UUID) -> list[ColumnElement[bool]]:
+    """SQL conditions for a queue: the viewer is not the comment's author, the deed's doer or
+    reporter, or a filer of a report in the case (security review M1). Needs ``FeedComment`` and
+    ``FeedPost`` joined to ``CommentReportCase``."""
+    filed = (
+        select(CommentReport.id)
+        .where(
+            CommentReport.case_id == CommentReportCase.id,
+            CommentReport.reporter_user_id == viewer_id,
+        )
+        .exists()
+    )
+    return [
+        FeedComment.author_id != viewer_id,
+        FeedPost.doer_id != viewer_id,
+        FeedPost.reporter_id != viewer_id,
+        ~filed,
+    ]
+
+
+async def _filers(session: AsyncSession, *case_ids: uuid.UUID) -> set[uuid.UUID]:
+    return set(
+        await session.scalars(
+            select(CommentReport.reporter_user_id).where(CommentReport.case_id.in_(case_ids))
+        )
+    )
+
+
+def _check_conflict(
+    actor_id: uuid.UUID, comment: FeedComment, post: FeedPost, filers: set[uuid.UUID]
+) -> None:
+    if actor_id in (comment.author_id, post.doer_id, post.reporter_id) or actor_id in filers:
         raise Forbidden(
             "Another moderator needs to review this one: you're part of this deed.",
             code="conflict_of_interest",
@@ -340,15 +391,6 @@ async def _locked(session: AsyncSession, comment_id: uuid.UUID) -> FeedComment |
         .where(FeedComment.id == comment_id)
         .with_for_update()
         .execution_options(populate_existing=True)
-    )
-
-
-async def _change_count(session: AsyncSession, deed_id: uuid.UUID, step: int) -> None:
-    await session.execute(
-        update(FeedPost)
-        .where(FeedPost.deed_id == deed_id)
-        .values(comment_count=FeedPost.comment_count + step)
-        .execution_options(synchronize_session=False)
     )
 
 
@@ -425,7 +467,7 @@ async def decide(
     assert post is not None
     if case.status != ReportCaseStatus.OPEN:
         raise Conflict("This report has already been decided.", code="case_not_open")
-    _check_conflict(actor_id, comment, post)
+    _check_conflict(actor_id, comment, post, await _filers(session, case.id))
     if action == "remove":
         if comment.deleted_at is None:
             comment.deleted_at = now
@@ -433,7 +475,7 @@ async def decide(
             comment.deleted_role = CommentDeletedRole.MODERATION
             comment.removal_notice_seen_at = None
             await session.flush()
-            await _change_count(session, comment.deed_id, -1)
+            await change_counts(session, comment.deed_id, comment.author_id, -1)
         case.decision = CaseDecision.REMOVED
     else:
         case.decision = CaseDecision.KEPT
@@ -474,7 +516,12 @@ async def restore(
     until = _restorable_until(comment, limits)
     if until is None or now > until:
         raise Conflict("This comment can't be restored.", code="not_restorable")
-    _check_conflict(actor_id, comment, post)
+    case_ids = list(
+        await session.scalars(
+            select(CommentReportCase.id).where(CommentReportCase.comment_id == comment.id)
+        )
+    )
+    _check_conflict(actor_id, comment, post, await _filers(session, *case_ids))
     last_case = await session.scalar(
         select(CommentReportCase.id)
         .where(CommentReportCase.comment_id == comment.id)
@@ -483,12 +530,21 @@ async def restore(
     )
     if last_case is None:  # a moderation removal only ever comes from a case
         raise Conflict("This comment can't be restored.", code="not_restorable")
-    comment.deleted_at = None
-    comment.deleted_by = None
-    comment.deleted_role = None
     comment.removal_notice_seen_at = None
-    await session.flush()
-    await _change_count(session, comment.deed_id, +1)
+    if comment.author_deleted_at is not None:
+        # The author deleted it after the removal (L3): undoing the moderation leaves the
+        # author's own deletion, erased now. Still not live, so the counts stay.
+        comment.deleted_at = comment.author_deleted_at
+        comment.deleted_by = comment.author_id
+        comment.deleted_role = CommentDeletedRole.AUTHOR
+        comment.body = None
+        await session.flush()
+    else:
+        comment.deleted_at = None
+        comment.deleted_by = None
+        comment.deleted_role = None
+        await session.flush()
+        await change_counts(session, comment.deed_id, comment.author_id, +1)
     _record(
         session,
         comment,

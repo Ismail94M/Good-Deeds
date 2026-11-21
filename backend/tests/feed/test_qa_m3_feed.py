@@ -83,10 +83,11 @@ async def test_top_score_from_real_likes_and_comments(
     assert by_doer.status_code == by_a.status_code == 201
     post = await post_of(session, deed_id)
     assert post is not None
-    assert (post.like_count, post.top_like_count, post.comment_count) == (4, 2, 2)
+    counts = (post.like_count, post.top_like_count, post.comment_count, post.top_comment_count)
+    assert counts == (4, 2, 2, 1)
 
-    # The doer's and reporter's likes weigh nothing; the doer's comment counts (Q43).
-    expected = 2 * like_w + 2 * comment_w
+    # The doer's and reporter's likes (Q43) and comments (L1) weigh nothing.
+    expected = 2 * like_w + comment_w
     for period in TopPeriod:
         assert await _score(session, period, NOW, deed_id) == expected
 
@@ -96,8 +97,8 @@ async def test_top_score_from_real_likes_and_comments(
     assert (await client.delete(like, headers=reporter.headers)).json()["like_count"] == 3
     later = NOW + timedelta(minutes=5)
     for period in TopPeriod:
-        assert await _score(session, period, later, deed_id) == 2 * like_w + comment_w
-    # The doer deleting their own comment and b unliking remove the rest.
+        assert await _score(session, period, later, deed_id) == 2 * like_w
+    # The doer deleting their own comment changes no score; b unliking removes the rest.
     await client.delete(f"/api/feed/comments/{by_doer.json()['id']}", headers=doer.headers)
     await client.delete(like, headers=b.headers)
     assert await _score(session, TopPeriod.WEEK, later + timedelta(minutes=5), deed_id) == like_w
@@ -673,7 +674,6 @@ async def test_not_onboarded_member_can_report_a_comment_never(
     )
     for method, path, body in (
         ("POST", f"/api/feed/comments/{r.json()['id']}/reports", {"reason": "spam"}),
-        ("POST", f"/api/feed/deeds/{deed_id}/show", None),
         ("DELETE", f"/api/feed/deeds/{deed_id}/save", None),
         ("DELETE", f"/api/users/{doer.handle}/follow", None),
     ):

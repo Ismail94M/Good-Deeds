@@ -6,7 +6,12 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from app.core.config import _DEV_SECRET, DEV_STORAGE_ACCESS_KEY, Settings
+from app.core.config import (
+    _DEV_SECRET,
+    DEV_STORAGE_ACCESS_KEY,
+    DEV_STORAGE_SECRET_KEY,
+    Settings,
+)
 
 GOOD_SECRET = "k" * 32
 
@@ -51,6 +56,7 @@ def test_valid_production_config_constructs() -> None:
         ({"storage_access_key_id": DEV_STORAGE_ACCESS_KEY}, "GD_STORAGE_ACCESS_KEY_ID"),
         ({"storage_access_key_id": ""}, "GD_STORAGE_ACCESS_KEY_ID"),
         ({"storage_secret_access_key": ""}, "GD_STORAGE_SECRET_ACCESS_KEY"),
+        ({"storage_secret_access_key": DEV_STORAGE_SECRET_KEY}, "GD_STORAGE_SECRET_ACCESS_KEY"),
     ],
 )
 def test_unsafe_production_config_rejected(overrides: dict[str, Any], message: str) -> None:

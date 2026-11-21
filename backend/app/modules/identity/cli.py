@@ -1,10 +1,12 @@
 """Identity command line (M3 D43). Roles are granted only here; no HTTP route changes a role.
 
-    uv run python -m app.modules.identity.cli set-role <handle> <role> --reason "..."
+    uv run python -m app.modules.identity.cli set-role <handle> <role> --reason "..." \
+        --operator "<your name>"
 
 ``<role>`` is ``admin``, ``moderator`` or ``member``.
 
-Every change writes ``audit_log`` (``role.changed``, with the reason) and bumps the user's
+Every change writes ``audit_log`` (``role.changed``, with the reason and the operator's name;
+``actor_id`` stays null because no signed-in account runs it) and bumps the user's
 ``token_version`` (their current access tokens stop working).
 """
 
@@ -17,13 +19,13 @@ from app.modules.identity.models import Role
 from app.modules.identity.service import get_user_by_handle, set_role
 
 
-async def _set_role(handle: str, role: Role, reason: str) -> int:
+async def _set_role(handle: str, role: Role, reason: str, operator: str) -> int:
     async with SessionLocal() as session:
         user = await get_user_by_handle(session, handle)
         if user is None:
             print(f"No user with handle {handle!r}.", file=sys.stderr)
             return 1
-        changed = await set_role(session, user, role, reason=reason)
+        changed = await set_role(session, user, role, reason=reason, operator=operator)
         await session.commit()
     print(f"@{handle} is now {role.value}." if changed else f"@{handle} is already {role.value}.")
     return 0
@@ -36,10 +38,15 @@ def main(argv: list[str] | None = None) -> int:
     cmd.add_argument("handle")
     cmd.add_argument("role", choices=[r.value for r in Role])
     cmd.add_argument("--reason", required=True, help="why (kept in the audit log)")
+    cmd.add_argument(
+        "--operator", required=True, help="your name: who changed the role (kept in the audit log)"
+    )
     args = parser.parse_args(argv)
     if not args.reason.strip():
         parser.error("--reason must not be empty")
-    run = _set_role(args.handle.lstrip("@"), Role(args.role), args.reason)
+    if not args.operator.strip():
+        parser.error("--operator must not be empty")
+    run = _set_role(args.handle.lstrip("@"), Role(args.role), args.reason, args.operator.strip())
     if sys.platform == "win32":
         # psycopg's async mode needs a selector event loop on Windows.
         return asyncio.run(run, loop_factory=asyncio.SelectorEventLoop)

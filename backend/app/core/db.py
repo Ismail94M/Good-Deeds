@@ -24,7 +24,9 @@ class Base(DeclarativeBase):
 # ``reporter_month`` advisory lock; under READ COMMITTED each statement sees rows committed by the
 # previous lock holder. REPEATABLE READ or SERIALIZABLE would keep the transaction's first
 # snapshot, so the locked count could miss them. Don't raise the isolation level.
-engine = create_async_engine(get_settings().database_url, pool_pre_ping=True)
+# hide_parameters: database errors and SQL logs never include bound values (coordinates, text,
+# hashes), in any environment (security review L8).
+engine = create_async_engine(get_settings().database_url, pool_pre_ping=True, hide_parameters=True)
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 

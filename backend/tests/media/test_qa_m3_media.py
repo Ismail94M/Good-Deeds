@@ -324,10 +324,9 @@ async def test_conflict_of_interest_holds_for_admins_too(
     for action in ("keep", "remove"):
         r = await _decide(client, case_id, involved, action)
         assert (r.status_code, r.json()["code"]) == (403, "conflict_of_interest")
-    # They can still read the queue and the case (only deciding is refused).
-    assert (
-        await client.get(f"/api/admin/photo-reports/{case_id}", headers=involved.headers)
-    ).status_code == 200
+    # SEC2 M1: they don't see the case at all (404, the same as a case that doesn't exist).
+    r = await client.get(f"/api/admin/photo-reports/{case_id}", headers=involved.headers)
+    assert (r.status_code, r.json()["code"]) == (404, "case_not_found")
     assert (await _decide(client, case_id, other)).status_code == 200
     r = await _restore(client, photo.id, involved)
     assert (r.status_code, r.json()["code"]) == (403, "conflict_of_interest")

@@ -74,8 +74,8 @@ async def purge_deleted(timestamp: int) -> int:
 @job_app.periodic(cron="* * * * *", periodic_id="media_move_objects")
 @job_app.task(name="media.move_objects", queue="media", queueing_lock="media_move_objects")
 async def move_objects(timestamp: int) -> int:
-    """Every minute: finish admin hold / restore moves left by a failed request. One batch per
-    run, so a move that keeps failing can't make the job spin."""
+    """Every minute: finish admin hold / restore moves left by a failed request. One pass over
+    every pending row (one attempt each), so failing moves can't spin the job or starve others."""
     async with SessionLocal() as session:
         return await _moves.move_pending(session, get_storage())
 
@@ -94,3 +94,14 @@ async def sweep_staging(timestamp: int) -> int:
     storage = get_storage()
     async with SessionLocal() as session:
         return await _cleanup.sweep_staging(session, storage)
+
+
+@job_app.periodic(cron="*/5 * * * *", periodic_id="media_sweep_late_puts")
+@job_app.task(name="media.sweep_late_puts", queue="media", queueing_lock="media_sweep_late_puts")
+async def sweep_late_puts(timestamp: int) -> int:
+    """Every 5 minutes: delete staging objects re-created by a still-valid upload URL after the
+    photo was already processed, rejected or removed (SEC2 L7)."""
+    storage = get_storage()
+    async with SessionLocal() as session:
+        _, limits = await load_limits(session)
+        return await _cleanup.sweep_late_puts(session, storage, limits)

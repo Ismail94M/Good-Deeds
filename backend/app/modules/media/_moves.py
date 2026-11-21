@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.storage import ObjectNotFound, ObjectStorage
 from app.modules.media import _keys
-from app.modules.media.models import ObjectMove, Photo
+from app.modules.media.models import ObjectMove, Photo, PhotoStatus
 
 log = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ async def run_move(session: AsyncSession, storage: ObjectStorage, photo_id: uuid
         .with_for_update()
         .execution_options(populate_existing=True)
     )
-    if photo is None or photo.object_move is None:
+    if photo is None or photo.object_move is None or photo.status == PhotoStatus.DELETED:
         await session.commit()
         return True
     try:
@@ -90,17 +90,23 @@ async def run_move(session: AsyncSession, storage: ObjectStorage, photo_id: uuid
 
 
 async def move_pending(session: AsyncSession, storage: ObjectStorage) -> int:
-    """One batch of rows with a pending move (``media.move_objects``). Returns rows found. The
-    job runs one batch per minute: a move that keeps failing must not make it spin."""
-    ids = list(
-        await session.scalars(
-            select(Photo.id)
-            .where(Photo.object_move.is_not(None))
-            .order_by(Photo.id)
-            .limit(MOVE_BATCH)
+    """One pass over every row with a pending move (``media.move_objects``), in ``MOVE_BATCH``
+    pages by id, so a group of moves that keep failing can't starve the others (SEC2 L6): each
+    pending row gets exactly one attempt per run. Deleted photos are skipped (their objects are
+    purged instead). Returns the rows attempted."""
+    attempted = 0
+    after: uuid.UUID | None = None
+    while True:
+        stmt = select(Photo.id).where(
+            Photo.object_move.is_not(None), Photo.status != PhotoStatus.DELETED
         )
-    )
-    await session.commit()
-    for photo_id in ids:
-        await run_move(session, storage, photo_id)
-    return len(ids)
+        if after is not None:
+            stmt = stmt.where(Photo.id > after)
+        ids = list(await session.scalars(stmt.order_by(Photo.id).limit(MOVE_BATCH)))
+        await session.commit()
+        for photo_id in ids:
+            await run_move(session, storage, photo_id)
+        attempted += len(ids)
+        if len(ids) < MOVE_BATCH:
+            return attempted
+        after = ids[-1]

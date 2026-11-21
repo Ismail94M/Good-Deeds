@@ -313,8 +313,11 @@ async def test_remove_then_restore(client: AsyncClient, session: AsyncSession) -
         restore, headers=other_moderator.headers, json={"note": "Context was fine"}
     )
     assert r.status_code == 200 and r.json()["comment"]["state"] == "visible"
+    assert r.json()["comment"]["body"] == "Not a nice thing to say here"
     assert [d["action"] for d in r.json()["decisions"]] == ["remove", "restore"]
     assert (await post_of(session, deed_id)).comment_count == 1  # type: ignore[union-attr]
+    restored = await _comment(session, comment_id)
+    assert restored.deleted_at is None and restored.author_deleted_at is None
     assert (await client.get("/api/feed/me/comment-notices", headers=author.headers)).json() == []
     r = await client.post(restore, headers=moderator.headers, json={"note": "Context was fine"})
     assert r.status_code == 409 and r.json()["code"] == "not_restorable"
@@ -343,6 +346,133 @@ async def test_remove_then_restore(client: AsyncClient, session: AsyncSession) -
     assert sorted(audits) == ["comment.removed", "comment.restored"]
     assert sorted(e["action"] for e in events) == ["remove", "restore"]
     assert set(events[0]) == {"comment_id", "case_id", "deed_id", "author_id", "action"}
+
+
+async def _counters(session: AsyncSession, deed_id: uuid.UUID) -> tuple[int, int]:
+    post = await post_of(session, deed_id)
+    assert post is not None
+    return post.comment_count, post.top_comment_count
+
+
+async def test_author_delete_after_moderation_removal_keeps_the_text(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """L3: the author's delete no longer erases text moderation removed, so the 30-day evidence
+    stays; the author gets the same 204 as any delete. A later restore undoes only the
+    moderation: the comment stays deleted as the author's own, erased then, counts unchanged."""
+    _, _, author, deed_id, comment_id = await _setup(session)
+    (member,) = await members(session, 1)
+    moderator = await _reviewer(session)
+    await _report(client, member, comment_id)
+    case = await _case(session, comment_id)
+    r = await client.post(
+        f"/api/admin/comment-reports/{case.id}/decision",
+        headers=moderator.headers,
+        json={"action": "remove", "note": "Harassment of the doer"},
+    )
+    assert r.status_code == 200
+    assert await _counters(session, deed_id) == (0, 0)
+
+    delete = f"/api/feed/comments/{comment_id}"
+    for _ in range(2):
+        r = await client.delete(delete, headers=author.headers)
+        assert r.status_code == 204 and r.content == b""
+    comment = await _comment(session, comment_id)
+    assert comment.body == "Not a nice thing to say here"
+    assert comment.deleted_role == CommentDeletedRole.MODERATION
+    assert comment.deleted_by == moderator.user_id
+    asked_at = comment.author_deleted_at
+    assert asked_at is not None  # the first request; the second changes nothing
+    assert await _counters(session, deed_id) == (0, 0)  # counted once
+    notices = await client.get("/api/feed/me/comment-notices", headers=author.headers)
+    assert [n["comment_id"] for n in notices.json()] == [str(comment_id)]
+
+    r = await client.post(
+        f"/api/admin/comments/{comment_id}/restore",
+        headers=moderator.headers,
+        json={"note": "Context was fine"},
+    )
+    assert r.status_code == 200
+    detail = r.json()
+    assert detail["comment"]["state"] == "deleted"
+    assert detail["comment"]["body"] is None and detail["comment"]["restorable_until"] is None
+    assert [d["action"] for d in detail["decisions"]] == ["remove", "restore"]
+    assert detail["author_removed_last_90_days"] == 0
+    comment = await _comment(session, comment_id)
+    assert comment.body is None and comment.deleted_role == CommentDeletedRole.AUTHOR
+    assert (comment.deleted_by, comment.deleted_at) == (author.user_id, asked_at)
+    assert await _counters(session, deed_id) == (0, 0)
+    assert (await client.get("/api/feed/me/comment-notices", headers=author.headers)).json() == []
+    listed = await client.get(f"/api/feed/deeds/{deed_id}/comments", headers=member.headers)
+    assert listed.json()["items"] == []
+    again = await client.post(
+        f"/api/admin/comments/{comment_id}/restore",
+        headers=moderator.headers,
+        json={"note": "Context was fine"},
+    )
+    assert again.status_code == 409 and again.json()["code"] == "not_restorable"
+    assert (await client.delete(delete, headers=author.headers)).status_code == 204
+    assert await _counters(session, deed_id) == (0, 0)
+
+
+async def test_author_may_still_erase_after_a_doer_or_reporter_delete(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    reporter, doer, author, deed_id, comment_id = await _setup(session)
+    _, limits = await load_limits(session)
+    second = await _comments.post_comment(session, deed_id, author.user_id, "Again", limits=limits)
+    await session.commit()
+    for who, cid, role in (
+        (doer, comment_id, CommentDeletedRole.DOER),
+        (reporter, second.id, CommentDeletedRole.REPORTER),
+    ):
+        r = await client.delete(f"/api/feed/comments/{cid}", headers=who.headers)
+        assert r.status_code == 204
+        assert (await _comment(session, cid)).body is not None
+        r = await client.delete(f"/api/feed/comments/{cid}", headers=author.headers)
+        assert r.status_code == 204
+        comment = await _comment(session, cid)
+        assert comment.body is None
+        assert comment.deleted_role == role  # who deleted it first stays recorded
+    assert await _counters(session, deed_id) == (0, 0)
+
+
+async def test_moderation_counters_skip_the_doer_and_reporter(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """L1: removing and restoring a doer's or reporter's comment moves ``comment_count`` only; a
+    third member's moves both."""
+    reporter, doer, _, deed_id, by_member = await _setup(session)
+    (filer,) = await members(session, 1)
+    moderator = await _reviewer(session)
+    _, limits = await load_limits(session)
+    by_doer = (
+        await _comments.post_comment(session, deed_id, doer.user_id, "Thanks all", limits=limits)
+    ).id
+    by_reporter = (
+        await _comments.post_comment(session, deed_id, reporter.user_id, "Saw it", limits=limits)
+    ).id
+    await session.commit()
+    assert await _counters(session, deed_id) == (3, 1)
+
+    steps = [(by_doer, (2, 1), (3, 1)), (by_reporter, (2, 1), (3, 1)), (by_member, (2, 0), (3, 1))]
+    for comment_id, removed, restored in steps:
+        await _report(client, filer, comment_id)
+        case = await _case(session, comment_id)
+        r = await client.post(
+            f"/api/admin/comment-reports/{case.id}/decision",
+            headers=moderator.headers,
+            json={"action": "remove", "note": "Spam link here"},
+        )
+        assert r.status_code == 200
+        assert await _counters(session, deed_id) == removed
+        r = await client.post(
+            f"/api/admin/comments/{comment_id}/restore",
+            headers=moderator.headers,
+            json={"note": "Context was fine"},
+        )
+        assert r.status_code == 200
+        assert await _counters(session, deed_id) == restored
 
 
 async def test_keep_changes_nothing(client: AsyncClient, session: AsyncSession) -> None:
@@ -440,12 +570,12 @@ async def test_author_history_counts_only_moderation_removals(session: AsyncSess
     await _comments.delete_comment(session, by_doer.id, doer.user_id)
     await _reports.report_comment(session, comment_id, member.user_id, "spam", None, shared=shared)
     case = await _case(session, comment_id)
-    detail = await _moderation.case_detail(session, case.id, limits=limits)
+    detail = await _moderation.case_detail(session, case.id, moderator.user_id, limits=limits)
     assert detail.author_removed_last_90_days == 0
     await _moderation.decide(
         session, moderator.user_id, case.id, "remove", "Spam posting", shared=shared
     )
-    detail = await _moderation.case_detail(session, case.id, limits=limits)
+    detail = await _moderation.case_detail(session, case.id, moderator.user_id, limits=limits)
     assert detail.author_removed_last_90_days == 1
 
 

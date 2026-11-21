@@ -1,11 +1,11 @@
-"""Top snapshots, one ranking per period (docs/M3-DESIGN.md §3.4 #1 "top", Q26, Q43, D40).
+"""Top snapshots, one ranking per period (docs/M3-DESIGN.md §3.4 #1 "top", Q26, Q43, L1, D40).
 
-``score = top_like_weight * top_like_count + top_comment_weight * comment_count`` over posts that
-are ``listed`` and were published inside the period's **rolling** window (the last
+``score = top_like_weight * top_like_count + top_comment_weight * top_comment_count`` over posts
+that are ``listed`` and were published inside the period's **rolling** window (the last
 ``top_{period}_days`` days). The counts are the post's totals, not only engagement inside the
-window. ``top_like_count`` leaves out the doer's and reporter's own likes (Q43). Ties: the newer
-deed first, then ``deed_id``. Display order only: nothing here touches deeds, counts, points or
-prizes.
+window. ``top_like_count`` and ``top_comment_count`` leave out the doer's and reporter's own likes
+(Q43) and comments (L1). Ties: the newer deed first, then ``deed_id``. Display order only: nothing
+here touches deeds, counts, points or prizes.
 
 Reads never compute scores. The job keeps the newest two snapshots per period, so a reader holding
 the previous snapshot's cursor can finish its pages.
@@ -36,7 +36,7 @@ async def compute_snapshot(
     window_start = now - timedelta(days=limits.top_days(period.value))
     score = (
         limits.top_like_weight * FeedPost.top_like_count
-        + limits.top_comment_weight * FeedPost.comment_count
+        + limits.top_comment_weight * FeedPost.top_comment_count
     ).label("score")
     rows = (
         await session.execute(

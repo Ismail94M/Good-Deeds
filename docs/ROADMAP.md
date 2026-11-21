@@ -36,7 +36,8 @@ Each milestone is built, tested and reviewed by the product owner before the nex
 - Linking a social account from inside a logged-in session.
 - A support flow for changing a verified phone number (re-authentication + notify the old number).
 - Separate signing keys per purpose (JWT / QR / device / phone hash) with key IDs, so one can be rotated without invalidating the others.
-- A real SMS provider (MSG91 or Twilio, with DLT registration).
+- A real SMS provider (MSG91 or Twilio, with DLT registration). It plugs into the existing `SmsProvider` interface (`app/core/sms.py`); start the DLT registration (sender ID and message templates) weeks early, as approval takes time (PO 2026-11-21).
+- Hosting (PO 2026-11-21): Google Cloud Run in Mumbai for the API and the worker (already separate containers), next to the photo bucket. Keep the PostgreSQL job queue (procrastinate) for background jobs and retries; move to Google Cloud Pub/Sub only if traffic ever outgrows it.
 - Web server / hosting: send `X-Robots-Tag: noindex, nofollow` on `/d/*` page responses (Q40; the app also adds a robots meta tag, and `/api/public/*` already sends the header). Set `og:image` in `frontend/index.html` to the absolute production URL of `/og-logo.png` (some preview crawlers ignore relative URLs).
 - PO approval of the photo-guidelines page copy (M3 Q39).
 - PO approval of the community-guidelines page copy (M3 comment-removed notice).
@@ -87,7 +88,7 @@ Each milestone is built, tested and reviewed by the product owner before the nex
 - Admin queue, score overrides with a required reason, audit view.
 
 **M6 Notifications & Challenges**
-- In-app notifications (plus email).
+- In-app notifications (plus email). Option (PO 2026-11-21): browser push through Firebase Cloud Messaging (FCM) as one more delivery channel, sent from the existing job worker.
 - Monthly challenges, including sponsored ones, and participation tracking.
 
 **M7 Moderation**

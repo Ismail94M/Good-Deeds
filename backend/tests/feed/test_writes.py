@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.audit import AuditLog
 from app.core.events import OutboxEvent
 from app.modules.deeds.models import Deed, SameActGroup, VerificationEvent
-from app.modules.feed import _comments
+from app.modules.feed import _comments, _top
 from app.modules.feed._limits import load_limits
 from app.modules.feed.models import (
     CommentDeletedRole,
@@ -23,12 +23,14 @@ from app.modules.feed.models import (
     FeedLike,
     FeedSave,
     FeedShare,
+    FeedTopEntry,
     Follow,
     ReportCaseStatus,
+    TopPeriod,
 )
 from tests.deeds.helpers import Member, make_member, members
 from tests.feed.helpers import follow, post_of, set_post, verified_deed, withdraw_directly
-from tests.feed.test_top import publish_feed
+from tests.feed.test_top import NOW, publish_feed
 
 
 async def _events(session: AsyncSession, event_type: str) -> list[dict[str, Any]]:
@@ -121,7 +123,8 @@ async def test_like_save_share_on_unviewable_deed_is_404(
 
 
 async def test_writes_need_onboarding(client: AsyncClient, session: AsyncSession) -> None:
-    """Q42: reading works, every write here is 403 ``onboarding_required``."""
+    """Q42: reading works, every write here is 403 ``onboarding_required``. Hide/show and
+    deleting a comment need only a signed-in party (security review L2, tests/feed/test_sec2.py)."""
     reporter, doer, deed_id = await _deed(session)
     newcomer = await make_member(session, onboarded=False)
     comment = FeedComment(deed_id=deed_id, author_id=reporter.user_id, body="Well done")
@@ -132,8 +135,6 @@ async def test_writes_need_onboarding(client: AsyncClient, session: AsyncSession
         ("DELETE", f"/api/feed/deeds/{deed_id}/like", None),
         ("PUT", f"/api/feed/deeds/{deed_id}/save", None),
         ("POST", f"/api/feed/deeds/{deed_id}/comments", {"body": "Nice"}),
-        ("DELETE", f"/api/feed/comments/{comment.id}", None),
-        ("POST", f"/api/feed/deeds/{deed_id}/hide", None),
         ("POST", f"/api/feed/deeds/{deed_id}/shares", {"target": "copy_link"}),
         ("PUT", f"/api/users/{doer.handle}/follow", None),
         ("DELETE", f"/api/me/followers/{doer.handle}", None),
@@ -320,6 +321,80 @@ async def test_delete_comment_rules_and_retention(
     for i in ids[1:]:
         await session.refresh(rows[i])
         assert rows[i].body is None
+
+
+async def _comment_counts(session: AsyncSession, deed_id: uuid.UUID) -> tuple[int, int]:
+    post = await post_of(session, deed_id)
+    assert post is not None
+    return post.comment_count, post.top_comment_count
+
+
+async def test_self_comments_show_but_carry_no_top_weight(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """L1: the doer's and reporter's comments count in ``comment_count`` (shown) but not in
+    ``top_comment_count``; every delete reverses exactly what its post did."""
+    reporter, doer, deed_id = await _deed(session)
+    member, other = await members(session, 2)
+    path = f"/api/feed/deeds/{deed_id}/comments"
+
+    async def post(who: Member) -> str:
+        r = await client.post(path, headers=who.headers, json={"body": "Lovely deed"})
+        assert r.status_code == 201
+        return str(r.json()["id"])
+
+    by_doer = await post(doer)
+    assert await _comment_counts(session, deed_id) == (1, 0)
+    by_reporter = await post(reporter)
+    assert await _comment_counts(session, deed_id) == (2, 0)
+    by_member = await post(member)
+    by_other = await post(other)
+    assert await _comment_counts(session, deed_id) == (4, 2)
+    r = await client.get(f"/api/feed/deeds/{deed_id}", headers=member.headers)
+    assert r.json()["comment_count"] == 4  # shown, self-comments included
+
+    async def delete(cid: str, who: Member) -> None:
+        r = await client.delete(f"/api/feed/comments/{cid}", headers=who.headers)
+        assert r.status_code == 204
+
+    # Author deletes, twice: one step down.
+    await delete(by_member, member)
+    await delete(by_member, member)
+    assert await _comment_counts(session, deed_id) == (3, 1)
+    # The doer deletes a third member's comment; the reporter deletes the doer's.
+    await delete(by_other, doer)
+    assert await _comment_counts(session, deed_id) == (2, 0)
+    await delete(by_doer, reporter)
+    assert await _comment_counts(session, deed_id) == (1, 0)
+    # The reporter deletes their own.
+    await delete(by_reporter, reporter)
+    assert await _comment_counts(session, deed_id) == (0, 0)
+
+
+async def test_self_comments_do_not_move_top_order(session: AsyncSession) -> None:
+    reporter, doer = await members(session, 2)
+    (member,) = await members(session, 1)
+    _, limits = await load_limits(session)
+    self_talk = await verified_deed(session, reporter, doer, verified_at=NOW - timedelta(hours=1))
+    for who in (doer, reporter, doer, reporter):
+        await _comments.post_comment(session, self_talk, who.user_id, "Thanks", limits=limits)
+    # Older, so it would lose a tie: it wins only on the third member's comment.
+    liked = await verified_deed(session, reporter, doer, verified_at=NOW - timedelta(hours=2))
+    await _comments.post_comment(session, liked, member.user_id, "Lovely", limits=limits)
+    snap = await _top.compute_snapshot(session, TopPeriod.WEEK, limits, now=NOW)
+    entries = {
+        deed_id: (rank, score)
+        for deed_id, rank, score in await session.execute(
+            select(FeedTopEntry.deed_id, FeedTopEntry.rank, FeedTopEntry.score).where(
+                FeedTopEntry.snapshot_id == snap.id,
+                FeedTopEntry.deed_id.in_([self_talk, liked]),
+            )
+        )
+    }
+    assert entries[liked][1] == limits.top_comment_weight
+    # Zero score: ranked below, or not in the snapshot at all if it is full.
+    assert self_talk not in entries or entries[self_talk] > (entries[liked][0], 0)
+    assert entries.get(self_talk, (0, 0))[1] == 0
 
 
 async def test_deleting_closes_an_open_report_case(session: AsyncSession) -> None:

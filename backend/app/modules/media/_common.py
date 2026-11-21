@@ -15,6 +15,19 @@ class Invalid(AppError):
     status_code = 422
 
 
+class InvalidText(AppError):
+    """422 ``invalid_text``: a NUL character (``\\x00``) can't be stored in a Postgres ``text``
+    value (it would surface as a 500) and has no place in a report or a note (SEC2 L8, the
+    same rule as the feed's free text)."""
+
+    status_code = 422
+
+
+def ensure_clean(*texts: str | None) -> None:
+    if any(text is not None and "\x00" in text for text in texts):
+        raise InvalidText("That text contains a character we can't accept.", code="invalid_text")
+
+
 def photo_not_found() -> NotFound:
     return NotFound("Photo not found.", code="photo_not_found")
 

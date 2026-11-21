@@ -12,7 +12,7 @@ import uuid
 from collections.abc import Sequence
 from datetime import datetime, timedelta
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.storage import ObjectStorage
@@ -195,6 +195,54 @@ async def purge_removed(
     )
     await session.commit()
     return await _purge_rows(session, storage, rows, now)
+
+
+# --------------------------------------------------- media.sweep_late_puts (SEC2 L7)
+
+# How far back the sweep looks for upload URLs that expired. The job runs every 5 minutes, so
+# each row gets several tries; ``sweep_staging`` (48 h) is the backstop after that.
+LATE_PUT_WINDOW = timedelta(minutes=30)
+_PAST_STAGING = (
+    PhotoStatus.READY,
+    PhotoStatus.REJECTED,
+    PhotoStatus.FAILED,
+    PhotoStatus.EXPIRED,
+    PhotoStatus.DELETED,
+)
+
+
+async def sweep_late_puts(
+    session: AsyncSession, storage: ObjectStorage, limits: MediaLimits, now: datetime | None = None
+) -> int:
+    """The presigned PUT stays valid for ``upload_url_ttl_seconds`` after create. A client that
+    PUTs again after the photo was processed (or rejected, discarded, deleted) re-creates
+    ``staging/{id}``: an unprocessed, unblurred copy with its metadata. Once a row's upload URL
+    has expired, nothing can write that key again, so deleting it then is final (Q31). Rows whose
+    URL expired within ``LATE_PUT_WINDOW`` are swept, in pages; deleting a missing key is free.
+    Returns rows looked at."""
+    now = now or utcnow()
+    ttl = timedelta(seconds=limits.upload_url_ttl_seconds)
+    seen = 0
+    after: tuple[datetime, uuid.UUID] | None = None
+    while True:
+        stmt = select(Photo.id, Photo.staging_key, Photo.created_at).where(
+            Photo.status.in_(_PAST_STAGING),
+            Photo.created_at <= now - ttl,
+            Photo.created_at > now - ttl - LATE_PUT_WINDOW,
+        )
+        if after is not None:
+            stmt = stmt.where(tuple_(Photo.created_at, Photo.id) > tuple_(*after))
+        rows = list(await session.execute(stmt.order_by(Photo.created_at, Photo.id).limit(BATCH)))
+        await session.commit()
+        for photo_id, key, _ in rows:
+            try:
+                await storage.delete(key)
+            except Exception as exc:
+                log.warning("photo %s: late staging delete failed (%s)", photo_id, type(exc))
+        seen += len(rows)
+        if len(rows) < BATCH:
+            return seen
+        after = (rows[-1].created_at, rows[-1].id)
 
 
 # --------------------------------------------------- media.sweep_staging

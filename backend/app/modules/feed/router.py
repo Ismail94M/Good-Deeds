@@ -29,6 +29,7 @@ from app.modules.feed import (
 )
 from app.modules.feed._limits import FeedLimits, load_limits
 from app.modules.feed._shared_limits import load_shared
+from app.modules.feed._text import ensure_clean
 from app.modules.feed.models import TopPeriod
 from app.modules.feed.schemas import (
     CommentCaseDetail,
@@ -270,13 +271,19 @@ async def post_comment(
     await limiter.hit(f"comment:u:{user.id}", limits.rate_comment_user)
     await limiter.hit(f"comment:ud:{user.id}", limits.rate_comment_user_daily)
     await limiter.hit(f"comment:ip:{client_ip(request)}", limits.rate_comment_ip)
+    ensure_clean(data.body)
     out = await _comments.post_comment(session, deed_id, user.id, data.body, limits=limits)
     await session.commit()
     return out
 
 
 @router.delete("/feed/comments/{comment_id}", status_code=204)
-async def delete_comment(comment_id: uuid.UUID, user: OnboardedUser, session: Session) -> None:
+async def delete_comment(
+    comment_id: uuid.UUID, user: CurrentUser, session: Session, limiter: Limiter
+) -> None:
+    # CurrentUser (security review L2): the party checks are the service's.
+    _, limits = await load_limits(session)
+    await limiter.hit(f"commentdelete:u:{user.id}", limits.rate_comment_user_daily)
     await _comments.delete_comment(session, comment_id, user.id)
     await session.commit()
 
@@ -286,7 +293,7 @@ async def delete_comment(comment_id: uuid.UUID, user: OnboardedUser, session: Se
 
 @router.post("/feed/deeds/{deed_id}/hide", response_model=VisibilityOut)
 async def hide(
-    deed_id: uuid.UUID, user: OnboardedUser, session: Session, limiter: Limiter
+    deed_id: uuid.UUID, user: CurrentUser, session: Session, limiter: Limiter
 ) -> VisibilityOut:
     _, limits = await load_limits(session)
     await limiter.hit(f"hide:u:{user.id}", limits.rate_hide_user)
@@ -297,7 +304,7 @@ async def hide(
 
 @router.post("/feed/deeds/{deed_id}/show", response_model=VisibilityOut)
 async def show(
-    deed_id: uuid.UUID, user: OnboardedUser, session: Session, limiter: Limiter
+    deed_id: uuid.UUID, user: CurrentUser, session: Session, limiter: Limiter
 ) -> VisibilityOut:
     _, limits = await load_limits(session)
     await limiter.hit(f"hide:u:{user.id}", limits.rate_hide_user)
@@ -389,12 +396,14 @@ async def my_following(
 
 
 @router.get("/feed/me/notices", response_model=list[str])
-async def my_notices(user: CurrentUser, session: Session) -> list[str]:
+async def my_notices(user: CurrentUser, session: Session, limiter: Limiter) -> list[str]:
+    await _feed_read_limit(session, limiter, user.id)
     return await _notices.unseen(session, user.id)
 
 
 @router.post("/feed/me/notices/{key}/seen", status_code=204)
-async def notice_seen(key: str, user: CurrentUser, session: Session) -> None:
+async def notice_seen(key: str, user: CurrentUser, session: Session, limiter: Limiter) -> None:
+    await _feed_read_limit(session, limiter, user.id)
     await _notices.mark_seen(session, user.id, key)
     await session.commit()
 
@@ -406,12 +415,15 @@ async def notice_seen(key: str, user: CurrentUser, session: Session) -> None:
 async def report_comment(
     comment_id: uuid.UUID,
     data: CommentReportIn,
+    request: Request,
     user: OnboardedUser,
     session: Session,
     limiter: Limiter,
 ) -> ReportReceived:
     _, limits = await load_limits(session)
     await limiter.hit(f"commentreport:u:{user.id}", limits.rate_comment_report_user)
+    await limiter.hit(f"commentreport:ip:{client_ip(request)}", limits.rate_comment_ip)
+    ensure_clean(data.details)
     shared = await load_shared(session)
     await _reports.report_comment(
         session, comment_id, user.id, data.reason, data.details, shared=shared
@@ -421,17 +433,29 @@ async def report_comment(
 
 
 @router.get("/feed/me/comment-notices", response_model=list[CommentNotice])
-async def my_comment_notices(user: CurrentUser, session: Session) -> list[CommentNotice]:
+async def my_comment_notices(
+    user: CurrentUser, session: Session, limiter: Limiter
+) -> list[CommentNotice]:
+    await _feed_read_limit(session, limiter, user.id)
     return await _reports.comment_notices(session, user.id, shared=await load_shared(session))
 
 
 @router.post("/feed/me/comment-notices/{comment_id}/seen", status_code=204)
-async def comment_notice_seen(comment_id: uuid.UUID, user: CurrentUser, session: Session) -> None:
+async def comment_notice_seen(
+    comment_id: uuid.UUID, user: CurrentUser, session: Session, limiter: Limiter
+) -> None:
+    await _feed_read_limit(session, limiter, user.id)
     await _reports.mark_notice_seen(session, user.id, comment_id)
     await session.commit()
 
 
 # --------------------------------------------------- #14 to #17 admin (moderators and admins, Q34)
+
+
+async def _admin_read_limit(session: AsyncSession, limiter: Limiter, user_id: uuid.UUID) -> None:
+    # Admin comment reads share the feed read spec under their own key (security review L9).
+    _, limits = await load_limits(session)
+    await limiter.hit(f"admincomments:u:{user_id}", limits.rate_feed_read_user)
 
 
 async def _decision_limit(session: AsyncSession, limiter: Limiter, user_id: uuid.UUID) -> None:
@@ -444,19 +468,22 @@ async def _decision_limit(session: AsyncSession, limiter: Limiter, user_id: uuid
 async def comment_report_queue(
     user: ReviewerUser,
     session: Session,
+    limiter: Limiter,
     status: Literal["open", "resolved"] = "open",
     cursor: str | None = None,
     limit: Limit = _cursor.DEFAULT_PAGE_SIZE,
 ) -> CommentCasePage:
-    return await _moderation.list_cases(session, queue=status, cursor=cursor, limit=limit)
+    await _admin_read_limit(session, limiter, user.id)
+    return await _moderation.list_cases(session, user.id, queue=status, cursor=cursor, limit=limit)
 
 
 @router.get("/admin/comment-reports/{case_id}", response_model=CommentCaseDetail, tags=["admin"])
 async def comment_report_detail(
-    case_id: uuid.UUID, user: ReviewerUser, session: Session
+    case_id: uuid.UUID, user: ReviewerUser, session: Session, limiter: Limiter
 ) -> CommentCaseDetail:
+    await _admin_read_limit(session, limiter, user.id)
     _, limits = await load_limits(session)
-    return await _moderation.case_detail(session, case_id, limits=limits)
+    return await _moderation.case_detail(session, case_id, user.id, limits=limits)
 
 
 @router.post(
@@ -470,12 +497,13 @@ async def decide_comment_report(
     limiter: Limiter,
 ) -> CommentCaseDetail:
     await _decision_limit(session, limiter, user.id)
+    ensure_clean(data.note)
     await _moderation.decide(
         session, user.id, case_id, data.action, data.note, shared=await load_shared(session)
     )
     await session.commit()
     _, limits = await load_limits(session)
-    return await _moderation.case_detail(session, case_id, limits=limits)
+    return await _moderation.case_detail(session, case_id, user.id, limits=limits)
 
 
 @router.post(
@@ -489,9 +517,10 @@ async def restore_comment(
     limiter: Limiter,
 ) -> CommentCaseDetail:
     await _decision_limit(session, limiter, user.id)
+    ensure_clean(data.note)
     _, limits = await load_limits(session)
     case_id = await _moderation.restore(
         session, user.id, comment_id, data.note, limits=limits, shared=await load_shared(session)
     )
     await session.commit()
-    return await _moderation.case_detail(session, case_id, limits=limits)
+    return await _moderation.case_detail(session, case_id, user.id, limits=limits)

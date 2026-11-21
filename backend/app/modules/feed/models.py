@@ -138,6 +138,10 @@ class FeedPost(Base):
             "top_like_count >= 0 AND top_like_count <= like_count", name="top_like_count_valid"
         ),
         CheckConstraint("comment_count >= 0", name="comment_count_non_negative"),
+        CheckConstraint(
+            "top_comment_count >= 0 AND top_comment_count <= comment_count",
+            name="top_comment_count_valid",
+        ),
         CheckConstraint("doer_id <> reporter_id", name="not_self"),
     )
 
@@ -159,6 +163,9 @@ class FeedPost(Base):
     top_like_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     # Live (not deleted) comments.
     comment_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # Live comments by anyone except the deed's doer and reporter; only the Top score reads it
+    # (L1).
+    top_comment_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     # Last sync_post.
     synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
@@ -214,6 +221,11 @@ class FeedComment(Base):
         CheckConstraint(
             "deleted_role IS DISTINCT FROM 'author' OR body IS NULL", name="author_delete_erases"
         ),
+        # Only a deleted comment can carry the author's delete request (L3).
+        CheckConstraint(
+            "author_deleted_at IS NULL OR deleted_at IS NOT NULL",
+            name="author_deleted_needs_deletion",
+        ),
         # The deed's live comments, oldest first.
         Index(
             "ix_feed_comments_deed_live",
@@ -244,6 +256,9 @@ class FeedComment(Base):
     )
     # When the author dismissed the "comment removed" notice (moderation removals only).
     removal_notice_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # When the author deleted a comment moderation had already removed (L3): the text is kept,
+    # and a later restore turns it into an author deletion instead of bringing it back.
+    author_deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 # An author's comments, newest first (also the removal notices).

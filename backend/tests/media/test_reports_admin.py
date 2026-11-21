@@ -733,9 +733,9 @@ async def test_set_role_audits_and_kills_old_tokens(
 
 
 async def test_cli_unknown_handle(capsys: pytest.CaptureFixture[str], migrated_db: None) -> None:
-    assert await cli._set_role("no-such-handle-xyz", Role.ADMIN, "testing") == 1
+    assert await cli._set_role("no-such-handle-xyz", Role.ADMIN, "testing", "Test Operator") == 1
     assert "No user" in capsys.readouterr().err
     with pytest.raises(SystemExit):
-        cli.main(["set-role", "someone", "superuser", "--reason", "x"])
+        cli.main(["set-role", "someone", "superuser", "--reason", "x", "--operator", "Op"])
     with pytest.raises(SystemExit):
-        cli.main(["set-role", "someone", "admin"])  # --reason is required
+        cli.main(["set-role", "someone", "admin", "--operator", "Op"])  # --reason is required

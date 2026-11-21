@@ -28,6 +28,7 @@ from app.modules.feed.models import (
     CommentReport,
     CommentReportCase,
     FeedComment,
+    FeedPost,
     Follow,
     ReportCaseStatus,
 )
@@ -240,6 +241,62 @@ async def test_report_racing_a_deletion_never_leaves_an_open_case(
     # Either the late report is refused, or it never leaves an open case on a deleted comment.
     assert outcome["result"] in ("accepted", "comment_not_found")
     assert await _open_cases(comment_id) == []
+
+
+# --------------------------------------------------- comment counters (L1)
+
+
+async def test_concurrent_comments_keep_top_comment_count_exact(committed: Committed) -> None:
+    """A mixed run of posts and deletes (by authors, the doer and the reporter, one delete
+    twice at once) by the doer, the reporter and six members: afterwards ``comment_count`` equals
+    the live comments and ``top_comment_count`` the live ones by neither party."""
+    reporter, doer = await committed.member(), await committed.member()
+    others = [await committed.member() for _ in range(6)]
+    deed_id = await committed.deed(reporter, doer)
+    async with SessionLocal() as s:
+        _, limits = await load_limits(s)
+        first: dict[uuid.UUID, uuid.UUID] = {}
+        for m in [*others, doer, reporter]:
+            out = await _comments.post_comment(s, deed_id, m.user_id, "First", limits=limits)
+            first[m.user_id] = out.id
+        await s.commit()
+
+    def first_of(m: Member) -> uuid.UUID:
+        return first[m.user_id]
+
+    calls: list[tuple[str, Member, uuid.UUID | None]] = [("post", m, None) for m in others]
+    calls += [("post", doer, None), ("post", doer, None)]
+    calls += [("post", reporter, None), ("post", reporter, None)]
+    calls += [("delete", m, first_of(m)) for m in others[:2]]
+    calls += [("delete", doer, first_of(others[2])), ("delete", reporter, first_of(others[3]))]
+    calls += [("delete", reporter, first_of(doer))]
+    calls += [("delete", others[4], first_of(others[4]))] * 2  # the same delete twice at once
+    barrier = asyncio.Barrier(len(calls))
+
+    async def run(action: str, member: Member, comment_id: uuid.UUID | None) -> None:
+        async with SessionLocal() as s:
+            await barrier.wait()
+            if comment_id is None:
+                await _comments.post_comment(s, deed_id, member.user_id, "Again", limits=limits)
+            else:
+                await _comments.delete_comment(s, comment_id, member.user_id)
+            await s.commit()
+
+    async with asyncio.timeout(60):
+        await asyncio.gather(*(run(*call) for call in calls))
+
+    async with SessionLocal() as s:
+        post = await s.get(FeedPost, deed_id)
+        assert post is not None
+        live = select(func.count()).select_from(FeedComment)
+        live = live.where(FeedComment.deed_id == deed_id, FeedComment.deleted_at.is_(None))
+        total = await s.scalar(live)
+        by_others = await s.scalar(
+            live.where(FeedComment.author_id.not_in([doer.user_id, reporter.user_id]))
+        )
+    # Live: others[5] and the reporter's first, plus 10 new; by others: others[5] plus 6 new.
+    assert post.comment_count == total == 12
+    assert post.top_comment_count == by_others == 7
 
 
 # --------------------------------------------------- follows

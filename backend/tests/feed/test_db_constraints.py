@@ -87,6 +87,7 @@ async def test_listed_is_generated_from_state_and_both_hides(session: AsyncSessi
     _, _, post = await _published(session)
     assert post.listed is True
     assert (post.like_count, post.top_like_count, post.comment_count) == (0, 0, 0)
+    assert post.top_comment_count == 0
 
     async def listed_after(**changes: Any) -> bool:
         for key, value in changes.items():
@@ -121,6 +122,11 @@ async def test_listed_cannot_be_written(session: AsyncSession) -> None:
         ({"comment_count": -1}, "ck_feed_posts_comment_count_non_negative"),
         ({"top_like_count": -1}, "ck_feed_posts_top_like_count_valid"),
         ({"like_count": 2, "top_like_count": 3}, "ck_feed_posts_top_like_count_valid"),
+        ({"top_comment_count": -1}, "ck_feed_posts_top_comment_count_valid"),
+        (
+            {"comment_count": 2, "top_comment_count": 3},
+            "ck_feed_posts_top_comment_count_valid",
+        ),
     ],
 )
 async def test_post_counters_are_checked(
@@ -134,7 +140,7 @@ async def test_post_counters_are_checked(
 async def test_top_like_count_may_equal_like_count(session: AsyncSession) -> None:
     reporter, doer = await _users(session, 2)
     deed = await _verified_qr_deed(session, reporter, doer)
-    session.add(_post(deed, like_count=3, top_like_count=3))
+    session.add(_post(deed, like_count=3, top_like_count=3, comment_count=2, top_comment_count=2))
     await session.flush()
 
 
@@ -614,3 +620,89 @@ def test_backfill_publishes_verified_deeds_only(sync_conn: Connection) -> None:
         )
         == 0
     )
+
+
+def _load_migration(name: str, filename: str) -> Any:
+    path = BACKEND_DIR / "alembic" / "versions" / filename
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None and spec.loader is not None
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+def test_top_comment_count_backfill_and_downgrade(sync_conn: Connection) -> None:
+    """Migration 0016 (L1): live comments by anyone but the doer and reporter; reversible."""
+    m15 = _load_migration("migration_0015", "2026_11_19_0200-0015_feed.py")
+    m16 = _load_migration("migration_0016", "2026_11_21_0000-0016_feed_top_comments.py")
+    reporter, doer, a, b = (_insert_user(sync_conn) for _ in range(4))
+    deed_id = _insert_deed(sync_conn, reporter, doer, verified=True)
+    with Operations.context(MigrationContext.configure(sync_conn)):
+        m15.backfill_feed_posts()
+
+    def comment(author: uuid.UUID, *, deleted: bool = False) -> None:
+        sync_conn.execute(
+            text(
+                "INSERT INTO feed_comments (id, deed_id, author_id, body, deleted_at, deleted_by, "
+                "deleted_role) VALUES (:id, :d, :a, :body, :at, :by, :role)"
+            ),
+            {
+                "id": uuid.uuid4(),
+                "d": deed_id,
+                "a": author,
+                "body": None if deleted else "Lovely",
+                "at": _now() if deleted else None,
+                "by": author if deleted else None,
+                "role": "author" if deleted else None,
+            },
+        )
+
+    for author in (doer, reporter, reporter, a, a, b):
+        comment(author)
+    comment(b, deleted=True)
+    comment(doer, deleted=True)
+    sync_conn.execute(
+        text("UPDATE feed_posts SET comment_count = 6, top_comment_count = 0 WHERE deed_id = :d"),
+        {"d": deed_id},
+    )
+
+    def counts() -> tuple[Any, ...]:
+        return tuple(
+            sync_conn.execute(
+                text("SELECT comment_count, top_comment_count FROM feed_posts WHERE deed_id = :d"),
+                {"d": deed_id},
+            ).one()
+        )
+
+    with Operations.context(MigrationContext.configure(sync_conn)):
+        m16.backfill_top_comment_count()
+        assert counts() == (6, 3)
+        m16.backfill_top_comment_count()  # safe to re-run
+        assert counts() == (6, 3)
+
+        m16.downgrade()
+        columns = sync_conn.execute(
+            text(
+                "SELECT table_name, column_name FROM information_schema.columns WHERE "
+                "(table_name = 'feed_posts' AND column_name = 'top_comment_count') OR "
+                "(table_name = 'feed_comments' AND column_name = 'author_deleted_at')"
+            )
+        ).all()
+        assert columns == []
+        m16.upgrade()
+        assert counts() == (6, 3)
+        too_many = text("UPDATE feed_posts SET top_comment_count = 7 WHERE deed_id = :d")
+        with (
+            pytest.raises(IntegrityError, match="ck_feed_posts_top_comment_count_valid"),
+            sync_conn.begin_nested(),
+        ):
+            sync_conn.execute(too_many, {"d": deed_id})
+        live = text(
+            "UPDATE feed_comments SET author_deleted_at = now() "
+            "WHERE deed_id = :d AND deleted_at IS NULL"
+        )
+        with (
+            pytest.raises(IntegrityError, match="ck_feed_comments_author_deleted_needs_deletion"),
+            sync_conn.begin_nested(),
+        ):
+            sync_conn.execute(live, {"d": deed_id})

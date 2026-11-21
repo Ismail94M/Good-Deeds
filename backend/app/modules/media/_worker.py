@@ -22,6 +22,7 @@ import asyncio
 import hashlib
 import logging
 import uuid
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -106,19 +107,32 @@ async def recover_stuck(session: AsyncSession, limits: MediaLimits, now: datetim
     return failed
 
 
-async def claim(session: AsyncSession, now: datetime, batch: int = CLAIM_BATCH) -> list[Claimed]:
+async def claim(
+    session: AsyncSession,
+    now: datetime,
+    batch: int = CLAIM_BATCH,
+    *,
+    only: Collection[uuid.UUID] | None = None,
+) -> list[Claimed]:
     """Mark up to ``batch`` queued rows ``processing`` (oldest attach first). The caller
-    commits. ``SKIP LOCKED``: rows another worker is claiming are skipped, never shared."""
-    ids = (
-        select(Photo.id)
-        .where(Photo.status == PhotoStatus.QUEUED)
-        .order_by(Photo.attached_at, Photo.id)
+    commits. ``SKIP LOCKED``: rows another worker is claiming are skipped, never shared.
+
+    The locking select is a ``MATERIALIZED`` CTE, so it runs exactly once (an ``IN`` subquery
+    with ``LIMIT`` may be re-evaluated by the planner). ``only`` restricts the claim to given
+    rows; the worker never passes it (tests use it to stay clear of other runs' rows)."""
+    ids = select(Photo.id).where(Photo.status == PhotoStatus.QUEUED)
+    if only is not None:
+        ids = ids.where(Photo.id.in_(list(only)))
+    picked = (
+        ids.order_by(Photo.attached_at, Photo.id)
         .limit(batch)
         .with_for_update(skip_locked=True)
+        .cte("claim")
+        .prefix_with("MATERIALIZED")
     )
     rows = await session.execute(
         update(Photo)
-        .where(Photo.id.in_(ids))
+        .where(Photo.id == picked.c.id)
         .values(
             status=PhotoStatus.PROCESSING,
             processing_started_at=now,
