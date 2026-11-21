@@ -1,8 +1,10 @@
-> **PO decision (2026-11-19):** use this dataset now under OpenCity's "Other (Public Domain)" label; credit it on `/terms` as "Ward boundaries: Greater Bengaluru Authority, via OpenCity (data.opencity.in)"; ask OpenCity/GBA to confirm provenance and terms in parallel (before-launch item). The display names still need PO review.
+> **PO decision (2026-11-19):** use this dataset now under OpenCity's "Other (Public Domain)" label; credit it on `/terms` as "Ward boundaries: Greater Bengaluru Authority, via OpenCity (data.opencity.in)"; ask OpenCity/GBA to confirm provenance and terms in parallel (before-launch item). **PO decision (2026-11-21):** display names approved exactly as proposed in `names.csv`.
 
 # Area names: ward dataset source (DATA1, Q28)
 
-Status: **candidate, waiting for PO review.** Nothing here is seeded yet. The licence verdict and the name table both need PO sign-off before DB4 copies `bangalore_areas.geojson` over the placeholder at `data/bangalore_areas.geojson`.
+Status: **seeded 2026-11-21** (migration 0017 copied this `bangalore_areas.geojson` over `data/bangalore_areas.geojson` and re-seeded `areas`: 369 wards, 34 self-intersecting geometries repaired with `ST_MakeValid`, no ward overlaps over 100 m², only slivers). Licence accepted by the PO on 2026-11-19 (credit on `/terms`). **Display names approved as proposed** in `names.csv` (PO 2026-11-21, all 369 rows including the 63 `U:` rows). Official names are not stored; `areas.ward_code` keeps the join key for a later milestone.
+
+**Remaining before launch:** (1) download the KML in a normal browser from the OpenCity URL and re-check its SHA-256 (concern 2); (2) OpenCity/GBA confirmation of provenance and terms (concern 1); (3) re-check for later renaming or corrigenda (concern 5).
 
 ## Dataset
 
@@ -108,9 +110,9 @@ Two pairs of similar official names are **different places** and were deliberate
 
 ## Open concerns for the PO
 
-1. **Licence:** accept OpenCity's "Public Domain" label (recommended, with the attribution above on `/terms`), or first ask OpenCity or GBA to confirm the source and terms.
-2. **Integrity:** the file came from an Internet Archive capture, because OpenCity blocks scripted downloads. Check the SHA-256 with a browser download before seeding.
-3. **Geometry validity was not checked** with a GIS library (none installed). DB4 should check `ST_IsValid` and `ST_MakeValid` when seeding. It should also report any overlaps between wards: the lookup takes the lowest `id` on a shared border, which already handles slivers.
+1. **Licence** (accepted 2026-11-19; OpenCity/GBA confirmation still open): accept OpenCity's "Public Domain" label (recommended, with the attribution above on `/terms`), or first ask OpenCity or GBA to confirm the source and terms.
+2. **Integrity:** the file came from an Internet Archive capture, because OpenCity blocks scripted downloads. Check the SHA-256 with a browser download before launch (still open; seeded 2026-11-21 from the archived copy).
+3. **Geometry validity** (resolved 2026-11-21): 34 of 369 wards fail `ST_IsValid` (self-intersections); the seed repairs them with `ST_MakeValid` (polygon parts, MultiPolygon), changing the total area by about 1 m². Overlaps between wards: 6 pairs, all slivers (largest 0.7 m²); the lowest-id rule handles them.
 4. **Accuracy:** OpenCity's KML is a digitisation of the notified wards, not the gazette text itself. Boundaries may differ slightly from the legal description. That is acceptable for coarse area names.
 5. **Currency:** re-check before launch whether any later renaming or corrigendum has been issued. The Central Corporation had a corrigendum to the 19 Nov notification, which the Dec 2025 file should include.
-6. **Name review:** the 63 `U:` rows need a person who knows Bangalore. Also check that rows without a note read naturally, e.g. "K Narayanapura", "A Narayanapura", "SK Garden", "JJR Nagar".
+6. **Name review** (resolved 2026-11-21: approved as proposed): the 63 `U:` rows need a person who knows Bangalore. Also check that rows without a note read naturally, e.g. "K Narayanapura", "A Narayanapura", "SK Garden", "JJR Nagar".

@@ -112,8 +112,9 @@ class VerificationEventKind(StrEnum):
 class Area(Base):
     """A Bangalore area (one ward of the official boundary dataset). M3-DESIGN §2.1, D39.
 
-    Seeded by migration 0013 from ``deeds/data/bangalore_areas.geojson``. Only ``name`` is ever
-    shown; ``ward_code`` is kept for audit and re-imports and is never returned by any API.
+    Seeded by migration 0013 (re-seeded by 0017) from ``deeds/data/bangalore_areas.geojson``. Only
+    ``name`` is ever shown; ``ward_code`` is kept for audit, re-imports and a later join to the
+    official ward names, and is never returned by any API.
     On a shared border the lowest ``id`` wins, so ids are part of the seed.
     """
 

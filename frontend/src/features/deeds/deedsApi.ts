@@ -167,6 +167,10 @@ export type DeedOptions = {
   reporter_monthly_limit: number
   /** Reports about one doer per reporter per IST month (15; D19). */
   reporter_doer_monthly_limit: number
+  /** The hub warns when this many or fewer reports are left this month in total (10). */
+  reporter_monthly_warn_at: number
+  /** The deed form warns when this many or fewer reports about the doer are left (3). */
+  reporter_doer_monthly_warn_at: number
   /** 00:00 IST on the 1st of next month, with the `+05:30` offset. */
   month_resets_at: string
   description_min: number

@@ -1,23 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { firstName, formatResetDate } from './format'
-import {
-  PAIR_WARN_AT,
-  pairLimitNotice,
-  showPairWarning,
-  TOTAL_WARN_AT,
-  totalLimitNotice,
-  totalLimitState,
-} from './limits'
+import { pairLimitNotice, showPairWarning, totalLimitNotice, totalLimitState } from './limits'
 
 const RESETS = '2026-12-01T00:00:00+05:30'
 const DOER = { handle: 'ahmed', display_name: 'Ahmed Khan' }
+// The seeded `deeds` config values (migration 0018): warn from 10 left in total, 3 for a pair.
+const TOTAL_WARN_AT = 10
+const PAIR_WARN_AT = 3
 
-describe('thresholds', () => {
-  it('warns from 10 left in total and from 3 left for a pair (D20)', () => {
-    expect(TOTAL_WARN_AT).toBe(10)
-    expect(PAIR_WARN_AT).toBe(3)
-  })
-
+describe('thresholds (from config, D20)', () => {
   it.each([
     [150, 'ok'],
     [11, 'ok'],
@@ -26,7 +17,7 @@ describe('thresholds', () => {
     [0, 'full'],
     [-1, 'full'],
   ] as const)('total with %i left is %s', (remaining, state) => {
-    expect(totalLimitState(remaining)).toBe(state)
+    expect(totalLimitState(remaining, TOTAL_WARN_AT)).toBe(state)
   })
 
   it.each([
@@ -36,7 +27,16 @@ describe('thresholds', () => {
     [1, true],
     [0, false],
   ])('pair warning with %i left: %s', (remaining, shown) => {
-    expect(showPairWarning(remaining)).toBe(shown)
+    expect(showPairWarning(remaining, PAIR_WARN_AT)).toBe(shown)
+  })
+
+  it('follows other thresholds from config', () => {
+    expect(totalLimitState(20, 25)).toBe('near')
+    expect(totalLimitState(10, 5)).toBe('ok')
+    expect(totalLimitState(0, 0)).toBe('full')
+    expect(showPairWarning(5, 5)).toBe(true)
+    expect(showPairWarning(3, 2)).toBe(false)
+    expect(showPairWarning(1, 0)).toBe(false)
   })
 })
 
@@ -44,6 +44,7 @@ describe('totalLimitNotice', () => {
   const options = (remaining: number) => ({
     reports_remaining_this_month: remaining,
     reporter_monthly_limit: 150,
+    reporter_monthly_warn_at: TOTAL_WARN_AT,
     month_resets_at: RESETS,
   })
 
@@ -59,6 +60,13 @@ describe('totalLimitNotice', () => {
       rest: 'Resets on 1 December.',
     })
     expect(totalLimitNotice(options(1))?.lead).toBe('1 deed left this month.')
+  })
+
+  it('uses the warning threshold from config', () => {
+    expect(totalLimitNotice({ ...options(20), reporter_monthly_warn_at: 25 })?.lead).toBe(
+      '20 deeds left this month.',
+    )
+    expect(totalLimitNotice({ ...options(8), reporter_monthly_warn_at: 5 })).toBeNull()
   })
 
   it('blocks at 0 with the limit from config', () => {
@@ -91,18 +99,25 @@ describe('pairLimitNotice', () => {
   })
 
   it('names the doer by first name from 3 left', () => {
-    expect(pairLimitNotice(scan(3))).toEqual({
+    expect(pairLimitNotice(scan(3), PAIR_WARN_AT)).toEqual({
       tone: 'warning',
       blocking: false,
       lead: 'You can record Ahmed 3 more times this month.',
       rest: 'Resets on 1 December.',
     })
-    expect(pairLimitNotice(scan(1))?.lead).toBe('You can record Ahmed 1 more time this month.')
+    expect(pairLimitNotice(scan(1), PAIR_WARN_AT)?.lead).toBe(
+      'You can record Ahmed 1 more time this month.',
+    )
   })
 
   it('shows nothing above 3 or at 0', () => {
-    expect(pairLimitNotice(scan(4))).toBeNull()
-    expect(pairLimitNotice(scan(0))).toBeNull()
+    expect(pairLimitNotice(scan(4), PAIR_WARN_AT)).toBeNull()
+    expect(pairLimitNotice(scan(0), PAIR_WARN_AT)).toBeNull()
+  })
+
+  it('uses the warning threshold from config', () => {
+    expect(pairLimitNotice(scan(5), 5)?.lead).toBe('You can record Ahmed 5 more times this month.')
+    expect(pairLimitNotice(scan(3), 2)).toBeNull()
   })
 })
 

@@ -662,7 +662,12 @@ def _run(conn: Connection, module: ModuleType, step: str) -> None:
 
 
 # Keys added by migrations after 0008; the 0008 rollback rightly leaves them alone.
-LATER_KEYS = {"rate_manual_target_daily", "area_fallback_m"}  # 0009, 0013
+LATER_KEYS = {
+    "rate_manual_target_daily",  # 0009
+    "area_fallback_m",  # 0013
+    "reporter_monthly_warn_at",  # 0018
+    "reporter_doer_monthly_warn_at",  # 0018
+}
 # Keys that 0008 adds but a later migration removed again (0013 moved ``photos_enabled`` to the
 # ``media`` namespace). Re-running 0008 on top of head brings them back, so they are compared
 # separately and dropped before validating against the current DeedLimits.

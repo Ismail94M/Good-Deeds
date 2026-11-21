@@ -29,9 +29,10 @@ services:
       # Read from the root .env file (see docs/SETUP-GOOGLE-SIGNIN.md). Empty hides the button.
       GD_GOOGLE_CLIENT_ID: ${GD_GOOGLE_CLIENT_ID:-}
       # Local S3-compatible storage (SeaweedFS). The API and worker reach it as storage:8333;
-      # browsers use the URLs signed for localhost:8333. Dev keys: infra/seaweedfs/s3.json.
+      # browsers use the URLs signed for 127.0.0.1:8333 (the port is published on IPv4 loopback
+      # only, and `localhost` may resolve to ::1 first). Dev keys: infra/seaweedfs/s3.json.
       GD_STORAGE_ENDPOINT_URL: http://storage:8333
-      GD_STORAGE_PUBLIC_ENDPOINT_URL: http://localhost:8333
+      GD_STORAGE_PUBLIC_ENDPOINT_URL: http://127.0.0.1:8333
       GD_STORAGE_REGION: us-east-1
       GD_STORAGE_BUCKET: gooddeeds-media
       GD_STORAGE_ACCESS_KEY_ID: gooddeeds-dev

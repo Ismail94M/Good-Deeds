@@ -1,18 +1,16 @@
 # Good Deeds architecture diagrams
 
-**Synced to commit `1a9fd6d` (`m2-deeds`) plus the forgot-password security fixes (migration 0012) that are committed with these diagrams, on 2026-11-17.** Pages touched by those fixes (02, 03 core + identity, 04 1b and 1c, 05 local compose) say so in their titles; the other changed pages say "Synced to 1a9fd6d". The implemented baseline is M0 + M1 + M2, backend and screens: My QR (F2), Record a deed (F3), My deeds, self-logs and profile counts (F6), and forgot password. M3–M8 are not built.
+**Synced to commit `2c7ba38` (`m3-feed`) plus the uncommitted working tree (migrations `0017_real_ward_areas` and `0018_deeds_v6`, the 127.0.0.1 storage endpoint) on 2026-11-21.** The implemented baseline is M0 + M1 + M2 + M3 (feed and social, photos, photo and comment reports with a moderator/admin review queue, the public share page), backend and screens. M3 is built, QA'd and security-reviewed but **not yet approved by the PO**. M4–M8 are not built. Pages changed for M3 say "Synced to 2c7ba38 (branch m3-feed) + uncommitted 0017/0018"; unchanged pages keep their older sync line.
 
-What AD2 changed since `4b05a3a`:
-- **Monthly limits (D19):** 15 reports per reporter–doer pair and 150 per reporter per IST month (`deeds` config v3, migration 0008). They're pre-checked at scan time and checked again under the `reporter_month` lock before the scan is consumed.
-- **Same-act grouping uses server time (D28):** `qr_scans.scanned_at` for QR deeds and `deeds.reported_at` for invite deeds. `occurred_at` is for display only.
-- **Invites are built but switched off** by config (D17, migration 0007), so the invite backend is drawn as partial and the invite screens as unscheduled (D26).
-- **Security fixes:**
-  - the access-log token redaction filter (`app/core/log_redaction.py`)
-  - a daily per-target limit on typed codes (`rate_manual_target_daily`, migration 0009)
-  - suspended reporters' invites return 404
-  - the frontend moves the QR token out of the URL
-- **Forgot password:** two endpoints, with `phone_otps.purpose` added by migration 0011. Migration 0012 adds the security-review fixes: a separate reset SMS budget charged only when a code is sent, and daily per-phone limits. A new sequence diagram (workflow 1c) shows the flow.
-- **Dev infrastructure:** Vite polling in Docker, and an optional cloudflared tunnel for testing on a phone.
+What AD3 changed since `c294451` (M3, [M3-DESIGN](../M3-DESIGN.md) Revision 2 and the code):
+- **Two new modules (D29):** `media` (uploads, the photo pipeline, signed URLs, photo reports, admin decisions) and `feed` (the feed projection, visibility, likes, comments, saves, shares, follows, Top, comment reports). Each has its own page in 03.
+- **Storage (D35):** `app/core/storage.py` talks to any S3-compatible store. SeaweedFS runs in docker-compose (`storage`, plus a one-shot `storage-init` that creates the bucket and its CORS rules); Google Cloud Storage `asia-south1` is the launch target but isn't configured, so storage is drawn as partial.
+- **Photo pipeline (D31–D34):** presigned PUT straight to `staging/`, `complete` checks the object, attach after the deed with blur regions, the worker blurs on the server, writes WebP variants under `photos/` and deletes the raw upload. Viewers get signed GET URLs (signing time floored to 30 min, valid 60 min). Admin removal moves variants to `held/` (90 days, Q32); uploader and doer removals delete the objects at once.
+- **Reports and review (D42–D45):** photo reports (anyone) and comment reports (onboarded members) open cases; moderators and admins decide keep / remove / restore with a note, in two queues under `/admin`. Roles change only through `python -m app.modules.identity.cli set-role HANDLE ROLE --reason ... --operator ...` (audited).
+- **Feed (D36–D40):** handlers for `DeedVerified`, `DeedWithdrawn` and `DeedRejected` call one idempotent `sync_post`; every read re-checks the deed live. Top snapshots per period (week, month, year) with zero weight for self-likes and for the doer's and reporter's own comments (Q43, L1). Public share page `/d/:id` with `no-store` and `noindex` (Q40).
+- **Migrations 0013–0018:** `areas` + `deeds.area_id` + `deeds` v5; media tables + `media` v1; feed tables + `feed` v1 + backfill; `feed_posts.top_comment_count` (L1) and `feed_comments.author_deleted_at` (L3); 0017 re-seeds `areas` with the 369 GBA wards; 0018 publishes `deeds` v6 (the report-limit warning thresholds).
+- **New jobs:** nine `media.*` jobs on the `media` queue and two `feed.*` jobs (see 02 and 03).
+- **Area names are implemented:** migration 0017 re-seeds `areas` with the 369 GBA wards (display names from `ward_candidate/names.csv`) and recomputes `deeds.area_id` (discrepancy 20, resolved).
 
 These diagrams are drawn from the repository (code, migrations, `docker-compose.yml`, CI, PRD and ROADMAP), not from assumptions. Every shape stores its evidence: open a diagram, select a shape, and choose **Edit → Edit Data** to see its `status`, `milestone`, `source` (repo paths) and `details`.
 
@@ -27,79 +25,54 @@ The `.drawio` files open in [app.diagrams.net](https://app.diagrams.net) (File �
 | IMPLEMENTED | solid border, green fill | Code on the branch, wired in (registered module, mounted route, migrated table, compose service, CI job). |
 | PARTIAL | solid border, amber fill | Code exists but is disabled, unconfigured or dev-only. |
 | PLANNED (Mx) | dashed border, grey fill | In ROADMAP or PRD, no code yet. Label ends with the milestone. |
-| PROPOSED | dotted border, white fill | From a design the product owner hasn't approved yet (none at the moment: the M2 design is approved and built). |
+| PROPOSED | dotted border, white fill | From a design the product owner hasn't approved yet (none at the moment: M3 is built from the approved M3 design). |
 
 ## Diagrams
 
 ### 01 System context: [`01-system-context.drawio`](01-system-context.drawio)
 ![System context](img/01-system-context.svg)
 
-Good Deeds as one system with its people and external services. M1 covers accounts, phone OTP, the age and consent gate, profiles and the rotating doer QR. M2 adds password reset by SMS code and recording, verifying, editing and withdrawing deeds, with screens.
-- **Witness / reporter** is now implemented: they scan a QR or type ID + code, record the deed, then edit or withdraw it (screens F3 and F6).
-- **Doer:** shows the QR, ID and 6-digit code, and sees only verified deeds about them (D24).
-- **External services:** Google sign-in works once configured. Facebook sign-in and SMS are partial; SMS carries both phone-verification and password-reset codes, to the console only.
-- **Planned actors:**
-  - viewers of the feed (M3)
-  - admins and moderators (M5)
-  - sponsors (M6/M8)
-  - organisations (unscheduled; the PRD lists them as future only)
-- **Planned external services:** storage, AI, email, CAPTCHA and WhatsApp sharing.
+Good Deeds as one system with its people and external services. M1 covers accounts, phone OTP, the age and consent gate, profiles and the rotating doer QR. M2 adds password reset by SMS code and recording, verifying, editing and withdrawing deeds. M3 adds the feed, photos, social actions, shares, the public share page and report review.
+- **Witness / reporter** and **doer** are unchanged; the doer now also removes photos on deeds about them and hides deeds from the feed.
+- **Viewer / member** is now implemented (M3): reads the feed, likes, comments, saves, follows, shares and reports. Visitors without an account see only `/d/:id` and public profiles.
+- **Moderator / admin** is implemented for M3's report review only; overrides and flags stay M5.
+- **External services:** Google sign-in works once configured; Facebook and SMS are partial. **Object storage** is partial (SeaweedFS locally, GCS not configured). **WhatsApp / Web Share** is implemented (share sheet, generic link preview).
+- **Planned:** sponsors (M6/M8), organisations (unscheduled), AI (M4), email (M6), CAPTCHA (before launch).
 
 ### 02 High-level architecture: [`02-high-level-architecture.drawio`](02-high-level-architecture.drawio)
 ![High-level architecture](img/02-high-level-architecture.svg)
 
-- **Frontend:** the React SPA calls the FastAPI API through the Vite `/api` proxy. It holds a 15-minute access JWT in memory and refreshes it with a rotating httpOnly `gd_refresh` cookie scoped to `/api/auth`.
-  - The **M2 screens** box is now implemented: My QR, Record a deed (hub, camera scan, ID + code, deed form, result), My deeds (detail, edit, withdraw), self-logs, profile counts and forgot password.
-  - Invite screens (D26) and photos (D23) are not part of M2.
-  - `/scan/:token` keeps the token in memory and replaces the URL with `/report/link`.
-- **Backend:** the API (modules `identity` and `deeds`) and the Procrastinate worker share PostgreSQL 16 + PostGIS (20 application tables plus the job schema).
-  - The API now lists `/api/auth/password/forgot` and `/reset`, and marks the invite routes as switched off.
-  - Token paths are redacted from the access log.
-  - The database box cites migrations 0007–0012: `deeds` config v4, `phone_otps.purpose`, and `identity` config v3 (reset SMS budget and daily per-phone limits).
-  - The worker runs `deeds.expire_invites` (every 15 min) and `deeds.purge_unconsumed_scans` (daily).
-- **Integrations:** Google sign-in is implemented when `GD_GOOGLE_CLIENT_ID` is set. Facebook is built but unconfigured. SMS is console-only and now sends both OTPs and reset codes.
-- **Planned:** media storage (M3), AI evaluation (M4) and notifications (M6).
+- **Frontend:** the React SPA calls the API through the Vite `/api` proxy, with the 15-minute access JWT in memory and the rotating `gd_refresh` cookie. A new **M3 screens** box covers the feed, deed page, share sheet, public page `/d/:id`, profiles with follows, saved, the photo picker and blur editor, report sheets and the admin queues. The browser PUTs photo uploads and loads images **straight from storage** with signed URLs (dashed arrow).
+- **API:** modules `identity`, `deeds`, `media`, `feed`. The box lists the `/api/media/*`, `/api/feed/*`, `/api/public/deeds/{id}` and `/api/admin/*` routes.
+- **Database:** 37 application tables, head `0018`; the box names the media and feed tables and cites every migration.
+- **Worker:** one Procrastinate worker on all queues. It adds `media.process_queued` (every 5 s), `media.move_objects` (1 min), `media.purge_deleted` and `media.sweep_late_puts` (5 min), `media.expire_uploads` (30 min), `media.purge_detached` (hourly), `media.purge_removed` (02:23), `media.sweep_staging` (02:53), `feed.refresh_top` (every minute, each period when due) and `feed.erase_deleted_comments` (03:47), plus the feed's three event handlers.
+- **Object storage** is partial: SeaweedFS in compose works; GCS `asia-south1` with HMAC keys is the launch target and has no configuration yet.
+- **Planned:** AI evaluation (M4) and notifications (M6).
 
 ### 03 Backend modules: [`03-backend-modules.drawio`](03-backend-modules.drawio)
-Three pages.
+Five pages.
 
 ![Backend modules: core + identity](img/03-backend-modules--core-identity-implemented.svg)
 
-- **Core + identity:**
-  - The `app/core` layer (config, runtime_config, db, events/outbox, jobs, audit, security, ratelimit, errors, sms, health, **log_redaction**) sits under the registered modules (`identity`, `deeds`).
-  - **Core changes since AD1:**
-    - `log_redaction` is installed by `create_app()`.
-    - `errors`: `AppError.extra` adds body fields (D27).
-    - `db` stays READ COMMITTED on purpose, so locked monthly counts see the previous lock holder's rows.
-    - `audit` is now also written by the identity password reset.
-  - **Identity changes since AD1:**
-    - `router.py` has the two password routes.
-    - `service.py` gained `is_active`, which deeds uses, and backs the router with `request_password_reset` and `reset_password`.
-    - `phone_otps` has a `purpose` column.
-    - `_limits.py` (`identity` v3) has the forgot and reset rate limits, hourly and daily per phone, and the `sms:reset_global` budget (migrations 0011, 0012).
-    - Refresh: replaying a token ended by revoke-all, or one from an older `token_version`, gets 401 `session_expired` without revoking again; reusing a rotated token still revokes all.
-  - A note gives the module boundary rule and what `tests/test_architecture.py` actually checks.
+- **Core + identity:** `registry.py` now lists `identity`, `deeds`, `media`, `feed`. Core gains **`storage`** (the `ObjectStorage` protocol, `S3Storage` over boto3 with SigV4, `MemoryStorage` for tests) and `db` creates its engine with `hide_parameters`. Identity's `service.py` adds `ReviewerUser` (moderator or admin), `onboarding_status`, `get_user_by_handle` and `set_role`; the new `cli.py` is the only way to change a role, writes `audit_log` (`role.changed`, with reason and operator) and bumps `token_version`.
 
 ![Backend modules: deeds module](img/03-backend-modules--deeds-module-m2.svg)
 
-- **Deeds module (M2):**
-  - **Routers and private files:**
-    - `router.py` lists every route, with the invite routes marked as switched off.
-    - New private file `_reporter_limit.py`: the `reporter_month` lock and the 150 / 15 monthly limits, plus unlocked pre-checks at scan time.
-    - `_invites.py` is drawn partial (switched off by config).
-    - `_scans.py` gains the daily per-target limit and the monthly pre-checks; `_qr_deeds.py` and `_grouping.py` group by server time (D28).
-    - `_reads.py` shows the doer verified deeds only (D24).
-    - `_limits.py` is at `deeds` v4.
-  - **Tables and imports:**
-    - The tables note the `ix_deeds_doer_counted` index (D15).
-    - The identity `service.py` box adds `is_active`; `core.db` adds the `reporter_month` lock key.
-  - The rules note lists all four lock orders from `CLAUDE.md`.
+- **Deeds module:** M3 adds `_areas.py` (area at create and accept, nearest area within 1500 m, else "Bangalore"; the seed holds the 369 GBA wards since 0017), the `areas` table and `deeds.area_id` (0013, re-seeded by 0017), `deeds` v5 (`photos_enabled` moved to `media`, `area_fallback_m`) and v6 (0018: `reporter_monthly_warn_at` 10, `reporter_doer_monthly_warn_at` 3), and `service.py` functions `get_deeds`, `area_name`, `category_labels`, `self_log_owner`. The feed now subscribes to `DeedVerified`, `DeedWithdrawn` and `DeedRejected`.
+
+![Backend modules: media module](img/03-backend-modules--media-module-m3.svg)
+
+- **Media module (new):** the router (uploads, attach, owner views, removal, photo reports, admin queue and decisions), nine jobs on the `media` queue, the private files (`_uploads`, `_owners`, `_worker` + `_pipeline`, `_reports`, `_admin`, `_moves`, `_cleanup`, `_keys`, `_limits`), four tables (0014, `photo_decisions` append-only) and two events with no subscribers yet. Imports go to `deeds.service`, `identity.service` and `app.core`; only `router.py` reads `feed.service` (D30).
+
+![Backend modules: feed module](img/03-backend-modules--feed-module-m3.svg)
+
+- **Feed module (new):** the router (feed tabs, deed and public pages, social actions, hide/show, follows, notices, comment reports, comment review), the three handlers and `sync_post`, two jobs, the private files (`_reads` + `_compose`, `_top`, `_writes` + `_follows`, `_comments` + `_kindness`, `_reports` + `_moderation`, `_limits` + `_shared_limits`), twelve tables (0015, 0016) and four events with no subscribers yet.
 
 ![Backend modules: module map](img/03-backend-modules--module-map-m1-m8.svg)
 
-- **Module map (M1–M8):** unchanged since AD1, so its title still says "Synced to 4b05a3a". Every module from the PRD module table is shown with its milestone, drawn as an event bus. The deeds events still have no subscriber.
+- **Module map (M1–M8):** Feed & Social is implemented and consumes `DeedVerified`, `DeedWithdrawn`, `DeedRejected`; a new **Media** box (M3-DESIGN D29, not in the PRD table) emits `PhotoRemovedByDoer` and `PhotoModerationDecided`; Feed emits `DeedLiked`, `CommentPosted`, `UserFollowed`, `CommentModerationDecided`. Moderation (M7) notes that photo and comment reports moved into M3.
 
-### 04 Workflows: [`04-workflows.drawio`](04-workflows.drawio), eight pages
+### 04 Workflows: [`04-workflows.drawio`](04-workflows.drawio), ten pages
 1. **1a Google sign-in** (implemented, sequence diagram; unchanged since AD1):
    - `/auth/config` decides whether the button shows.
    - Google's popup returns an ID token, and `POST /auth/oauth/google` verifies it against Google's keys (audience, issuer, 30 s clock leeway).
@@ -154,7 +127,7 @@ Three pages.
      - A pending deed cancels its invite. A verified deed leaves its group, with promotion and prize-rank revocation.
      - The deed still counts toward the monthly limits.
    - **The doer's view (D24):** a withdrawn report disappears; the reporter still sees it as Withdrawn.
-   - Later consumers (Feed M3, Scoring M4) are planned.
+   - **M3:** the feed consumes `DeedWithdrawn` (the post becomes withdrawn, and reads drop it at once); edits need no handler because the feed reads content live (D38). Scoring (M4) is still planned.
 
    ![Workflow 3b: edit and withdraw](img/04-workflows--3b-edit-and-withdraw-m2.svg)
 7. **4 Impact scoring** (M4, planned; unchanged):
@@ -162,21 +135,32 @@ Three pages.
    - An append-only ledger with caps, plus rank score, tier and badges.
 
    ![Workflow 4: impact scoring](img/04-workflows--4-impact-scoring-m4.svg)
-8. **5 Feed publishing** (M3, planned; unchanged):
-   - Presigned media upload and a face-blur job.
-   - Posts from deed events, with pending posts hiding the doer.
-   - Nearby / Following / Top tabs, social actions, and M8 ad slots.
+8. **5 Feed publishing and reads** (M3, implemented; replaces the planned page):
+   - The three deed events reach the feed handlers through the outbox; `sync_post` upserts `feed_posts`.
+   - `GET /api/feed` (Nearby, Following, Top with week / month / year) and the deed page read posts, re-check each deed live, read content from `deeds.get_deeds` and photos from `media.public_photos`.
+   - Social writes keep the counters on `feed_posts`; hide / show is per person (Q24). `feed.refresh_top` snapshots Top; `feed.erase_deleted_comments` erases removed comment text after 30 days.
+   - The public share page `/d/:id` calls `GET /api/public/deeds/{id}` (no login, `no-store`, `noindex`, per-IP limit). Ad slots stay M8. Area names come from the 369 GBA wards (0017).
 
    ![Workflow 5: feed publishing](img/04-workflows--5-feed-publishing-m3.svg)
+9. **5b Photo upload and processing** (M3, new page, implemented):
+   - Create upload → PUT bytes to `staging/` with a signed URL → `complete` (HEAD + magic bytes) → attach after the deed with blur regions (D31).
+   - `media.process_queued` claims queued rows, blurs and resizes on the server, writes WebP variants under `photos/`, then deletes the staging object (no unblurred copy, D33).
+   - Viewers load signed GET URLs; uploader and doer removals delete the objects right after commit. Cleanup jobs expire, purge and sweep. The bucket is partial (SeaweedFS only).
+
+   ![Workflow 5b: photo upload and processing](img/04-workflows--5b-photo-upload-and-processing-m3.svg)
+10. **5c Photo and comment reports, moderation** (M3, new page, implemented):
+    - Photo reports (anyone, per-IP limit) and comment reports (onboarded members) open one case per item, with priorities children → privacy and harmful → other (Q44). Reports never change anything by themselves (D42).
+    - Moderators and admins work two queues under `/admin` and decide keep / remove / restore with a note; nobody decides a case on their own deed (D43). Decisions go to append-only tables and `audit_log` and emit events with no subscribers yet.
+    - An admin removal moves the variants to `held/` (`media.move_objects`); `media.purge_removed` deletes them after 90 days (Q32); uploader and doer can't purge a held photo (L4). Removed comment text is kept 30 days (L3). Guidelines pages are partial (copy awaits PO approval); the full admin area (M5) and post reports (M7) are planned.
+
+   ![Workflow 5c: reports and moderation](img/04-workflows--5c-reports-and-moderation-m3.svg)
 
 ### 05 Infrastructure and deployment: [`05-infrastructure-deployment.drawio`](05-infrastructure-deployment.drawio), two pages
 
-- **Local Docker Compose** (synced to `1a9fd6d`):
-  - **Services:** `db` (PostGIS, with a health check and the `db-data` volume), a one-shot `migrate` (head 0012), then `api` and `worker` (both built from `./backend`) and `web` (the Vite dev server).
-  - **web:** now sets `VITE_USE_POLLING=true`, because Docker on Windows doesn't forward file events. Vite allows `.trycloudflare.com` hosts.
-  - **api:** redacts token paths in its access log.
-  - **Phone testing (partial, dev only, outside compose):** a phone browser reaches the dev server through an optional, hand-started cloudflared quick tunnel. Camera and location need HTTPS.
-  - The root `.env` supplies `GD_GOOGLE_CLIENT_ID` only. Each service's `depends_on` condition is written in its label rather than drawn as an arrow.
+- **Local Docker Compose** (synced to `2c7ba38`):
+  - **Services:** `db` (PostGIS on `127.0.0.1:5432`, `db-data`), a one-shot `migrate` (head **0018**), `api` and `worker` (both built from `./backend`), `web` (Vite), and since M3 **`storage`** (SeaweedFS `chrislusf/seaweedfs:4.48`, S3 on `127.0.0.1:8333`, keys from `infra/seaweedfs/s3.json`, volume `storage-data`) and the one-shot **`storage-init`** (`amazon/aws-cli`, creates bucket `gooddeeds-media` and puts its CORS rules for `http://localhost:5173`).
+  - `api` and `worker` now also wait for `storage-init`. The `&backend-env` anchor adds the `GD_STORAGE_*` settings: the API and worker call `storage:8333`; URLs signed for browsers use `127.0.0.1:8333` (the port is published on IPv4 loopback only, and `localhost` can resolve to `::1` first). Dev keys are refused outside development.
+  - The phone path through the cloudflared quick tunnel is unchanged (partial, dev only).
 
   ![Infrastructure: local Docker Compose](img/05-infrastructure-deployment--local-docker-compose.svg)
 - **CI and deployment:** unchanged; CI and the Dockerfiles haven't changed since `c6395cf`, so this page still says "Synced to c6395cf".
@@ -188,7 +172,7 @@ Three pages.
 
 ## Discrepancies found while drawing
 
-First found on 2026-11-12; re-checked on 2026-11-15 against `4b05a3a` and on 2026-11-17 against `1a9fd6d`. These are inconsistencies between code, PRD, ROADMAP and `CLAUDE.md`; none were fixed as part of the diagram work. The numbers stay the same between updates.
+First found on 2026-11-12; re-checked on 2026-11-15 against `4b05a3a` on 2026-11-17 against `1a9fd6d` and on 2026-11-21 against `2c7ba38`. These are inconsistencies between code, PRD, ROADMAP and `CLAUDE.md`; none were fixed as part of the diagram work. The numbers stay the same between updates.
 
 1. **Facebook can't be enabled under Docker.** Compose forwards only `GD_GOOGLE_CLIENT_ID`; the Facebook settings and `GD_SMS_PROVIDER` never reach the containers. ROADMAP marks Facebook in M1 as done. *Still open.*
 2. **The audit log is never written.** *Mostly resolved* (see [M2-DESIGN §0](../M2-DESIGN.md#0-decisions-on-known-discrepancies)):
@@ -203,7 +187,7 @@ First found on 2026-11-12; re-checked on 2026-11-15 against `4b05a3a` and on 202
    - The proposed `DeedUnverified` was dropped. Invite expiry is `DeedRejected(new_status="unverified", reason="invite_expired")`.
    - PRD §11 now says Identity emits `UserRegistered` and `PhoneVerified`. None of these events has a subscriber yet.
 7. **Self-logs are placed in different modules.** *Resolved by M2* (see [M2-DESIGN §0, D3 and D4](../M2-DESIGN.md#01-product-owner-decisions-2026-11-15)): self-logs live in the `deeds` module, and PRD §11 now puts them under "Deeds & Verification".
-8. **Object storage:** PRD §14 says MinIO locally, but `CLAUDE.md` says the MinIO image is gone and a replacement will be chosen in M3. *Still open.*
+8. **Object storage:** *Resolved by M3:* SeaweedFS replaces MinIO in docker-compose (D35), and PRD §14 now says GCS at launch and SeaweedFS locally.
 9. **No deployment path.** *Still open.*
    - Compose runs dev servers (`uvicorn --reload`, Vite).
    - CI builds no images.
@@ -211,13 +195,19 @@ First found on 2026-11-12; re-checked on 2026-11-15 against `4b05a3a` and on 202
 10. **Feature branches aren't CI-checked** until a pull request is opened, because CI runs only on `main` and on PRs. *Still open.*
 11. **The PRD places AuditLog in M5** (Review & Audit), but `audit_log` has existed in core since M0 and has been written since M2. *Still open.*
 12. **Organisations** appear only as future work in the PRD and not in the ROADMAP. *Still open.*
-13. **Later subscribers of the M2 events appear only in the design.** M2-DESIGN §4 says Scoring (M4) will consume `DeedWithdrawn`, `DeedPrizeRankChanged`, `DeedCountsForPointsChanged` and `DeedEdited`, and Feed (M3) will consume `DeedEdited` and `DeedWithdrawn`. PRD §11's "consumes" column still lists only `DeedVerified` for Scoring and `DeedSubmitted, DeedVerified` for Feed. The module map follows the PRD; workflow 3b shows the design's later consumers as planned. *Still open.*
+13. **Later subscribers of the M2 events.** *Partly resolved by M3:* the feed subscribes to `DeedVerified`, `DeedWithdrawn` and `DeedRejected` (M3-DESIGN §5). PRD §11's Feed row still says it consumes `DeedSubmitted, DeedVerified`, which the code doesn't do. Scoring's (M4) subscribers remain design-only. *Still open.*
 14. **ROADMAP M2 says invite acceptance means "sign up through the link".** D9 and PRD §5 let existing members accept too, and the code allows it. Invites are now switched off and have no screens (D17, D26). *Still open.*
 15. **Naming only:** PRD §11 calls the module "Deeds & Verification"; the code module is `deeds`. The diagrams show both names. *Still open.*
-16. **(New) Forgot password is only in the ROADMAP.** ROADMAP M2 lists it (PO decision 2026-11-17) and the code is built (migrations 0011 and 0012, `/api/auth/password/*`), but neither `docs/PRD.md` nor `docs/M2-DESIGN.md` describes it.
-17. **(New) `CLAUDE.md` misses parts of identity.** It doesn't mention the password reset, `phone_otps.purpose` or the forgot/reset rate limits. Its list of identity `service.py` functions used by other modules omits `is_active`, which deeds calls on invite accept.
-18. **(New) M2-DESIGN's status line** still says Revision 5 is "for PO review", although Revision 5 is built and pushed in `1a9fd6d`.
-19. **(New, naming only) Migration numbering skips 0010:** `0011_identity_password_reset` revises `0009`. Alembic is fine with this; it's noted so nobody looks for a missing file.
+16. **Forgot password was only in the ROADMAP.** *Resolved:* PRD §5 step 1 now describes it.
+17. **`CLAUDE.md` missed parts of identity.** *Resolved:* it now covers the password reset, `phone_otps.purpose` and `is_active`.
+18. **M2-DESIGN's status line.** *Resolved:* it says Revision 5 is approved, built and pushed.
+19. **(Naming only) Migration numbering skips 0010:** `0011_identity_password_reset` revises `0009`. Alembic is fine with this; it's noted so nobody looks for a missing file.
+
+20. **(New) Area names use placeholder data.** PO decision Q28 (2026-11-19, recorded in `deeds/data/ward_candidate/AREAS_SOURCE.md`) says to use the GBA ward dataset now, but migration 0013 seeded `deeds/data/bangalore_areas.geojson`, which holds 13 hand-made placeholder areas ("PLACEHOLDER - replace with the official ward dataset"). Most real deeds will show "Bangalore" or a coarse placeholder name until the ward file replaces it (task DB4). *Resolved:* migration `0017_real_ward_areas` re-seeds the table with the 369 GBA wards in `bangalore_areas.geojson`; `_areas.py` and the area boxes are drawn as implemented (uncommitted at sync time).
+21. **(New) The reporting-limit warning thresholds are code constants.** "Warn from 3 left for a pair and from 10 left in total" lives in `frontend/src/features/report/limits.ts` (`PAIR_WARN_AT`, `TOTAL_WARN_AT`), not in a config row, although `CLAUDE.md` says every tunable limit is config. PRD §12's limits table doesn't list them. *Resolved:* migration 0018 publishes them as `deeds` v6 (`reporter_doer_monthly_warn_at` 3, `reporter_monthly_warn_at` 10); `GET /api/deeds/options` returns them and the frontend uses those values.
+22. **(New) M3-DESIGN §4.8's job table is incomplete.** The code also runs `media.process_queued` (every 5 s, the pipeline) and `media.sweep_late_puts` (every 5 min, SEC2 L7), and `feed.refresh_top` is one job every minute that refreshes each period when it is due (10 / 30 / 60 min). *Resolved:* the table now lists them.
+23. **(New) M3-DESIGN's status line** still says "Nothing is built yet", although M3 is built in `5f37066`–`2c7ba38`. *Resolved:* it now says built, QA'd, security-reviewed and awaiting PO review.
+24. **(New) PRD §11 has no Media module.** M3-DESIGN D29 adds a `media` module (uploads, pipeline, photo reports and decisions); the PRD module table and its Moderation row ("reports") don't mention it or that photo and comment reports moved into M3. *Resolved:* §11 has a Media row, Feed consumes `DeedVerified`, `DeedWithdrawn` and `DeedRejected`, and the Moderation row no longer lists photo and comment reports.
 
 ## Keeping this up to date
 

@@ -62,7 +62,7 @@ A user can never verify their own deed.
 
 **Profile counts:** every profile shows two public counts, like followers/following: *Self-log Deeds* and *Verified Deeds*. Verified Deeds counts the user's **counted** verified reports, the same figure the leaderboard uses: 20 witnesses of one act count as 5 (the same-act cap), while 100 reports in separate places or times count as 100. Self-logs are never included in it.
 
-**Monthly reporting limits (PO decision 2026-11-16):** per calendar month (India time, resetting on the 1st), a reporter can submit at most 15 reports about the same doer, and at most 150 reports in total across all doers. Withdrawn reports still use up a slot; failed submissions don't. The app warns the reporter when they are close to either limit.
+**Monthly reporting limits (PO decision 2026-11-16, replaces the earlier flat limit):** per IST calendar month (resetting on the 1st), a reporter can submit at most **15 reports per reporter–doer pair**, plus at most **150 reports in total** across all doers. Both limits apply to QR and invite reports. Withdrawn reports still use up a slot; failed submissions don't. The app shows no warning until the reporter is close: a warning on the deed form from **3 reports left** for that doer, and a warning on the reporting hub from **10 reports left** in total. At either limit, further reports are refused until the month resets. The two limits (15 and 150) are config values.
 
 **Invites are switched off for now** (2026-11-16). Only QR / ID + code reporting is live. The invite rules below apply when invites are switched back on; when they return, an invite-verified deed earns points but needs human review or another independent verification before it counts for prizes.
 
@@ -307,12 +307,13 @@ Deed count, points, badges, likes and prize history are shown separately on the 
 | Fraud Checks                      | reciprocal, ring, concentration and invite-anomaly detection                       | consumes DeedVerified, emits FlagRaised    |
 | Review & Audit                    | flag queue, overrides, append-only audit log                                       | consumes FlagRaised                        |
 | Points & Leaderboard              | ledger, badges, configurable rankings                                              | consumes DeedEvaluated                     |
-| Feed & Social                     | posts, feed ranking, likes, comments, shares, follows                              | consumes DeedSubmitted, DeedVerified       |
+| Feed & Social                     | posts, feed ranking, likes, comments, shares, follows, comment reports and their review | consumes DeedVerified, DeedWithdrawn, DeedRejected |
 | Challenges                        | monthly kindness challenges, sponsored challenges                                  | —                                          |
 | Rewards                           | prize eligibility, monthly prize calculation, winner review, payouts               | consumes leaderboard results               |
 | Ads & Sponsorship                 | ad slots, sponsored challenges, sponsor-funded prizes                              | consumes Analytics events                  |
 | Notifications                     | all user notifications                                                             | consumes the events above                  |
-| Moderation                        | reports, AI pre-screening, takedowns, blocking                                     | —                                          |
+| Media                             | photo uploads, server-side blur and processing, signed URLs, photo reports and their review | emits PhotoRemovedByDoer, PhotoModerationDecided |
+| Moderation                        | user and deed reports, AI pre-screening, takedowns, blocking (photo and comment reports were built in M3, in Media and Feed) | —                                          |
 | Analytics                         | North Star, engagement, fraud, revenue and payout metrics                          | consumes the events above                  |
 | Professional Recognition (future) | placeholder boundary, not built                                                    | —                                          |
 
@@ -379,7 +380,7 @@ A user can win a cash prize only if all of these are true:
 - **Backend:** Python 3.12, FastAPI, SQLAlchemy 2.0 + Alembic, Pydantic v2. Modular monolith.
 - **Database:** PostgreSQL 16 + PostGIS.
 - **Background jobs:** Procrastinate (Postgres-based queue), fed by a transactional outbox of domain events.
-- **Media:** S3-compatible object storage: Google Cloud Storage in Mumbai (asia-south1) at launch through its S3-compatible API, and an S3-compatible container locally (the MinIO image is no longer published; see `docs/M3-DESIGN.md`).
+- **Media:** S3-compatible object storage: Google Cloud Storage in Mumbai (asia-south1) at launch through its S3-compatible API, and SeaweedFS (S3-compatible) in docker-compose locally (the MinIO image is no longer published; see `docs/M3-DESIGN.md`).
 - **AI:** provider-agnostic `ImpactEvaluator` interface; shadow mode at launch.
 
 ## 15. Compliance notes (to confirm with legal / CA before launch)

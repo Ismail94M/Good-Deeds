@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_prefix="GD_", extra="ignore")
 
     env: str = "production"
-    database_url: str = "postgresql+psycopg://gooddeeds:gooddeeds@localhost:5432/gooddeeds"
+    database_url: str = "postgresql+psycopg://gooddeeds:gooddeeds@127.0.0.1:5432/gooddeeds"
     cors_origins: list[str] = ["http://localhost:5173"]
     # Public URL of the web app; QR codes link to it.
     web_base_url: str = "http://localhost:5173"

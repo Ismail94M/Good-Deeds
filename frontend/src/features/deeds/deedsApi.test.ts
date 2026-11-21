@@ -244,6 +244,8 @@ describe('deedsApi: deeds', () => {
       reports_remaining_this_month: 12,
       reporter_monthly_limit: 150,
       reporter_doer_monthly_limit: 15,
+      reporter_monthly_warn_at: 10,
+      reporter_doer_monthly_warn_at: 3,
       month_resets_at: '2026-12-01T00:00:00+05:30',
       description_min: 10,
       description_max: 1000,

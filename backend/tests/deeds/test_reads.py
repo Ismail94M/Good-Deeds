@@ -288,6 +288,9 @@ async def test_options_reflect_config_and_todays_invites(
         # Revision 5 (D20, D23)
         "reporter_monthly_limit",
         "reporter_doer_monthly_limit",
+        # Migration 0018: the warning thresholds
+        "reporter_monthly_warn_at",
+        "reporter_doer_monthly_warn_at",
         "month_resets_at",
         "description_min",
         "description_max",
@@ -301,6 +304,8 @@ async def test_options_reflect_config_and_todays_invites(
     # The limits and copy values follow config (seeded values, apart from the two published).
     assert body["reporter_monthly_limit"] == 10
     assert body["reporter_doer_monthly_limit"] == 15
+    assert body["reporter_monthly_warn_at"] == 10
+    assert body["reporter_doer_monthly_warn_at"] == 3
     assert "photos_enabled" not in body  # moved to GET /api/media/options (M3 D41)
     assert body["beneficiaries_max"] == 10000
     assert body["qr_occurred_max_age_minutes"] == 120
@@ -336,6 +341,8 @@ async def test_options_limits_and_copy_values_follow_config(
         qr_occurred_max_age_minutes=90,
         beneficiaries_max=500,
         same_act_cap=3,
+        reporter_monthly_warn_at=12,
+        reporter_doer_monthly_warn_at=2,
     )
     body = (await client.get("/api/deeds/options", headers=me.headers)).json()
     assert body["reporter_monthly_limit"] == 40
@@ -345,6 +352,8 @@ async def test_options_limits_and_copy_values_follow_config(
     assert body["qr_occurred_max_age_minutes"] == 90
     assert body["beneficiaries_max"] == 500
     assert body["same_act_cap"] == 3
+    assert body["reporter_monthly_warn_at"] == 12
+    assert body["reporter_doer_monthly_warn_at"] == 2
 
 
 # --------------------------------------------------- deeds.service views (§4)

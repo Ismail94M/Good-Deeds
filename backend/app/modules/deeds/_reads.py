@@ -172,6 +172,8 @@ async def options(
         reports_remaining_this_month=max(0, limits.reporter_monthly_limit - reported),
         reporter_monthly_limit=limits.reporter_monthly_limit,
         reporter_doer_monthly_limit=limits.reporter_doer_monthly_limit,
+        reporter_monthly_warn_at=limits.reporter_monthly_warn_at,
+        reporter_doer_monthly_warn_at=limits.reporter_doer_monthly_warn_at,
         month_resets_at=ist_month(now)[1],
         description_min=limits.description_min,
         description_max=limits.description_max,

@@ -51,6 +51,17 @@ describe('ReportHubPage', () => {
     )
   })
 
+  it('takes the warning threshold from the deed options (config)', async () => {
+    mockApi({
+      ...signedIn(makeMe()),
+      'GET /deeds/options': {
+        body: makeOptions({ reports_remaining_this_month: 20, reporter_monthly_warn_at: 25 }),
+      },
+    })
+    renderApp('/report')
+    expect(await screen.findByText('20 deeds left this month.')).toBeInTheDocument()
+  })
+
   it('says "1 deed left" in the singular', async () => {
     setup(1)
     renderApp('/report')

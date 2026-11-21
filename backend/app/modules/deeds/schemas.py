@@ -255,6 +255,10 @@ class DeedOptions(BaseModel):
     # per-doer: the pair count comes with the scan.
     reporter_monthly_limit: int
     reporter_doer_monthly_limit: int
+    # Warning thresholds (migration 0018): the hub warns at <= reporter_monthly_warn_at reports
+    # left in total, the deed form at <= reporter_doer_monthly_warn_at left about the doer.
+    reporter_monthly_warn_at: int
+    reporter_doer_monthly_warn_at: int
     month_resets_at: datetime
     description_min: int
     description_max: int

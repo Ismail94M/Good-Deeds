@@ -1,28 +1,28 @@
 /**
- * Monthly-limit warnings (M2-DESIGN D19, D20, §5.5). The limits themselves and the remaining
- * counts come from the server; these thresholds only decide when a banner shows.
+ * Monthly-limit warnings (M2-DESIGN D19, D20, §5.5). The limits, the remaining counts and the
+ * warning thresholds (`reporter_monthly_warn_at`, `reporter_doer_monthly_warn_at`) all come from
+ * the server's `deeds` config via `GET /deeds/options`.
  */
 
 import type { DeedOptions, ScanOut } from '../deeds/deedsApi'
 import { firstName, formatResetDate } from './format'
 
-/** Warn on the hub when this many or fewer reports are left this month (in total). */
-export const TOTAL_WARN_AT = 10
-/** Warn on the deed form when this many or fewer reports about this doer are left. */
-export const PAIR_WARN_AT = 3
-
 /** `ok`: no banner; `near`: a warning; `full`: the limit is reached and recording is blocked. */
 export type TotalLimitState = 'ok' | 'near' | 'full'
 
-export function totalLimitState(remaining: number): TotalLimitState {
+/** `warnAt` is `reporter_monthly_warn_at`: warn when this many or fewer are left in total. */
+export function totalLimitState(remaining: number, warnAt: number): TotalLimitState {
   if (remaining <= 0) return 'full'
-  if (remaining <= TOTAL_WARN_AT) return 'near'
+  if (remaining <= warnAt) return 'near'
   return 'ok'
 }
 
-/** The deed form warns only when 1..PAIR_WARN_AT are left (0 is refused by the server). */
-export function showPairWarning(remaining: number): boolean {
-  return remaining >= 1 && remaining <= PAIR_WARN_AT
+/**
+ * The deed form warns only when 1..`warnAt` are left (0 is refused by the server). `warnAt` is
+ * `reporter_doer_monthly_warn_at`.
+ */
+export function showPairWarning(remaining: number, warnAt: number): boolean {
+  return remaining >= 1 && remaining <= warnAt
 }
 
 /**
@@ -43,15 +43,18 @@ function resetsOn(iso: string): string {
   return date ? `Resets on ${date}.` : 'Resets at the start of next month.'
 }
 
-/** Hub banner from `GET /deeds/options`, or null when more than TOTAL_WARN_AT are left. */
+/** Hub banner from `GET /deeds/options`, or null when more than `reporter_monthly_warn_at` are left. */
 export function totalLimitNotice(
   options: Pick<
     DeedOptions,
-    'reports_remaining_this_month' | 'reporter_monthly_limit' | 'month_resets_at'
+    | 'reports_remaining_this_month'
+    | 'reporter_monthly_limit'
+    | 'reporter_monthly_warn_at'
+    | 'month_resets_at'
   >,
 ): LimitNotice | null {
   const remaining = options.reports_remaining_this_month
-  const state = totalLimitState(remaining)
+  const state = totalLimitState(remaining, options.reporter_monthly_warn_at)
   if (state === 'ok') return null
   if (state === 'near') {
     return {
@@ -70,12 +73,16 @@ export function totalLimitNotice(
   }
 }
 
-/** Deed-form warning from the scan, or null unless 1..PAIR_WARN_AT reports are left. */
+/**
+ * Deed-form warning from the scan, or null unless 1..`warnAt` reports are left. `warnAt` is
+ * `reporter_doer_monthly_warn_at` from `GET /deeds/options`.
+ */
 export function pairLimitNotice(
   scan: Pick<ScanOut, 'doer' | 'pair_reports_remaining' | 'month_resets_at'>,
+  warnAt: number,
 ): LimitNotice | null {
   const remaining = scan.pair_reports_remaining
-  if (!showPairWarning(remaining)) return null
+  if (!showPairWarning(remaining, warnAt)) return null
   const name = firstName(scan.doer.display_name)
   return {
     tone: 'warning',

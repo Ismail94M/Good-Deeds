@@ -28,7 +28,11 @@ export function ReportHubPage() {
   }
 
   const notice = totalLimitNotice(options.data)
-  const full = totalLimitState(options.data.reports_remaining_this_month) === 'full'
+  const full =
+    totalLimitState(
+      options.data.reports_remaining_this_month,
+      options.data.reporter_monthly_warn_at,
+    ) === 'full'
 
   return (
     <ReportMain wide>

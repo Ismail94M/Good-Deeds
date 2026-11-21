@@ -1,11 +1,14 @@
 """Typed values of the ``deeds`` config namespace (docs/M2-DESIGN.md §2.1).
 
 Every key is required and has no default: the ``config_versions`` row (seeded as ``deeds`` v1 by
-migration 0004, then v2 by 0007, v3 by 0008, v4 by 0009 and v5 by 0013) is the only source of
-these values. Change them by publishing a new version.
+migration 0004, then v2 by 0007, v3 by 0008, v4 by 0009, v5 by 0013 and v6 by 0018) is the only
+source of these values. Change them by publishing a new version.
 
 v5 (docs/M3-DESIGN.md §2.1, D41): ``photos_enabled`` moved to the ``media`` namespace, and
 ``area_fallback_m`` was added.
+
+v6 (migration 0018): the report-limit warning thresholds ``reporter_monthly_warn_at`` and
+``reporter_doer_monthly_warn_at``, formerly frontend constants.
 """
 
 from pydantic import BaseModel, ConfigDict
@@ -38,6 +41,10 @@ class DeedLimits(RuntimeConfig):
     # in total and about any one doer
     reporter_monthly_limit: int
     reporter_doer_monthly_limit: int
+    # Warnings (D20, §5.5): the report hub warns when this many or fewer reports are left this
+    # month in total; the deed form when this many or fewer about the scanned doer are left
+    reporter_monthly_warn_at: int
+    reporter_doer_monthly_warn_at: int
     # Invites (B6); switched off while ``invites_enabled`` is false (D17)
     invites_enabled: bool
     invites_per_day: int

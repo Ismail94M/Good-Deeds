@@ -22,11 +22,18 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.modules.deeds._areas import area_names, display_name, resolve_area_id
 from app.modules.deeds.models import Area, DeedStatus, VerificationMethod
 from tests.conftest import BACKEND_DIR
 
 AREAS_FILE = BACKEND_DIR / "app" / "modules" / "deeds" / "data" / "bangalore_areas.geojson"
 MIGRATION = BACKEND_DIR / "alembic" / "versions" / "2026_11_19_0000-0013_deeds_v5.py"
+RESEED_MIGRATION = BACKEND_DIR / "alembic" / "versions" / "2026_11_21_0100-0017_real_ward_areas.py"
+
+# Ashoka Pillar, Jayanagar 1st Block: inside ward GBA-C040, shown as "Jayanagar".
+ASHOKA_PILLAR = "SRID=4326;POINT(77.5838 12.9406)"
+# New Delhi: outside every ward and far beyond the fallback distance.
+NEW_DELHI = "SRID=4326;POINT(77.2090 28.6139)"
 
 
 def _square(lng: float, lat: float, half: float) -> str:
@@ -80,6 +87,28 @@ async def test_area_names_follow_the_clean_up_rule(session: AsyncSession) -> Non
         assert not any(ch.isdigit() for ch in area.name), area.name
 
 
+async def test_seeded_wards_have_a_ward_code_each(session: AsyncSession) -> None:
+    """Official names can be joined later on ``ward_code`` (PO 2026-11-21: nothing new stored)."""
+    codes = list((await session.execute(select(Area.ward_code).where(Area.id < 30000))).scalars())
+    assert len(codes) == 369
+    assert len(set(codes)) == 369
+    assert all(code.startswith("GBA-") for code in codes)
+
+
+@pytest.mark.parametrize(
+    ("point", "expected"),
+    [(ASHOKA_PILLAR, "Jayanagar"), (NEW_DELHI, "Bangalore"), (None, "Bangalore")],
+)
+async def test_lookup_in_the_real_wards(
+    session: AsyncSession, point: str | None, expected: str
+) -> None:
+    area_id = await resolve_area_id(session, point, 1500)
+    assert display_name(area_id, await area_names(session, [area_id])) == expected
+    if expected == "Jayanagar":
+        ward = await session.scalar(select(Area.ward_code).where(Area.id == area_id))
+        assert ward == "GBA-C040"
+
+
 # --- constraints --------------------------------------------------------------------------------
 
 
@@ -122,8 +151,8 @@ async def test_deed_area_must_exist_and_cannot_be_deleted_while_used(
 # --- backfill (the §2.1 lookup rule) ------------------------------------------------------------
 
 
-def _load_migration() -> ModuleType:
-    spec = importlib.util.spec_from_file_location("migration_0013", MIGRATION)
+def _load_migration(path: Path = MIGRATION) -> ModuleType:
+    spec = importlib.util.spec_from_file_location(f"migration_{path.stem}", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -217,6 +246,66 @@ def test_backfill_applies_the_lookup_rule(sync_conn: Connection) -> None:
     assert m.AREA_FALLBACK_M == 1500
 
 
+def test_reseed_replaces_placeholder_areas_and_keeps_deeds_meaningful(
+    sync_conn: Connection,
+) -> None:
+    """Migration 0017 on a database seeded with the placeholder: old areas go, deeds that pointed
+    at them get the real ward of their own point (or null), the FK never breaks, and running it
+    again changes nothing."""
+    reporter = uuid.uuid4()
+    sync_conn.execute(
+        text(
+            "INSERT INTO users (id, display_name, handle, city, role, status) "
+            "VALUES (:id, 'Area Test', :h, 'Bangalore', 'member', 'active')"
+        ),
+        {"id": reporter, "h": f"rs{reporter.hex[:12]}"},
+    )
+    # A stand-in for a placeholder area that old deeds point at.
+    _insert_area(sync_conn, 30020, 77.58, 12.94, 0.01)
+    in_ward = _insert_deed(sync_conn, reporter, ASHOKA_PILLAR)
+    outside = _insert_deed(sync_conn, reporter, NEW_DELHI)
+    sync_conn.execute(
+        text("UPDATE deeds SET area_id = 30020 WHERE id IN (:a, :b)"),
+        {
+            "a": in_ward,
+            "b": outside,
+        },
+    )
+
+    m = _load_migration(RESEED_MIGRATION)
+    first = m.reseed_areas(sync_conn)
+    rows_after_first = sync_conn.execute(
+        text("SELECT id, name, ward_code, ST_AsBinary(boundary) FROM areas ORDER BY id")
+    ).all()
+    second = m.reseed_areas(sync_conn)
+    rows_after_second = sync_conn.execute(
+        text("SELECT id, name, ward_code, ST_AsBinary(boundary) FROM areas ORDER BY id")
+    ).all()
+
+    assert first["areas"] == second["areas"] == 369
+    assert first["repaired"] == second["repaired"] > 0  # the source has self-intersections
+    assert first["overlaps"] == []  # only slivers along shared borders
+    assert rows_after_first == rows_after_second
+    assert sync_conn.execute(text("SELECT count(*) FROM areas WHERE id = 30020")).scalar() == 0
+    invalid = sync_conn.execute(
+        text("SELECT count(*) FROM areas WHERE NOT ST_IsValid(boundary::geometry)")
+    ).scalar()
+    assert invalid == 0
+
+    def ward_of(deed_id: uuid.UUID) -> str | None:
+        value = sync_conn.execute(
+            text(
+                "SELECT a.ward_code FROM deeds AS d LEFT JOIN areas AS a ON a.id = d.area_id "
+                "WHERE d.id = :id"
+            ),
+            {"id": deed_id},
+        ).scalar_one()
+        return None if value is None else str(value)
+
+    assert ward_of(in_ward) == "GBA-C040"
+    assert ward_of(outside) is None
+
+
 def test_seed_loader_rejects_a_bad_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     m = _load_migration()
     good = json.loads(AREAS_FILE.read_text(encoding="utf-8"))
@@ -292,3 +381,41 @@ def test_deeds_v5_rollback_and_republish_append(sync_conn: Connection) -> None:
         text("SELECT count(*) FROM config_versions WHERE namespace = 'deeds'")
     ).scalar_one()
     assert total == up_version
+
+
+# --- deeds v6 config round trip (migration 0018, warning thresholds) ------------------------------
+
+V6_MIGRATION = BACKEND_DIR / "alembic" / "versions" / "2026_11_21_0200-0018_deeds_v6.py"
+
+
+def test_deeds_v6_rollback_and_republish_append(sync_conn: Connection) -> None:
+    """Downgrade of 0018 appends a version without the two thresholds (never deletes); re-running
+    either step is a no-op; a value published by hand in between survives the re-publish."""
+    from app.modules.deeds._limits import DeedLimits
+
+    m = _load_migration(V6_MIGRATION)
+    version, v6 = _latest_deeds(sync_conn)
+    DeedLimits.model_validate(v6)
+    keys = ("reporter_monthly_warn_at", "reporter_doer_monthly_warn_at")
+    with Operations.context(MigrationContext.configure(sync_conn)):
+        m.rollback_v6()
+        m.rollback_v6()
+    down_version, down = _latest_deeds(sync_conn)
+    assert down_version == version + 1
+    assert down == {k: v for k, v in v6.items() if k not in keys}
+
+    sync_conn.execute(
+        text(
+            "INSERT INTO config_versions (namespace, version, values, reason, created_by) "
+            "VALUES ('deeds', :v, CAST(:values AS jsonb), 'by hand', NULL)"
+        ),
+        {"v": down_version + 1, "values": json.dumps({**down, "same_act_cap": 7})},
+    )
+    with Operations.context(MigrationContext.configure(sync_conn)):
+        m.publish_v6()
+        m.publish_v6()
+    up_version, up = _latest_deeds(sync_conn)
+    assert up_version == down_version + 2
+    assert up == {**v6, "same_act_cap": 7}
+    limits = DeedLimits.model_validate(up)
+    assert (limits.reporter_monthly_warn_at, limits.reporter_doer_monthly_warn_at) == (10, 3)

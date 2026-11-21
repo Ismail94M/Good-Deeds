@@ -35,7 +35,7 @@ const TONES: Record<ReportPriority, string> = {
 
 /**
  * Priority labels. Photos (Q44): Child red, Privacy/Harm orange, Other grey. Comments (Q38,
- * _interim_ labels): threats and personal details first, then hate, then spam and the rest.
+ * labels approved by the PO 2026-11-21): threats and personal details first, then hate, then spam and the rest.
  * The label carries the meaning, not the colour.
  */
 const LABELS: Record<ChipKind, Record<ReportPriority, string>> = {

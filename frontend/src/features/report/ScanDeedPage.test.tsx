@@ -106,6 +106,16 @@ describe('deed form', () => {
     expect(screen.queryByText(/more times? this month/)).not.toBeInTheDocument()
   })
 
+  it('takes the pair warning threshold from the deed options (config)', async () => {
+    setup({
+      scan: makeScanDetail({ pair_reports_remaining: 5 }),
+      options: makeOptions({ reporter_doer_monthly_warn_at: 5 }),
+    })
+    renderApp(PATH)
+    await screen.findByText('Recognising')
+    expect(screen.getByText('You can record Ahmed 5 more times this month.')).toBeVisible()
+  })
+
   it('needs a category and a long enough description before sending', async () => {
     const api = setup()
     const user = userEvent.setup()

@@ -8,6 +8,7 @@ no outbound geocoding).
   than the local database and storage: no external geocoder ever sees coordinates.
 """
 
+import csv
 import json
 import re
 import socket
@@ -55,15 +56,6 @@ def test_area_source_notes_name_the_licence_and_attribution() -> None:
     assert "OpenCity" in notes and "Greater Bengaluru Authority" in notes
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "GAP (data, not code): the seeded areas table still comes from the placeholder "
-        "data/bangalore_areas.geojson (sources 'PLACEHOLDER - replace with the official ward "
-        "dataset (DATA1)', 6 fake areas); the PO-approved ward_candidate file (369 GBA wards) "
-        "has not been copied over and seeded yet (DB4)."
-    ),
-)
 async def test_seeded_areas_are_the_approved_ward_dataset(session: AsyncSession) -> None:
     rows = list((await session.execute(select(Area).where(Area.id < 30000))).scalars())
     assert rows
@@ -71,6 +63,16 @@ async def test_seeded_areas_are_the_approved_ward_dataset(session: AsyncSession)
         assert area.source.strip()
         assert "placeholder" not in area.source.lower(), area.source
     assert len(rows) == len(_features(CANDIDATE / "bangalore_areas.geojson"))
+
+
+def test_seed_file_is_the_approved_candidate_with_the_approved_names() -> None:
+    """PO 2026-11-21: display names exactly as proposed in names.csv, all 369 rows."""
+    seed = _features(DATA / "bangalore_areas.geojson")
+    assert seed == _features(CANDIDATE / "bangalore_areas.geojson")
+    with (CANDIDATE / "names.csv").open(encoding="utf-8", newline="") as f:
+        proposed = {r["ward_code"]: r["proposed_display_name"] for r in csv.DictReader(f)}
+    assert len(proposed) == 369
+    assert {f["properties"]["ward_code"]: f["properties"]["name"] for f in seed} == proposed
 
 
 class _NoOutbound:

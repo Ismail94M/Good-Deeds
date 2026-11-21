@@ -4,6 +4,9 @@ import { PUBLIC_FEED_NOTICE } from '../qr/qrFormat'
 
 const CONTACT_EMAIL = 'privacy@gooddeeds.example'
 
+/** Attribution for the area names (PO 2026-11-19, AREAS_SOURCE.md). */
+const WARD_CREDIT = 'Ward boundaries: Greater Bengaluru Authority, via OpenCity (data.opencity.in)'
+
 function DraftBanner() {
   return (
     <p
@@ -43,6 +46,10 @@ export function TermsPage() {
           Keep your login safe. One account per person, with one verified phone number. We may
           suspend accounts that break these rules.
         </p>
+      </Section>
+      <Section title="Map data">
+        <p>{WARD_CREDIT}</p>
+        <p>Area names shown in the app are simplified from the official ward names.</p>
       </Section>
     </Page>
   )

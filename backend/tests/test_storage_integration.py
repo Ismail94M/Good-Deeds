@@ -1,7 +1,7 @@
 """S3Storage against a real store (SeaweedFS locally, or a GCS test bucket).
 
 Runs only when GD_TEST_STORAGE_URL is set, e.g. with `docker compose up -d storage storage-init`:
-    GD_TEST_STORAGE_URL=http://localhost:8333 uv run pytest tests/test_storage_integration.py
+    GD_TEST_STORAGE_URL=http://127.0.0.1:8333 uv run pytest tests/test_storage_integration.py
 Keys default to the SeaweedFS dev identity (infra/seaweedfs/s3.json); override with
 GD_TEST_STORAGE_ACCESS_KEY, GD_TEST_STORAGE_SECRET_KEY, GD_TEST_STORAGE_BUCKET,
 GD_TEST_STORAGE_REGION and GD_TEST_STORAGE_ADDRESSING_STYLE (e.g. for GCS: region `auto`).

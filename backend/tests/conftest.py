@@ -10,7 +10,7 @@ os.environ["GD_ENV"] = "test"
 os.environ["GD_COOKIE_SECURE"] = "false"  # the test client talks plain http
 os.environ.setdefault(
     "GD_DATABASE_URL",
-    "postgresql+psycopg://gooddeeds:gooddeeds@localhost:5432/gooddeeds_test",
+    "postgresql+psycopg://gooddeeds:gooddeeds@127.0.0.1:5432/gooddeeds_test",
 )
 
 import psycopg

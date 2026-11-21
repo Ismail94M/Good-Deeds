@@ -52,7 +52,7 @@ export function DeedForm({
 }) {
   const doer = scan.doer
   const first = firstName(doer.display_name)
-  const pairNotice = pairLimitNotice(scan)
+  const pairNotice = pairLimitNotice(scan, options.reporter_doer_monthly_warn_at)
   const errors = showErrors ? validateDeedForm(values, options) : {}
   const earlierChoices = EARLIER_CHOICES.filter(
     (choice) => choice.minutes <= options.qr_occurred_max_age_minutes,

@@ -4,7 +4,7 @@
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="context-title" value="&lt;b&gt;01 System context (C4 level 1)&lt;/b&gt;&lt;br&gt;Synced to 1a9fd6d (branch m2-deeds), 2026-11-17" style="text;html=1;align=left;verticalAlign=top;fontSize=16;" vertex="1" parent="1">
+        <mxCell id="context-title" value="&lt;b&gt;01 System context (C4 level 1)&lt;/b&gt;&lt;br&gt;Synced to 2c7ba38 (branch m3-feed) + uncommitted 0017/0018, 2026-11-21" style="text;html=1;align=left;verticalAlign=top;fontSize=16;" vertex="1" parent="1">
           <mxGeometry x="20" y="20" width="700" height="50" as="geometry" />
         </mxCell>
         <mxCell id="context-legend" value="&lt;b&gt;Legend&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;align=left;verticalAlign=top;spacingLeft=6;" vertex="1" parent="1">
@@ -22,7 +22,7 @@
         <mxCell id="context-legend-proposed" value="proposed" style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=10;fillColor=#ffffff;strokeColor=#9673a6;dashed=1;dashPattern=1 4;" vertex="1" parent="1">
           <mxGeometry x="1445" y="92" width="125" height="32" as="geometry" />
         </mxCell>
-        <object id="system" label="&lt;b&gt;Good Deeds&lt;/b&gt;&lt;br&gt;[Software system]&lt;br&gt;Mobile-responsive web app: a feed of good deeds witnessed by others, Bangalore launch.&lt;br&gt;&lt;br&gt;&lt;i&gt;Today: accounts, phone OTP, consent, profiles, QR (M1); password reset by SMS code, recording, verifying, editing and withdrawing deeds, with screens (M2)&lt;/i&gt;" status="implemented" milestone="M2" source="docs/PRD.md#1; backend/app/main.py; backend/app/modules/registry.py; frontend/src/app/routes.tsx" details="Registered modules: identity and deeds. M2 screens are built: My QR (F2), Record a deed (F3), My deeds, self-logs and profile counts (F6), forgot password. Invites are built but switched off by config (D17) and have no screens (D26). Feed, scoring etc. are M3-M8.">
+        <object id="system" label="&lt;b&gt;Good Deeds&lt;/b&gt;&lt;br&gt;[Software system]&lt;br&gt;Mobile-responsive web app: a feed of good deeds witnessed by others, Bangalore launch.&lt;br&gt;&lt;br&gt;&lt;i&gt;Today: accounts, phone OTP, consent, profiles, QR (M1); recording, verifying, editing and withdrawing deeds, password reset (M2); feed, photos, likes, comments, follows, Top, shares, public share page, photo and comment reports with a review queue (M3)&lt;/i&gt;" status="implemented" milestone="M3" source="docs/PRD.md#1; backend/app/main.py; backend/app/modules/registry.py; frontend/src/app/routes.tsx" details="Registered modules: identity, deeds, media, feed. M3 is built on m3-feed (2c7ba38) and awaits PO review. Invites stay switched off (D17). Scoring etc. are M4-M8.">
           <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
             <mxGeometry x="620" y="360" width="360" height="300" as="geometry" />
           </mxCell>
@@ -43,20 +43,20 @@
         <mxCell id="context-e2" value="records deeds (M2)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="witness" target="system">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <object id="viewer" label="&lt;b&gt;Viewer&lt;/b&gt;&lt;br&gt;[Person]&lt;br&gt;Scrolls, likes, comments, shares (M3)" status="planned" milestone="M3" source="docs/PRD.md#2; docs/ROADMAP.md#M3; frontend/src/features/profile/PublicProfilePage.tsx" details="Today a visitor can only open public profiles (/u/:handle). Feed and social actions are M3.">
-          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=36;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1">
+        <object id="viewer" label="&lt;b&gt;Viewer / member&lt;/b&gt;&lt;br&gt;[Person]&lt;br&gt;Reads the feed; likes, comments, saves, follows, shares; reports photos and comments" status="implemented" milestone="M3" source="docs/PRD.md#2; frontend/src/features/feed/FeedPage.tsx; frontend/src/features/feed/PublicDeedPage.tsx; backend/app/modules/feed/router.py" details="Signed-in users read the feed; social actions need onboarding (D44, Q42). Visitors without an account see only the public share page /d/:id and public profiles; photo reports are open to anyone (IP-limited).">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=36;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
             <mxGeometry x="60" y="580" width="260" height="80" as="geometry" />
           </mxCell>
         </object>
-        <mxCell id="context-e3" value="browses feed (M3)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.8667;entryDx=0;entryDy=0;" edge="1" parent="1" source="viewer" target="system">
+        <mxCell id="context-e3" value="feed, social, reports (M3)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.8667;entryDx=0;entryDy=0;" edge="1" parent="1" source="viewer" target="system">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <object id="admin" label="&lt;b&gt;Admin / moderator&lt;/b&gt;&lt;br&gt;[Person]&lt;br&gt;Review, overrides, takedowns (M5)" status="planned" milestone="M5" source="docs/ROADMAP.md#M5; docs/PRD.md#11; backend/app/modules/identity/models.py#Role" details="users.role (member/moderator/admin) and require_role exist since M1, but no admin UI or endpoints. Admin queue M5, moderation M7, prize review and analytics M8.">
-          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=36;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1">
+        <object id="admin" label="&lt;b&gt;Moderator / admin&lt;/b&gt;&lt;br&gt;[Person]&lt;br&gt;Reviews photo and comment reports (M3); overrides, flags (M5)" status="implemented" milestone="M3" source="backend/app/modules/media/router.py#/admin/photo-reports; backend/app/modules/feed/router.py#/admin/comment-reports; backend/app/modules/identity/cli.py; docs/ROADMAP.md#M5" details="Roles are set only with the CLI (python -m app.modules.identity.cli set-role HANDLE ROLE --reason ... --operator ...), audited. Moderators and admins both review (Q34). Full admin area M5, moderation M7.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=36;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
             <mxGeometry x="400" y="190" width="220" height="80" as="geometry" />
           </mxCell>
         </object>
-        <mxCell id="context-e4" value="reviews, moderates (M5)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.15;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="admin" target="system">
+        <mxCell id="context-e4" value="reviews reports (M3)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.15;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="admin" target="system">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <object id="sponsor" label="&lt;b&gt;Sponsor / advertiser&lt;/b&gt;&lt;br&gt;[Organisation]&lt;br&gt;Funds challenges, prizes, ads (M6)" status="planned" milestone="M6" source="docs/PRD.md#13; docs/ROADMAP.md#M6; docs/ROADMAP.md#M8" details="Sponsored challenges in M6; sponsors, ad slots and sponsor-funded prizes in M8.">
@@ -107,12 +107,12 @@
         <mxCell id="context-e10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=1;exitY=0.9333;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="system" target="captcha">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <object id="storage" label="&lt;b&gt;Object storage&lt;/b&gt;&lt;br&gt;[External] S3-compatible, photos/videos (M3)" status="planned" milestone="M3" source="docs/ROADMAP.md#M3; docs/PRD.md#14; CLAUDE.md#Gotchas" details="Provider not chosen: CLAUDE.md says the MinIO image is gone and a replacement is picked in M3.">
-          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1">
+        <object id="storage" label="&lt;b&gt;Object storage&lt;/b&gt;&lt;br&gt;[External] S3-compatible: Google Cloud Storage asia-south1 at launch; SeaweedFS locally" status="partial" milestone="M3" source="backend/app/core/storage.py; backend/app/core/config.py; docker-compose.yml#storage; docs/M3-DESIGN.md#42-appcorestoragepy-provider-neutral" details="Partial: the code is provider-neutral (boto3, SigV4) and runs against SeaweedFS in docker-compose; no GCS bucket or HMAC keys are configured yet. Private bucket, short-lived signed URLs (D34, D35). Photos only; video deferred.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
             <mxGeometry x="345" y="770" width="210" height="80" as="geometry" />
           </mxCell>
         </object>
-        <mxCell id="context-e11" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=0.125;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="system" target="storage">
+        <mxCell id="context-e11" value="presign, HEAD, variants" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=0.125;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="system" target="storage">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <object id="ai" label="&lt;b&gt;AI model provider&lt;/b&gt;&lt;br&gt;[External] impact evaluator,&lt;br&gt;pre-screen (M4)" status="planned" milestone="M4" source="docs/ROADMAP.md#M4; docs/ROADMAP.md#M7; docs/PRD.md#14" details="Provider-agnostic ImpactEvaluator in shadow mode (M4); AI moderation pre-screen in M7.">
@@ -131,8 +131,8 @@
         <mxCell id="context-e13" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=0.625;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="system" target="email">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <object id="whatsapp" label="&lt;b&gt;WhatsApp / Web Share&lt;/b&gt;&lt;br&gt;[External] share links (M3)" status="planned" milestone="M3" source="docs/ROADMAP.md#M3; docs/PRD.md#5" details="Feed shares via Web Share API + WhatsApp link (M3). The PRD also suggests sending invite links over WhatsApp, but invites are switched off and have no screens in M2 (D17, D26).">
-          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1">
+        <object id="whatsapp" label="&lt;b&gt;WhatsApp / Web Share&lt;/b&gt;&lt;br&gt;[External] share links to /d/:id (M3)" status="implemented" milestone="M3" source="frontend/src/features/feed/ShareSheet.tsx; frontend/index.html; docs/PRD.md#5" details="Share sheet: WhatsApp link, copy link and the device share menu. Link previews are generic (logo + 'A good deed was shared with you', Q40); invites stay off (D17, D26).">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
             <mxGeometry x="1035" y="770" width="210" height="80" as="geometry" />
           </mxCell>
         </object>

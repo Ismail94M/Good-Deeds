@@ -177,7 +177,7 @@ class S3Storage:
 
     Two clients: ``_client`` talks to the internal endpoint; ``_signer`` is only used offline
     to sign URLs for the public endpoint (in docker the API reaches ``storage:8333`` while
-    browsers use ``localhost:8333``).
+    browsers use ``127.0.0.1:8333``).
     """
 
     def __init__(
