@@ -81,6 +81,25 @@ Each milestone is built, tested and reviewed by the product owner before the nex
 - Badges and monthly Kindness Hero.
 - AI shadow evaluator, with evidence caps 40/70/100 and structured output stored in `ImpactEvaluation` (mode = shadow).
 - Public impact tier.
+- **Design:** `docs/M4-DESIGN.md` (Revision 2; PO answers Q45–Q57 on 2026-11-22). Built in two slices:
+  - **M4a:** scoring, ledger, leaderboards, badges, titles and tier.
+  - **M4b** (after PO review of M4a): AI shadow evaluator and AI shadow tie-break, shipped switched off until legal review (Q56, Q57).
+- Points (Q45–Q48):
+  - 10 for every category, +2 photo, minimum 4.
+  - Reporter 2 (1 beyond the same-act cap), for at most 10 reports a day.
+  - Repeat pairs 100% / 75% / 50% for reports 1–3 / 4–7 / 8–15 in an IST month.
+  - Each counted report is scored on its own.
+- 24-hour withdrawal window after verification (replaces Q52):
+  - Edits after it never change points, and points are provisional for 24 h.
+  - Months finalize after month end + 24 h + 1 h, once all earlier events are processed; then boards and titles are frozen.
+- Location hierarchy (`regions`: ward, city, state, country) with a monthly board and Kindness Hero per level (replaces Q54):
+  - Bangalore wards and city at launch.
+  - Ward Hero needs 3 counted deeds from 2 reporters.
+  - City #1 Hero, #2–#3 "Top 3 in Bangalore".
+  - Tie-break: distinct reporters, then distinct days, then a shared rank (Q50).
+- Public profile: Verified Deeds, badges, titles, followers, following and tier. Points are owner-only.
+  - The public Self-log Deeds count is removed (Q55). This changes built M2/M3 code.
+  - No leaderboard opt-out (Q51).
 
 **M5 Fraud & Review**
 - Detectors: reciprocal verification, rings (graph cycles over a recent window), 30% reporter concentration, invite anomalies.
