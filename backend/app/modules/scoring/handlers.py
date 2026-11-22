@@ -61,7 +61,7 @@ async def rescore_edited_deed(session: AsyncSession, event: DeedEdited) -> None:
         return  # a pending deed is scored, with its current text, when it is verified
     saved_at = await revision_time(session, event.revision_id)
     window_end = inputs.verified_at + timedelta(hours=await withdraw_window_hours(session))
-    if saved_at is None or saved_at > window_end:
+    if saved_at is None or saved_at >= window_end:  # half-open, like withdrawal
         return
     await reconcile_deed(session, event.deed_id)
 

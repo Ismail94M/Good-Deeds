@@ -462,6 +462,8 @@ async def leaderboard(
     period = parse_month(month) if month else await _now_month(session, now)
     region = await _board_region(session, region_code, config)
     finalized = await _leaderboard.is_finalized(session, period)
+    # A past month with no deeds at all is never finalized by the job; it reads as final.
+    finalized = finalized or await _finalize.closed_without_deeds(session, period, now)
     snapshot = await _leaderboard.latest_snapshot(session, region.id, period)
     if finalized and snapshot is not None and not snapshot.final:
         snapshot = None  # finalized with no counted deed here: the final board is empty

@@ -54,13 +54,27 @@ export type LedgerReason =
 // ----------------------------------------------------------------- #1 options
 
 /**
+ * One region level (§3.4 item 11), e.g. a ward needs 3 deeds from 2 different people for a
+ * Hero and titles place 1; the city titles places 1–3 with no minimum. The Hero fields are
+ * optional so older replies still work (the copy then falls back to general wording).
+ */
+export type LevelOption = {
+  kind: RegionKind
+  enabled: boolean
+  hero_min_deeds?: number
+  hero_min_reporters?: number
+  /** Titled places, sorted, e.g. ward [1], city [1, 2, 3]. */
+  titled_places?: number[]
+}
+
+/**
  * `GET /scoring/options` (#1, shape per §3.4 item 1). All values come from config.
  */
 export type ScoringOptions = {
   tiers: (Tier & { min_points: number })[]
   badges: (Badge & { description: string })[]
-  /** Every region level and whether it has boards, e.g. ward and city enabled. */
-  levels: { kind: RegionKind; enabled: boolean }[]
+  /** Every region level, whether it has boards, and its Hero minimums (§3.4 item 11). */
+  levels: LevelOption[]
   withdraw_window_hours: number
   doer_daily_cap: number
   reporter_daily_cap: number
@@ -164,9 +178,9 @@ export type Leaderboard = {
   computed_at: string | null
   final: boolean
   /**
-   * CONTRACT (proposed, not in §3.3/§3.4): when a provisional board becomes final (the month's
-   * finalization cutoff), for "Provisional until 2 Dec, 01:00 IST". Optional: without it the
-   * banner says "Provisional" with no date, since the client never computes the cutoff (§6.4).
+   * When a provisional board becomes final (the month's finalization cutoff, §3.4 item 10),
+   * for "Provisional until 2 Dec, 01:00 IST"; null once final. Without it the banner says
+   * "Provisional" with no date, since the client never computes the cutoff (§6.4).
    */
   finalizes_at?: string | null
   items: LeaderboardRow[]

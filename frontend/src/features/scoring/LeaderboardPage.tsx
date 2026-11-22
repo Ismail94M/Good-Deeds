@@ -6,8 +6,15 @@ import { useAuth } from '../auth/authContext'
 import { formatWithdrawUntil } from '../deeds/withdrawWindow'
 import { Avatar, FeedMain, focusRing, secondaryButton } from '../feed/feedUi'
 import type { BoardTitle, Leaderboard, LeaderboardRow, RegionKind } from './scoringApi'
-import { useHeroes, useLeaderboard, useMyScoring } from './scoringQueries'
-import { currentIstMonth, deedsText, formatMonth, rankText, recentMonths } from './scoringText'
+import { useHeroes, useLeaderboard, useMyScoring, useScoringOptions } from './scoringQueries'
+import {
+  currentIstMonth,
+  deedsText,
+  formatMonth,
+  noHeroText,
+  rankText,
+  recentMonths,
+} from './scoringText'
 import { TierChip } from './TierChip'
 import { WardPicker } from './WardPicker'
 
@@ -188,11 +195,14 @@ function StatusBanner({ board }: { board: Leaderboard }) {
 
 /** The Kindness Heroes of a final board ("#1 · Kindness Hero · Koramangala · November 2026"). */
 function Titles({ board }: { board: Leaderboard }) {
+  const options = useScoringOptions(board.titles.length === 0)
   if (board.titles.length === 0) {
-    return board.region.kind === 'ward' ? (
+    const level = options.data?.levels.find((l) => l.kind === board.region.kind)
+    // Only levels with minimums can end a month without a Hero while people are on the board.
+    const gated = board.region.kind === 'ward' || Boolean(level?.hero_min_deeds)
+    return gated ? (
       <p className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-[15px] text-slate-700">
-        No Kindness Hero this month: nobody in this ward reached the minimum number of deeds
-        recognised by different people.
+        {noHeroText(level)}
       </p>
     ) : null
   }

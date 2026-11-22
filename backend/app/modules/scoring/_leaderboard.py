@@ -29,7 +29,7 @@ from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import delete, func, select
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.dialects.postgresql import distinct_on, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.deeds import service as deeds
@@ -348,7 +348,7 @@ async def user_board_entries(
     current = (
         select(LeaderboardSnapshot.id)
         .where(LeaderboardSnapshot.period_month.in_(months))
-        .distinct(LeaderboardSnapshot.region_id, LeaderboardSnapshot.period_month)
+        .ext(distinct_on(LeaderboardSnapshot.region_id, LeaderboardSnapshot.period_month))
         .order_by(
             LeaderboardSnapshot.region_id,
             LeaderboardSnapshot.period_month,

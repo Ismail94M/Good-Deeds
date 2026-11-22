@@ -192,12 +192,17 @@ class _Reconciler:
     async def rules(self, window_end_hours: int) -> tuple[RuleResult, int, EvidenceLevel]:
         """Rule result, photo bonus and evidence level, from content and evidence as of the end
         of the withdrawal window."""
+        # The window is half-open, like withdrawal (``now < verified_at + window``): an edit or
+        # photo at exactly the window end is already outside it. Timestamps have microsecond
+        # precision, so "as of one microsecond before the end" is exact.
         window_end = self.verified_at + timedelta(hours=window_end_hours)
-        content = await deeds.content_as_of(self.session, self.inputs.id, window_end)
+        content = await deeds.content_as_of(
+            self.session, self.inputs.id, window_end - timedelta(microseconds=1)
+        )
         assert content is not None
         result = evaluate(content.category, content.description, self.config)
         photo_at = await first_photo_ready_at(self.session, self.inputs.id)
-        has_photo = photo_at is not None and photo_at <= window_end
+        has_photo = photo_at is not None and photo_at < window_end
         bonus = self.config.photo_bonus if has_photo else 0
         level = EvidenceLevel.PHOTO if has_photo else EvidenceLevel.TEXT_ONLY
         if self.inputs.same_act_group_id is not None:

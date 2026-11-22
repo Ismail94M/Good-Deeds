@@ -4,7 +4,7 @@
  */
 
 import { LAUNCH_TIME_ZONE } from '../report/format'
-import type { LeaderboardRow } from './scoringApi'
+import type { LeaderboardRow, LevelOption } from './scoringApi'
 
 const monthFormat = new Intl.DateTimeFormat('en-IN', {
   month: 'long',
@@ -59,4 +59,20 @@ export function rankText(row: Pick<LeaderboardRow, 'rank' | 'shared'>): string {
 /** "1 deed" / "4 deeds". */
 export function deedsText(n: number): string {
   return `${n} ${n === 1 ? 'deed' : 'deeds'}`
+}
+
+/**
+ * Why a final board has no Hero, naming the level's minimums from `/scoring/options` (§3.4
+ * item 11): "a Hero needs at least 3 deeds recognised by 2 different people". General wording
+ * when the options don't say (not loaded, or an older reply).
+ */
+export function noHeroText(level: LevelOption | undefined): string {
+  const deeds = level?.hero_min_deeds
+  const reporters = level?.hero_min_reporters
+  if (deeds && reporters) {
+    const people = reporters === 1 ? '1 person' : `${reporters} different people`
+    return `No Kindness Hero this month: a Hero needs at least ${deedsText(deeds)} recognised by ${people}.`
+  }
+  if (deeds) return `No Kindness Hero this month: a Hero needs at least ${deedsText(deeds)}.`
+  return 'No Kindness Hero this month: nobody here reached the minimum number of deeds recognised by different people.'
 }

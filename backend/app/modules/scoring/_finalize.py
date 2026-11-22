@@ -84,6 +84,22 @@ async def pending_scoring_events(session: AsyncSession, cutoff: datetime) -> int
     )
 
 
+async def closed_without_deeds(session: AsyncSession, month: date, now: datetime) -> bool:
+    """True for a month past its cutoff that has no ledger row at all and no scoring event from
+    before the cutoff still pending: nothing can ever appear on its boards. ``finalize_due``
+    only finalizes months with ledger rows, so reads treat such a month as final (otherwise a
+    month with zero deeds would show "provisional" with a past ``finalizes_at`` forever)."""
+    cutoff = await cutoff_for(session, month)
+    if now < cutoff:
+        return False
+    has_rows = await session.scalar(
+        select(PointsLedger.id).where(PointsLedger.period_month == month).limit(1)
+    )
+    if has_rows is not None:
+        return False
+    return await pending_scoring_events(session, cutoff) == 0
+
+
 def qualifies(row: BoardRow, level: LevelRule) -> bool:
     return (
         row.deed_count >= level.min_counted_deeds
