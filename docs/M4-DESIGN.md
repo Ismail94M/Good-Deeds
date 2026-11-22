@@ -95,7 +95,7 @@ Migrations: **0019 `deeds_v7_regions`** (deeds module), **0020 `scoring`** (M4a)
 
 - **`media`:** no schema change. The worker emits `DeedPhotoReady` when a deed photo reaches `ready` (§5).
 - **`deeds`:** config v7 (§2.6); regions (§2.2); a withdrawal-window check in `_edits.withdraw_deed`; `DeedOut` gains `withdrawable_until: datetime | null` (verified deeds: `verified_at + window`; pending: null, cancel any time); `DeedCountsOut` loses `self_logged` (the owner's count comes from the self-log list, D69). New read functions in `deeds.service` (§3.1).
-- **`core/runtime_config.py`:** `load_version()`. **`core/events.py`:** `unprocessed_before(session, handler_names, cutoff) -> int` counts outbox events with `occurred_at < cutoff` whose subscribed handlers in `handler_names` have no `processed_events` row (used by finalization, D64).
+- **`core/runtime_config.py`:** `load_version()`. **`core/events.py`:** `unprocessed_before(session, handler_names, cutoff, *, since=None) -> int` counts outbox events with `since <= occurred_at < cutoff` that still wait for a handler in `handler_names`: no `processed_events` row, and the event is either not dispatched yet or was enqueued for that handler at dispatch (`outbox_events.dispatched_handlers`, migration 0021, SEC3 M1). `redispatch_stale` re-enqueues enqueued-but-unprocessed pairs (hourly job `core.redispatch_stale`, and `python -m app.core.cli redispatch`). Used by finalization, D64.
 
 ### 2.2 Location hierarchy (`deeds/models.py`, migration 0019)
 
@@ -380,7 +380,7 @@ Worked example (Q47): Priya reports Ahmed 12 times in November → reports 1–3
 
 ### 4.3 Photo evidence (`scoring/_evidence.py`)
 
-`DeedPhotoReady(photo_id, deed_id, uploader_id, attached_at)`: if not set and `attached_at ≤ reported_at + photo_bonus_window_hours`, set `first_photo_ready_at` once and reconcile, **if still inside the withdrawal window**. A photo that finishes processing after the window still sets the evidence (it is used by the AI) but doesn't re-score points, so points never move after 24 h. Removal events have no scoring subscriber (test).
+`DeedPhotoReady(photo_id, deed_id, uploader_id, attached_at, ready_at)`: if not set and `attached_at ≤ reported_at + photo_bonus_window_hours`, set `first_photo_ready_at` once to `ready_at` (when processing finished, not when the handler ran: SEC3 L5) and reconcile, **if still inside the withdrawal window**. A photo that finishes processing after the window still sets the evidence (it is used by the AI) but doesn't re-score points, so points never move after 24 h. Removal events have no scoring subscriber (test).
 
 ### 4.4 Text rules (`scoring/_rules.py`)
 
@@ -393,7 +393,7 @@ As D55; the look-alike folding is copied from `feed/_text.py` into `scoring/_tex
 
 ### 4.6 Finalization, titles, badges (`scoring/_finalize.py`, `_badges.py`)
 
-- **`scoring.finalize_month`** (periodic every 15 min): for the oldest unfinalized past month, `cutoff = first day of next month 00:00 IST + withdraw_window_hours + finalize_margin_minutes`. If `now < cutoff` → wait. If `core.events.unprocessed_before(scoring handler names, cutoff) > 0` → wait (logged; admin #10 shows it). Otherwise, under the per-month advisory lock and if no `month_finalizations` row exists: compute final snapshots for every region of every enabled level (same query, `final=true`), award titles, write `month_finalizations`, emit `MonthFinalized` and `HeroTitleAwarded` events, in one transaction. Re-running does nothing.
+- **`scoring.finalize_month`** (periodic every 15 min): for the oldest unfinalized past month, `cutoff = first day of next month 00:00 IST + withdraw_window_hours + finalize_margin_minutes`. If `now < cutoff` → wait. If `core.events.unprocessed_before(scoring handler names, cutoff, since=<previous month start>) > 0` → wait (logged; admin #10 shows it). Older events can't touch the month (a report is verified within `invite_expiry_hours` of it), and an event dispatched before a handler existed never waits for it (SEC3 M1). Otherwise, under the per-month advisory lock and if no `month_finalizations` row exists: compute final snapshots for every region of every enabled level (same query, `final=true`), award titles, write `month_finalizations`, emit `MonthFinalized` and `HeroTitleAwarded` events, in one transaction. Re-running does nothing.
 - **Titles:** for each final snapshot and each title in the level config: users on the title's places (shared places included) who meet the level's minimums. A ward with no qualifying user gets no title that month (never auto-awarded to the next person); its board stays visible. City: #1 "Bangalore City Kindness Hero", #2–#3 "Top 3 in Bangalore", no minimums. A user can receive a ward title and a city title in the same month.
 - **Badges** (`scoring.award_badges`, every 15 min): for users with ledger rows whose `verified_at + window` passed since the last run, count non-provisional counted doer deeds (`SUM(deed_units)` where `verified_at + window ≤ now`) and non-provisional reporter awards; insert missing badges (unique index, idempotent) with the deed that crossed the threshold; emit `BadgeAwarded`. Never removed by later changes (only M5 revocation).
 - **Tier:** computed on read from non-provisional all-time doer points.
@@ -728,3 +728,25 @@ Example: Ahmed has 12 deeds verified on 5 March; after an outage the worker scor
   - §12 resolved decisions and limits table.
 - **ROADMAP M4:** M4a / M4b split, hierarchy, window, finalization, public profile change.
 - **CLAUDE.md:** a note that the `scoring` module is designed in `docs/M4-DESIGN.md`; the append-only list names `points_ledger`, `impact_evaluations`, `month_finalizations`, `ai_tiebreak_shadow`. The full module entry is written after the build (DOC4).
+
+---
+
+## 13. Security review SEC3 of M4a (2026-11-22)
+
+No High findings. Fixes approved by the PO on 2026-11-22 and built:
+
+| # | Finding | Fix |
+|---|---|---|
+| M1 | Finalization could block for ever: events from before scoring existed, a new handler on an old event type (M4b), or a job out of retries. | Barrier counts only events since the previous month's start, and only for handlers the event was enqueued for (`outbox_events.dispatched_handlers`, migration 0021, backfilled from `processed_events`). Hourly `core.redispatch_stale` job and `python -m app.core.cli redispatch` re-enqueue failed pairs. |
+| L1 | `month=9999-12` or `year=9999` caused a 500. | Months and years limited to 2000–2100 (`invalid_month` / 422). |
+| L2 | A past month with no deeds scanned the ledger and the outbox on every read. | `ix_points_ledger_period_month`, `ix_outbox_events_occurred_at` (0021) and the month bound from M1. |
+| L3 | `reconcile_deed` read the deed before its locks, so a racing withdrawal could keep its award. | The deed is re-read after the locks (built with QA3). |
+| L4 | The withdrawal window was checked against a time taken before lock waits. | The clock is read after the locks. |
+| L5 | The photo bonus depended on worker speed. | `DeedPhotoReady.ready_at` (= `photos.processed_at`) is the evidence time. |
+| L6 | Accounts suspended or deleted after finalization still showed by name on final boards and Hero lists. | Shown as `handle: null`, "Unavailable account", unlinked; place and title unchanged (PO QA2). Wording to be confirmed by the PO. |
+
+Deferred:
+- **L7 (invites only, off by D17):** a late invite acceptance can change ledger rows of a deed whose own window or month is already over (prize-rank upgrade, same-act promotion). Fix before invites are switched on: after a deed's own window, re-score it only for status changes (M5/M7).
+- **I1–I6 hardening:** store the window and month per deed (I1); scaling of refresh and badges (I2); block INSERT into final snapshots (I3); tighten the AI-import architecture test to transitive imports and an allow-list **before M4b** (I4); cursors and ReDoS acceptable (I5, I6).
+- **Business points for the PO (one at a time, later):** collusion rings meeting the ward minimum before M5 detectors; no city minimum; public tier reveals a points band (accepted in Q55).
+

@@ -151,7 +151,7 @@ async def leaderboard_heroes(
     session: Session,
     limiter: Limiter,
     region: str | None = None,
-    year: Annotated[int | None, Query(ge=2000, le=9999)] = None,
+    year: Annotated[int | None, Query(ge=_reads.MIN_YEAR, le=_reads.MAX_YEAR)] = None,
 ) -> Heroes:
     await _limit(session, limiter, request, user.id)
     return await _reads.heroes(session, region_code=region, year=year)

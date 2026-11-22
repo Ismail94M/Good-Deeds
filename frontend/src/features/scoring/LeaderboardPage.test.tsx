@@ -139,6 +139,34 @@ describe('LeaderboardPage', () => {
     expect(await screen.findByText(/^No Kindness Hero this month/)).toBeVisible()
   })
 
+  it('shows an account no longer active as "Unavailable account", unlinked, keeping its place (SEC3 L6)', async () => {
+    const gone = { handle: null, display_name: 'Unavailable account' }
+    setup({
+      'GET /leaderboards': {
+        body: makeLeaderboard({
+          region: { code: 'W150', name: 'Koramangala', kind: 'ward' },
+          month: '2026-10',
+          final: true,
+          finalizes_at: null,
+          items: [makeRow({ user: gone }), makeRow({ rank: 2, user: RAVI })],
+          me: null,
+          titles: [
+            { place: 1, label: 'Kindness Hero · Koramangala · October 2026', users: [gone] },
+          ],
+        }),
+      },
+    })
+    renderApp('/leaderboard/W150?month=2026-10')
+    const heroes = await screen.findByRole('region', { name: 'Kindness Heroes' })
+    expect(heroes).toHaveTextContent('Unavailable account')
+    expect(within(heroes).queryByRole('link')).not.toBeInTheDocument()
+    const rows = within(await ranking()).getAllByTestId('board-row')
+    expect(rows[0]).toHaveTextContent('Unavailable account')
+    expect(within(rows[0]).getByLabelText('Rank 1')).toBeVisible()
+    expect(within(rows[0]).queryByRole('link')).not.toBeInTheDocument()
+    expect(within(rows[1]).getByRole('link', { name: 'Ravi Kumar' })).toBeVisible()
+  })
+
   it('switches months with the picker and keeps it in the URL', async () => {
     const api = setup()
     const { router } = renderApp('/leaderboard')

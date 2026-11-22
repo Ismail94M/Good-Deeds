@@ -86,6 +86,8 @@ async def record_photo_evidence(session: AsyncSession, event: DeedPhotoReady) ->
         deed_id=event.deed_id,
         photo_id=event.photo_id,
         attached_at=event.attached_at,
-        now=datetime.now(UTC),
+        # When the photo became ready, not when this handler ran (SEC3 L5). Events emitted
+        # before ``ready_at`` existed fall back to the handling time.
+        ready_at=event.ready_at or datetime.now(UTC),
     ):
         await reconcile_deed(session, event.deed_id)

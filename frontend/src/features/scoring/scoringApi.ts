@@ -156,18 +156,24 @@ export type DeedPoints = {
 
 // ----------------------------------------------------------------- #6–#8 leaderboards
 
+/**
+ * A name on a board or title list. An account no longer active shows as `handle: null` and
+ * `display_name: "Unavailable account"` (SEC3 L6): its place and title stay, with no link.
+ */
+export type BoardUser = { handle: string | null; display_name: string }
+
 /** One leaderboard row: rank, name, tier and verified-deed count; never points (D69). */
 export type LeaderboardRow = {
   rank: number
   /** A shared place, shown as "=2" (dense ranking, Q58). */
   shared: boolean
-  user: UserSummary
+  user: BoardUser
   tier: Tier
   deed_count: number
 }
 
 /** A titled place on a final board. */
-export type BoardTitle = { place: number; label: string; users: UserSummary[] }
+export type BoardTitle = { place: number; label: string; users: BoardUser[] }
 
 /** `GET /leaderboards` (#6). Provisional until `final`; `titles` only on final boards. */
 export type Leaderboard = {

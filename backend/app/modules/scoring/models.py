@@ -290,6 +290,8 @@ class PointsLedger(Base):
             postgresql_where=text("role = 'doer' AND counts_for_prize_rank"),
         ),
         Index("ix_points_ledger_user_day_role", "user_id", "earned_on", "role"),
+        # Month lookups that aren't board reads (SEC3 L2: "closed month with no deeds").
+        Index("ix_points_ledger_period_month", "period_month"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)

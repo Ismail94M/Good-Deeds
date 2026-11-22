@@ -332,6 +332,7 @@ async def _finish_ready(
                 deed_id=photo.deed_id,
                 uploader_id=photo.uploader_user_id,
                 attached_at=photo.attached_at,
+                ready_at=now,
             ),
         )
     await session.commit()

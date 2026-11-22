@@ -48,3 +48,6 @@ class DeedPhotoReady(DomainEvent):
     deed_id: uuid.UUID
     uploader_id: uuid.UUID
     attached_at: datetime
+    # When processing finished (``photos.processed_at``): scoring's photo evidence time, so a
+    # worker backlog never decides the photo bonus (M4 SEC3 L5). None only on older events.
+    ready_at: datetime | None = None

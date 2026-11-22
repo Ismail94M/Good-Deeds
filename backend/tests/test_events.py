@@ -52,6 +52,8 @@ async def test_dispatch_enqueues_each_handler_once(session: AsyncSession) -> Non
     assert await events.dispatch_pending(session, enqueue) >= 1
     assert (row.id, HANDLER) in enqueued
     assert row.dispatched_at is not None
+    # The handlers it was sent to are recorded (the finalization barrier reads them).
+    assert row.dispatched_handlers == [HANDLER]
 
     enqueued.clear()
     assert await events.dispatch_pending(session, enqueue) == 0
@@ -149,8 +151,9 @@ async def test_unprocessed_before_counts_events_waiting_for_any_named_handler(
     )  # no named handler subscribes to it
 
     assert await events.unprocessed_before(session, [FIRST, SECOND], cutoff) == 1
-    # Dispatched but not yet handled still waits.
+    # Dispatched to both handlers but not yet handled still waits.
     before.dispatched_at = cutoff
+    before.dispatched_handlers = [FIRST, SECOND]
     await session.flush()
     assert await events.unprocessed_before(session, [FIRST, SECOND], cutoff) == 1
 
@@ -172,3 +175,53 @@ async def test_unprocessed_before_ignores_unknown_handlers_and_other_subscribers
     assert await events.unprocessed_before(session, ["no.such.handler"], cutoff) == 0
     assert await events.unprocessed_before(session, [FIRST, SECOND], cutoff) == 0
     assert await events.unprocessed_before(session, [UNWATCHED], cutoff) >= 1
+
+
+async def test_an_event_dispatched_before_a_handler_existed_never_waits_for_it(
+    session: AsyncSession,
+) -> None:
+    """SEC3 M1: an M2/M3 event sent only to the handlers of its day must not block a scoring
+    handler added later (nor a new M4b handler on an old event type)."""
+    cutoff = datetime(2026, 12, 2, 1, 0, tzinfo=UTC)
+    old = await _event_at(session, BarrierEvent(thing_id=uuid.uuid4()), cutoff - timedelta(days=1))
+    old.dispatched_at = cutoff - timedelta(days=1)
+    old.dispatched_handlers = [FIRST]  # SECOND did not exist yet
+    await session.flush()
+    assert await events.unprocessed_before(session, [SECOND], cutoff) == 0
+    assert await events.unprocessed_before(session, [FIRST], cutoff) == 1
+    # Backfilled events that nothing ran: an empty list waits for nobody.
+    old.dispatched_handlers = []
+    await session.flush()
+    assert await events.unprocessed_before(session, [FIRST, SECOND], cutoff) == 0
+
+
+async def test_unprocessed_before_honours_since(session: AsyncSession) -> None:
+    cutoff = datetime(2026, 12, 2, 1, 0, tzinfo=UTC)
+    since = datetime(2026, 10, 1, tzinfo=UTC)
+    await _event_at(session, BarrierEvent(thing_id=uuid.uuid4()), since - timedelta(seconds=1))
+    assert await events.unprocessed_before(session, [FIRST], cutoff, since=since) == 0
+    await _event_at(session, BarrierEvent(thing_id=uuid.uuid4()), since)
+    assert await events.unprocessed_before(session, [FIRST], cutoff, since=since) == 1
+
+
+async def test_redispatch_stale_sends_unprocessed_pairs_again(session: AsyncSession) -> None:
+    """SEC3 M1: a job that ran out of retries is enqueued again, once per missing handler, and
+    only for handlers still registered."""
+    now = datetime(2026, 12, 2, 1, 0, tzinfo=UTC)
+    stale = await _event_at(session, BarrierEvent(thing_id=uuid.uuid4()), now - timedelta(hours=3))
+    stale.dispatched_at = now - timedelta(hours=3)
+    stale.dispatched_handlers = [FIRST, SECOND, "gone.handler"]
+    fresh = await _event_at(session, BarrierEvent(thing_id=uuid.uuid4()), now)
+    fresh.dispatched_at = now
+    fresh.dispatched_handlers = [FIRST]
+    await session.flush()
+    assert await events.run_handler(session, stale.id, FIRST) is True
+
+    enqueued: list[tuple[uuid.UUID, str]] = []
+
+    async def enqueue(event_id: uuid.UUID, handler: str) -> None:
+        enqueued.append((event_id, handler))
+
+    await events.redispatch_stale(session, enqueue, now - timedelta(hours=1), batch_size=100_000)
+    mine = [pair for pair in enqueued if pair[0] in {stale.id, fresh.id}]
+    assert mine == [(stale.id, SECOND)]

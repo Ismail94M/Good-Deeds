@@ -15,9 +15,11 @@ RegionKindName = Literal["country", "state", "city", "ward"]
 
 
 class UserSummary(BaseModel):
-    """The public name of a user (same shape as identity's ``UserSummary``)."""
+    """The public name of a user (same shape as identity's ``UserSummary``). On final boards and
+    title lists an account that is no longer active shows as ``handle=None`` and
+    ``display_name="Unavailable account"`` (SEC3 L6): its place and title stay, its name goes."""
 
-    handle: str
+    handle: str | None
     display_name: str
 
 

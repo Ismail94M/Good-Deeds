@@ -162,7 +162,6 @@ async def withdraw_deed(
     limits: DeedLimits,
     now: datetime | None = None,
 ) -> DeedOut:
-    now = now or utcnow()
     # The invite row first (if any): accept and the expiry job lock it before the deed.
     invite = (
         await session.scalars(
@@ -180,6 +179,9 @@ async def withdraw_deed(
     if peek is not None and peek.reporter_user_id == reporter_id and peek.doer_user_id:
         await _grouping.lock_doer(session, peek.doer_user_id)
     deed = await _lock_own_deed(session, reporter_id, deed_id)
+    # The clock is read only now, after every lock wait (SEC3 L4): a request that waited on a
+    # lock past the window end is refused, keeping the window strictly half-open.
+    now = now or utcnow()
     if deed.status not in _CHANGEABLE:
         raise Conflict("This deed can no longer be withdrawn.", code="deed_not_withdrawable")
     # The window (D64) is checked here, under the deed row lock, so it can't be raced.

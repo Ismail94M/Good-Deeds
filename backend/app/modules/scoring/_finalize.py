@@ -4,9 +4,14 @@
 
 1. ``now >= cutoff``: the first day of the next month 00:00 (IST) + ``withdraw_window_hours``
    + ``finalize_margin_minutes``. November finalizes at about 2 December 01:00 IST.
-2. ``core.events.unprocessed_before(<scoring handlers>, cutoff) == 0``: every outbox event from
-   before the cutoff has been handled by every scoring handler (closes the outbox delay; a
-   stuck event blocks finalization rather than finalizing wrong, and admin #10 shows it).
+2. ``core.events.unprocessed_before(<scoring handlers>, cutoff, since=<previous month start>)
+   == 0``: every outbox event from the start of the previous month to the cutoff has been
+   handled by every scoring handler it was sent to (closes the outbox delay; a stuck event
+   blocks finalization rather than finalizing wrong, and admin #10 shows it). Older events
+   can't touch the month's ledger rows: rows are dated by ``verified_at``, events about a deed
+   come after its report, and a report is verified within ``invite_expiry_hours`` (7 days) of
+   it. A handler job that ran out of retries is sent again by the hourly
+   ``core.redispatch_stale`` job (SEC3 M1).
 
 It then, in one transaction under the advisory lock ``finalize_month:(month)`` and only if no
 ``month_finalizations`` row exists: writes a final snapshot of every board of every enabled
@@ -77,10 +82,14 @@ async def cutoff_for(session: AsyncSession, month: date) -> datetime:
     )
 
 
-async def pending_scoring_events(session: AsyncSession, cutoff: datetime) -> int:
-    """Outbox events from before ``cutoff`` some scoring handler has not processed yet."""
+async def pending_scoring_events(session: AsyncSession, month: date, cutoff: datetime) -> int:
+    """Outbox events from the start of the month before ``month`` to ``cutoff`` some scoring
+    handler has not processed yet (step 2)."""
+    _, scoring = await load_scoring(session)
+    previous = (month - timedelta(days=1)).replace(day=1)
+    since = datetime.combine(previous, time(0), tzinfo=scoring.zone)
     return await unprocessed_before(
-        session, handler_names_with_prefix(SCORING_HANDLER_PREFIX), cutoff
+        session, handler_names_with_prefix(SCORING_HANDLER_PREFIX), cutoff, since=since
     )
 
 
@@ -97,7 +106,7 @@ async def closed_without_deeds(session: AsyncSession, month: date, now: datetime
     )
     if has_rows is not None:
         return False
-    return await pending_scoring_events(session, cutoff) == 0
+    return await pending_scoring_events(session, month, cutoff) == 0
 
 
 def qualifies(row: BoardRow, level: LevelRule) -> bool:
@@ -118,7 +127,7 @@ async def finalize_month(
         return FinalizeResult(month, Outcome.ALREADY_FINALIZED, cutoff)
     if now < cutoff:
         return FinalizeResult(month, Outcome.TOO_EARLY, cutoff)
-    pending = await pending_scoring_events(session, cutoff)
+    pending = await pending_scoring_events(session, month, cutoff)
     if pending > 0:
         log.warning("finalize_month %s waits for %d scoring events", month, pending)
         return FinalizeResult(month, Outcome.EVENTS_PENDING, cutoff, pending_events=pending)

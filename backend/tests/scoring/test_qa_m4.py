@@ -267,7 +267,7 @@ async def test_photo_evidence_edges(session: AsyncSession) -> None:
         deed_id=a.id,
         photo_id=uuid.uuid4(),
         attached_at=a.reported_at + window,
-        now=_verified(a) + window - timedelta(seconds=1),
+        ready_at=_verified(a) + window - timedelta(seconds=1),
     )
     # b: attached 1 s after the photo window: not evidence at all.
     assert not await record_photo_ready(
@@ -275,7 +275,7 @@ async def test_photo_evidence_edges(session: AsyncSession) -> None:
         deed_id=b.id,
         photo_id=uuid.uuid4(),
         attached_at=b.reported_at + window + timedelta(seconds=1),
-        now=_verified(b) + timedelta(hours=1),
+        ready_at=_verified(b) + timedelta(hours=1),
     )
     # c: attached in time but ready 1 s after the withdrawal window: recorded, no bonus.
     assert await record_photo_ready(
@@ -283,7 +283,7 @@ async def test_photo_evidence_edges(session: AsyncSession) -> None:
         deed_id=c.id,
         photo_id=uuid.uuid4(),
         attached_at=c.reported_at + timedelta(hours=1),
-        now=_verified(c) + window + timedelta(seconds=1),
+        ready_at=_verified(c) + window + timedelta(seconds=1),
     )
     for out in (a, b, c):
         await reconcile_deed(session, out.id)

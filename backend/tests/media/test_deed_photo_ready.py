@@ -41,12 +41,15 @@ async def test_deed_photo_ready_emits_one_event_with_ids_only(
     assert row.attached_at is not None
     events = await _events_for(session, photo.id)
     assert len(events) == 1
-    assert set(events[0]) == {"photo_id", "deed_id", "uploader_id", "attached_at"}
+    assert set(events[0]) == {"photo_id", "deed_id", "uploader_id", "attached_at", "ready_at"}
+    # ready_at is when processing finished: scoring's photo evidence time (SEC3 L5).
+    assert row.processed_at is not None
     assert media.DeedPhotoReady.model_validate(events[0]) == media.DeedPhotoReady(
         photo_id=photo.id,
         deed_id=deed.id,
         uploader_id=reporter.user_id,
         attached_at=row.attached_at,
+        ready_at=row.processed_at,
     )
 
 

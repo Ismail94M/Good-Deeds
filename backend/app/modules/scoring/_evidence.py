@@ -10,7 +10,7 @@ compares this time with the window end); a later one is still recorded, for the 
 """
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
@@ -27,22 +27,27 @@ async def record_photo_ready(
     deed_id: uuid.UUID,
     photo_id: uuid.UUID,
     attached_at: datetime,
-    now: datetime,
+    ready_at: datetime,
 ) -> bool:
-    """Set the deed's first photo once. Returns True if this call set it; False if it was
-    already set, the photo was attached after the photo window, or the deed doesn't exist."""
+    """Set the deed's first photo once, at ``ready_at``: when the media worker finished the
+    photo, not when this handler runs, so a worker backlog never decides the bonus (SEC3 L5).
+    Returns True if this call set it; False if it was already set, the photo was attached
+    after the photo window, or the deed doesn't exist."""
     inputs = await deeds.scoring_inputs(session, deed_id)
     if inputs is None:
         return False
     _, config = await load_scoring(session)
     if attached_at > inputs.reported_at + timedelta(hours=config.photo_bonus_window_hours):
         return False
+    now = datetime.now(UTC)
     stmt = (
         insert(ScoringEvidence)
-        .values(deed_id=deed_id, first_photo_ready_at=now, first_photo_id=photo_id, updated_at=now)
+        .values(
+            deed_id=deed_id, first_photo_ready_at=ready_at, first_photo_id=photo_id, updated_at=now
+        )
         .on_conflict_do_update(
             index_elements=[ScoringEvidence.deed_id],
-            set_={"first_photo_ready_at": now, "first_photo_id": photo_id, "updated_at": now},
+            set_={"first_photo_ready_at": ready_at, "first_photo_id": photo_id, "updated_at": now},
             where=ScoringEvidence.first_photo_ready_at.is_(None),
         )
         .returning(ScoringEvidence.deed_id)

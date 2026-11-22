@@ -66,11 +66,16 @@ _MONTH = re.compile(r"^(\d{4})-(\d{2})$")
 MAX_REGION_RESULTS = 50
 
 
+# Months and years the API accepts (SEC3 L1): wide enough for any real board, and far from
+# ``date``'s limit, so "the month after" never overflows into a server error.
+MIN_YEAR, MAX_YEAR = 2000, 2100
+
+
 def parse_month(value: str) -> date:
     match = _MONTH.match(value)
     if match is not None:
         year, month = int(match.group(1)), int(match.group(2))
-        if 2000 <= year <= 9999 and 1 <= month <= 12:
+        if MIN_YEAR <= year <= MAX_YEAR and 1 <= month <= 12:
             return date(year, month, 1)
     raise AppError("Please choose a month as YYYY-MM.", code="invalid_month")
 
@@ -95,6 +100,22 @@ async def _summaries(
     return {
         uid: UserSummary(handle=s.handle, display_name=s.display_name) for uid, s in found.items()
     }
+
+
+UNAVAILABLE_NAME = "Unavailable account"
+
+
+async def _board_summaries(
+    session: AsyncSession, user_ids: Iterable[uuid.UUID]
+) -> dict[uuid.UUID, UserSummary]:
+    """Names for boards and title lists: active accounts by name, any other account (suspended
+    or deleted after its month was finalized) as a placeholder, so final results stay as they
+    were (PO QA2) without showing who it was (SEC3 L6)."""
+    ids = set(user_ids)
+    active = await identity.active_user_ids(session, ids)
+    found = await _summaries(session, active)
+    hidden = UserSummary(handle=None, display_name=UNAVAILABLE_NAME)
+    return {uid: found.get(uid, hidden) for uid in ids}
 
 
 def _tier_out(tier: Tier) -> TierOut:
@@ -431,7 +452,7 @@ async def _board_titles(
     session: AsyncSession, titles: Sequence[HeroTitle], region_name: str
 ) -> list[BoardTitle]:
     labels = _TitleLabels(session)
-    people = await _summaries(session, {t.user_id for t in titles})
+    people = await _board_summaries(session, {t.user_id for t in titles})
     grouped: dict[tuple[int, str], list[HeroTitle]] = defaultdict(list)
     for t in titles:
         grouped[(t.place, t.title_key)].append(t)
@@ -512,7 +533,7 @@ async def leaderboard(
         raise _cursor.invalid_cursor()
 
     users = {e.user_id for e, _ in rows} | ({me[0].user_id} if me else set())
-    people = await _summaries(session, users)
+    people = await _board_summaries(session, users)
     tiers = await _badges.tiers_for(session, users, now=now)
 
     def _row(e: LeaderboardEntry, n: int) -> LeaderboardRow | None:
@@ -686,7 +707,7 @@ async def admin_month(session: AsyncSession, month: str) -> AdminMonth:
     return AdminMonth(
         period_month=_labels.month_param(period),
         cutoff_at=cutoff,
-        pending_scoring_events=await _finalize.pending_scoring_events(session, cutoff),
+        pending_scoring_events=await _finalize.pending_scoring_events(session, period, cutoff),
         finalized_at=None if done is None else done.finalized_at,
         final_snapshots=int(finals or 0),
     )

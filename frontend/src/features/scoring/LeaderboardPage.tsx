@@ -229,14 +229,18 @@ function TitleList({ titles }: { titles: BoardTitle[] }) {
           </p>
           <p className="text-[15px] text-slate-800">
             {title.users.map((u, i) => (
-              <span key={u.handle}>
+              <span key={u.handle ?? `unavailable-${i}`}>
                 {i > 0 && ', '}
-                <Link
-                  to={`/u/${encodeURIComponent(u.handle)}`}
-                  className={`font-medium underline-offset-2 hover:underline ${focusRing}`}
-                >
-                  {u.display_name}
-                </Link>
+                {u.handle === null ? (
+                  <span className="font-medium text-slate-600">{u.display_name}</span>
+                ) : (
+                  <Link
+                    to={`/u/${encodeURIComponent(u.handle)}`}
+                    className={`font-medium underline-offset-2 hover:underline ${focusRing}`}
+                  >
+                    {u.display_name}
+                  </Link>
+                )}
               </span>
             ))}
           </p>
@@ -266,17 +270,22 @@ function BoardRows({
   if (board.final) {
     for (const title of board.titles) {
       for (const u of title.users) {
-        if (!titleOf.has(u.handle.toLowerCase())) titleOf.set(u.handle.toLowerCase(), title.label)
+        if (u.handle !== null && !titleOf.has(u.handle.toLowerCase())) {
+          titleOf.set(u.handle.toLowerCase(), title.label)
+        }
       }
     }
   }
-  const row = (r: LeaderboardRow) => (
-    <Row
-      row={r}
-      me={r.user.handle.toLowerCase() === myHandle}
-      title={titleOf.get(r.user.handle.toLowerCase()) ?? null}
-    />
-  )
+  const row = (r: LeaderboardRow) => {
+    const handle = r.user.handle?.toLowerCase() ?? null
+    return (
+      <Row
+        row={r}
+        me={handle !== null && handle === myHandle}
+        title={handle === null ? null : (titleOf.get(handle) ?? null)}
+      />
+    )
+  }
 
   if (rows.length === 0) {
     return (
@@ -296,8 +305,8 @@ function BoardRows({
         aria-label="Ranking"
         className="flex flex-col divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white"
       >
-        {rows.map((r) => (
-          <li key={r.user.handle}>{row(r)}</li>
+        {rows.map((r, i) => (
+          <li key={r.user.handle ?? `unavailable-${r.rank}-${i}`}>{row(r)}</li>
         ))}
       </ol>
       {hasMore && (
@@ -326,15 +335,19 @@ function Row({ row, me, title }: { row: LeaderboardRow; me: boolean; title: stri
       >
         {rankText(row)}
       </span>
-      <Avatar name={row.user.display_name} handle={row.user.handle} size="md" />
+      <Avatar name={row.user.display_name} handle={row.user.handle ?? ''} size="md" />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <Link
-          to={`/u/${encodeURIComponent(row.user.handle)}`}
-          className={`truncate font-semibold text-slate-900 underline-offset-2 hover:underline ${focusRing}`}
-        >
-          {row.user.display_name}
-          {me && <span className="font-normal text-slate-600"> (you)</span>}
-        </Link>
+        {row.user.handle === null ? (
+          <span className="truncate font-semibold text-slate-600">{row.user.display_name}</span>
+        ) : (
+          <Link
+            to={`/u/${encodeURIComponent(row.user.handle)}`}
+            className={`truncate font-semibold text-slate-900 underline-offset-2 hover:underline ${focusRing}`}
+          >
+            {row.user.display_name}
+            {me && <span className="font-normal text-slate-600"> (you)</span>}
+          </Link>
+        )}
         <div className="flex flex-wrap items-center gap-1.5">
           <TierChip tier={row.tier} />
           {title && (
