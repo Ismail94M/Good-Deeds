@@ -342,6 +342,16 @@ No public shape contains points or rank scores (D69).
 
 Rate limits: per account and per IP on #2–#8 (`scoring.rate_*`).
 
+### 3.4 Contract clarifications (main session, 2026-11-22, from the F14 build)
+
+1. **#1 options:** `{tiers: [{slug, label, min_points}], badges: [{slug, label, description}], levels: [{kind, enabled}], withdraw_window_hours, doer_daily_cap, reporter_daily_cap, reason_labels: {<reason slug>: <display text>}}`. All values come from config.
+2. **#8 heroes:** `{region: {code, name, kind}, items: [{period_month, titles: [{place, label, users: UserSummary[]}]}]}`, final months only, newest first.
+3. **#9 admin deed:** `{deed_id, ledger: [LedgerEntry + {breakdown, config_version, reverses_entry_id}], evaluations: [{method, mode, created_at, config_version, scores...}]}`. **#10 admin month:** `{period_month, cutoff_at, pending_scoring_events: int, finalized_at: datetime|null, final_snapshots: int}`.
+4. **#4 is public** like `GET /api/users/{handle}/deed-counts` (Q55: tier, badge and title totals are public): no login needed, per-IP rate limit (plus per account when signed in). Still never contains points or ranks. Leaderboards (#6–#8) keep `CurrentUser`.
+5. **`MyScoring.total_points`** = doer + reporter points, computed on the server (the client never sums points).
+6. **`LedgerEntry.reason_label`**: display text from the server (from `reason_labels`), so the client never maps slugs.
+7. **`MyScoring.boards[].region`** = `{id, code, name, kind}` (code added, so cards link to `/leaderboard/{code}`).
+
 ---
 
 ## 4. Rules and processing

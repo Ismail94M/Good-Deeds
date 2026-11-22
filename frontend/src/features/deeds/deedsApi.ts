@@ -127,7 +127,16 @@ export type DeedOut = {
   area_name: string
   /** True only for the reporter, while pending or verified. */
   can_edit: boolean
+  /**
+   * True for the reporter while a deed is pending, or verified and inside the withdrawal window
+   * (M4 D64); false once the 24 h window has passed.
+   */
   can_withdraw: boolean
+  /**
+   * A verified deed's `verified_at + withdraw_window_hours` (exclusive, M4 D64); null for any
+   * other status (a pending invite can be cancelled at any time). Display only.
+   */
+  withdrawable_until: string | null
   /** Reporter only. */
   invite: InviteOut | null
 }
@@ -228,10 +237,18 @@ export type SelfLogOut = {
   updated_at: string
 }
 
+/**
+ * `GET /me/self-logs`: a page plus `total`, the owner's own self-log count (M4 D69: the count
+ * is no longer public). Optional so screens keep working before the API sends it.
+ */
+export type SelfLogPage = Page<SelfLogOut> & {
+  total?: number
+}
+
 // ----------------------------------------------------------------- profile counts
 
+/** Public profile count (D4, D15). The Self-log Deeds count is no longer public (M4 D69). */
 export type DeedCountsOut = {
-  self_logged: number
   verified: number
 }
 
@@ -267,6 +284,7 @@ export type DeedsErrorCode =
   | 'deed_not_found'
   | 'deed_not_editable'
   | 'deed_not_withdrawable'
+  | 'withdraw_window_closed'
 
 /**
  * The doer named in a scan-time error body (D27): only 409 `already_recognized_today` and
@@ -319,8 +337,7 @@ export const deedsApi = {
 
   // self-logs
   createSelfLog: (data: SelfLogCreate) => apiPost<SelfLogOut>('/me/self-logs', data),
-  selfLogs: (cursor?: string | null) =>
-    apiGet<Page<SelfLogOut>>(`/me/self-logs${query({ cursor })}`),
+  selfLogs: (cursor?: string | null) => apiGet<SelfLogPage>(`/me/self-logs${query({ cursor })}`),
   updateSelfLog: (id: string, data: SelfLogUpdate) =>
     apiPatch<SelfLogOut>(`/me/self-logs/${seg(id)}`, data),
   deleteSelfLog: (id: string) => apiDelete(`/me/self-logs/${seg(id)}`),

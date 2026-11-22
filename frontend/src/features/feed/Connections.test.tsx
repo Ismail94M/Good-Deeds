@@ -89,7 +89,7 @@ describe('Own profile line', () => {
   it('links followers, following and Saved', async () => {
     mockApi({
       ...signedIn(ME),
-      'GET /users/priya/deed-counts': { body: { self_logged: 1, verified: 2 } },
+      'GET /users/priya/deed-counts': { body: { verified: 2 } },
       'GET /users/priya/social': {
         body: { followers: 1, following: 45, is_following: null, is_me: true },
       },

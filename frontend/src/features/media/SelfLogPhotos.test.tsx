@@ -60,7 +60,7 @@ function setup(handlers: Parameters<typeof mockApi>[0] = {}) {
     'GET /deeds/options': { body: makeOptions() },
     'GET /media/options': { body: makeMediaOptions() },
     'GET /me/self-logs': { body: { items: [LOG], next_cursor: null } },
-    'GET /users/asha/deed-counts': { body: { self_logged: 1, verified: 0 } },
+    'GET /users/asha/deed-counts': { body: { verified: 0 } },
     'POST /media/uploads': TICKET,
     'PUT https://storage.test/staging/ph1': { status: 200 },
     'POST /media/uploads/ph1/complete': { body: { photo_id: 'ph1', status: 'uploaded' } },
