@@ -23,8 +23,8 @@ const joinedFormat = new Intl.DateTimeFormat('en-IN', { month: 'long', year: 'nu
  * `/u/:handle` (F7 "Ahmed's profile", M3-DESIGN §6.3; M4 D69, PO Q55): avatar, name, "@handle"
  * (Q22, C1), the tier, a Follow button, the counts (Verified Deeds, Badges, Hero titles,
  * Followers, Following; Q36: nobody can open another person's follower lists) and the person's
- * listed deeds. No Self-log Deeds count and never any points (D69). Signed out: the deed and
- * follow counts and "Join to follow" only (the scoring read needs a signed-in user).
+ * listed deeds. No Self-log Deeds count and never any points (D69). Signed out: the tier and
+ * all five counts (the scoring read #4 is public, §3.4 item 4) and "Join to follow", no deeds.
  */
 export function PublicProfilePage() {
   const { handle = '' } = useParams()
@@ -66,7 +66,7 @@ export function PublicProfilePage() {
         </h1>
         {/* Q22: "@handle" only; no city until there is more than one. */}
         <p className="text-slate-600">@{data.handle}</p>
-        {user && <ProfileTier handle={data.handle} />}
+        <ProfileTier handle={data.handle} />
         {data.bio && <p className="whitespace-pre-line text-slate-800">{data.bio}</p>}
         <p className="text-sm text-slate-500">
           Joined {joinedFormat.format(new Date(data.joined_at))}
@@ -82,7 +82,7 @@ export function PublicProfilePage() {
           </LinkButton>
         )}
       </section>
-      <ProfileCounts handle={data.handle} signedIn={Boolean(user)} />
+      <ProfileCounts handle={data.handle} />
       <p className="flex items-start gap-2.5 text-sm text-slate-600">
         <svg
           aria-hidden
@@ -152,21 +152,21 @@ type ListName = 'badges' | 'titles'
  * Badges and Hero titles open their list (M4-DESIGN §6.3). There is no Self-log Deeds count
  * and no points on a public profile (D69, PO Q55).
  */
-function ProfileCounts({ handle, signedIn }: { handle: string; signedIn: boolean }) {
+function ProfileCounts({ handle }: { handle: string }) {
   const counts = useQuery({
     queryKey: deedsKeys.counts(handle),
     queryFn: () => deedsApi.deedCounts(handle),
     retry: false,
   })
   const social = useSocial(handle)
-  const scoring = useUserScoring(handle, signedIn)
+  const scoring = useUserScoring(handle)
   const [open, setOpen] = useState<ListName | null>(null)
   const listId = useId()
   const show = (failed: boolean, n: number | undefined) => (failed ? '–' : (n ?? '…'))
   const toggle = (name: ListName) => setOpen((current) => (current === name ? null : name))
   // Five tiles fit one row from `sm`; on a phone they wrap 3 + 2 with no empty cell.
-  const top = signedIn ? 'col-span-2 sm:col-span-1' : ''
-  const bottom = signedIn ? 'col-span-3 sm:col-span-1' : ''
+  const top = 'col-span-2 sm:col-span-1'
+  const bottom = 'col-span-3 sm:col-span-1'
   const listButton = (name: ListName, n: number | undefined, label: string) =>
     scoring.data ? (
       <button
@@ -187,20 +187,16 @@ function ProfileCounts({ handle, signedIn }: { handle: string; signedIn: boolean
       <div
         role="group"
         aria-label="Counts"
-        aria-busy={
-          counts.isPending || social.isPending || (signedIn && scoring.isPending) || undefined
-        }
-        className={`grid gap-px overflow-hidden rounded-2xl border border-slate-200 bg-slate-200 ${
-          signedIn ? 'grid-cols-6 sm:grid-cols-5' : 'grid-cols-3'
-        }`}
+        aria-busy={counts.isPending || social.isPending || scoring.isPending || undefined}
+        className="grid grid-cols-6 gap-px overflow-hidden rounded-2xl border border-slate-200 bg-slate-200 sm:grid-cols-5"
       >
         <Count
           n={show(counts.isError, counts.data?.verified)}
           label="Verified Deeds"
           className={top}
         />
-        {signedIn && listButton('badges', scoring.data?.badges_total, 'Badges')}
-        {signedIn && listButton('titles', scoring.data?.titles_total, 'Hero titles')}
+        {listButton('badges', scoring.data?.badges_total, 'Badges')}
+        {listButton('titles', scoring.data?.titles_total, 'Hero titles')}
         <Count
           n={show(social.isError, social.data?.followers)}
           label="Followers"

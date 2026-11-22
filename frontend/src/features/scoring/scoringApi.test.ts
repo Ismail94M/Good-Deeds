@@ -13,7 +13,7 @@ const PUBLIC: PublicScoring = {
 }
 
 const BOARD: Leaderboard = {
-  region: { name: 'Bangalore', kind: 'city' },
+  region: { code: 'IN-KA-BLR', name: 'Bangalore', kind: 'city' },
   month: '2026-11',
   computed_at: '2026-11-22T10:00:00Z',
   final: false,
@@ -31,7 +31,13 @@ describe('scoringApi (M4 §3.3)', () => {
       'GET /scoring/me/ledger': { body: { items: [], next_cursor: null } },
       'GET /scoring/users/a%20b': { body: PUBLIC },
       'GET /scoring/deeds/d1': {
-        body: { points: 10, reason: 'verified', capped: false, provisional_until: null },
+        body: {
+          points: 10,
+          reason: 'verified',
+          reason_label: 'Deed verified',
+          capped: false,
+          provisional_until: null,
+        },
       },
     })
     await scoringApi.options()
@@ -58,7 +64,9 @@ describe('scoringApi (M4 §3.3)', () => {
   it('searches wards by name (#7) and reads heroes (#8)', async () => {
     const api = mockApi({
       'GET /leaderboards/regions': { body: [{ code: 'W1', name: 'Koramangala' }] },
-      'GET /leaderboards/heroes': { body: [] },
+      'GET /leaderboards/heroes': {
+        body: { region: { code: 'W1', name: 'Koramangala', kind: 'ward' }, items: [] },
+      },
     })
     await expect(scoringApi.regions({ q: 'kora' })).resolves.toEqual([
       { code: 'W1', name: 'Koramangala' },
@@ -74,9 +82,15 @@ describe('scoringApi (M4 §3.3)', () => {
 
   it('calls the admin endpoints #9–#10', async () => {
     const api = mockApi({
-      'GET /admin/scoring/deeds/d1': { body: { ledger: [], evaluations: [] } },
+      'GET /admin/scoring/deeds/d1': { body: { deed_id: 'd1', ledger: [], evaluations: [] } },
       'GET /admin/scoring/months/2026-11': {
-        body: { month: '2026-11', cutoff_at: 'x', pending_scoring_events: 0, finalized_at: null },
+        body: {
+          period_month: '2026-11',
+          cutoff_at: 'x',
+          pending_scoring_events: 0,
+          finalized_at: null,
+          final_snapshots: 0,
+        },
       },
     })
     await scoringApi.adminDeed('d1')

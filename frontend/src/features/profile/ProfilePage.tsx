@@ -127,9 +127,8 @@ function OwnTier() {
 function OwnPoints() {
   const scoring = useMyScoring()
   if (!scoring.data) return null
-  const { doer_points, reporter_points, provisional_points, badges_total, titles_total } =
-    scoring.data
-  const total = doer_points + reporter_points
+  // The server sums doer and reporter points (§3.4 item 5); the client never adds them up.
+  const { total_points: total, provisional_points, badges_total, titles_total } = scoring.data
   return (
     <section
       aria-label="Your points"

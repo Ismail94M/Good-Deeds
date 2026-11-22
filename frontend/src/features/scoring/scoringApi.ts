@@ -1,6 +1,7 @@
 /**
  * Types and calls for the M4 scoring API (docs/M4-DESIGN.md §3.2, §3.3 #1–#10;
- * backend/app/modules/scoring). Every read needs a signed-in user; there are no member writes.
+ * §3.4 clarifications; backend/app/modules/scoring). Every read needs a signed-in user except the
+ * public profile scoring (#4); there are no member writes.
  *
  * Privacy (D69, PO Q55): points are shown only to their owner (`MyScoring`, `LedgerEntry`,
  * `DeedPoints`). The public shapes (`PublicScoring`, `LeaderboardRow`, heroes) never carry
@@ -53,23 +54,23 @@ export type LedgerReason =
 // ----------------------------------------------------------------- #1 options
 
 /**
- * `GET /scoring/options`. §3.3 #1 lists the contents ("tiers, badge labels, enabled levels,
- * `withdraw_window_hours`, caps to explain") without field names; these names follow the
- * `leaderboard` / `scoring` config keys (§2.6). CONTRACT: confirm with B33.
+ * `GET /scoring/options` (#1, shape per §3.4 item 1). All values come from config.
  */
 export type ScoringOptions = {
   tiers: (Tier & { min_points: number })[]
-  badges: Badge[]
-  /** Enabled region levels, e.g. `['ward', 'city']`. */
-  levels: RegionKind[]
+  badges: (Badge & { description: string })[]
+  /** Every region level and whether it has boards, e.g. ward and city enabled. */
+  levels: { kind: RegionKind; enabled: boolean }[]
   withdraw_window_hours: number
   doer_daily_cap: number
   reporter_daily_cap: number
+  /** Display text per ledger reason slug (`LedgerReason`), e.g. for the deed points line. */
+  reason_labels: Partial<Record<string, string>>
 }
 
 // ----------------------------------------------------------------- #2 / #4 profile scoring
 
-/** `GET /scoring/users/{handle}` (#4): public, no points. */
+/** `GET /scoring/users/{handle}` (#4): public, no login needed (§3.4 item 4), no points. */
 export type PublicScoring = {
   tier: Tier
   badges_total: number
@@ -80,7 +81,8 @@ export type PublicScoring = {
 
 /** One of my board places on the My points cards (§6.3). */
 export type MyBoard = {
-  region: { id: number; name: string; kind: RegionKind }
+  /** `code` links the card to `/leaderboard/{code}` (§3.4 item 7). */
+  region: { id: number; code: string; name: string; kind: RegionKind }
   /** `YYYY-MM`. */
   period_month: string
   /** Null when I'm not on that board yet. */
@@ -91,6 +93,8 @@ export type MyBoard = {
 
 /** `GET /scoring/me` (#2): owner only. */
 export type MyScoring = PublicScoring & {
+  /** Doer + reporter points, summed by the server (§3.4 item 5): never add them up here. */
+  total_points: number
   doer_points: number
   reporter_points: number
   /** The part of my points still inside a deed's 24 h window. */
@@ -111,6 +115,8 @@ export type LedgerEntry = {
   /** Positive award, 0 decision, negative reversal. */
   points: number
   reason: LedgerReason
+  /** Display text for `reason`, from the server (§3.4 item 6): never map slugs here. */
+  reason_label: string
   provisional: boolean
   provisional_until: string | null
   category_label: string
@@ -128,6 +134,8 @@ export type LedgerParams = { role?: LedgerRole | null; cursor?: string | null }
 export type DeedPoints = {
   points: number
   reason: LedgerReason
+  /** Display text for `reason`, from the server (as on `LedgerEntry`). */
+  reason_label: string
   capped: boolean
   provisional_until: string | null
 }
@@ -149,11 +157,18 @@ export type BoardTitle = { place: number; label: string; users: UserSummary[] }
 
 /** `GET /leaderboards` (#6). Provisional until `final`; `titles` only on final boards. */
 export type Leaderboard = {
-  region: { name: string; kind: RegionKind }
+  region: { code: string; name: string; kind: RegionKind }
   /** `YYYY-MM`. */
   month: string
-  computed_at: string
+  /** Null while the board has no snapshot yet (an empty board). */
+  computed_at: string | null
   final: boolean
+  /**
+   * CONTRACT (proposed, not in §3.3/§3.4): when a provisional board becomes final (the month's
+   * finalization cutoff), for "Provisional until 2 Dec, 01:00 IST". Optional: without it the
+   * banner says "Provisional" with no date, since the client never computes the cutoff (§6.4).
+   */
+  finalizes_at?: string | null
   items: LeaderboardRow[]
   /** My own row, pinned; null when I'm not on this board. */
   me: LeaderboardRow | null
@@ -174,32 +189,47 @@ export type RegionOption = { code: string; name: string }
 
 export type RegionSearchParams = { kind?: RegionKind; q?: string }
 
-/**
- * `GET /leaderboards/heroes` (#8): "final titles per month for a region". §3.3 gives no field
- * names; this mirrors the `titles` of a final board, grouped by month. CONTRACT: confirm with
- * B33.
- */
-export type HeroMonth = { month: string; titles: BoardTitle[] }
+/** `GET /leaderboards/heroes` (#8, §3.4 item 2): final months only, newest first. */
+export type HeroMonth = { period_month: string; titles: BoardTitle[] }
+
+export type Heroes = {
+  region: { code: string; name: string; kind: RegionKind }
+  items: HeroMonth[]
+}
 
 export type HeroesParams = { region?: string | null; year?: number | null }
 
 // ----------------------------------------------------------------- #9–#10 admin
 
-/**
- * `GET /admin/scoring/deeds/{deed_id}` (#9, admin only): "ledger rows + evaluations". §3.3 gives
- * no field names; the rows are typed loosely until B33 publishes the schema. CONTRACT.
- */
-export type AdminDeedScoring = {
-  ledger: Record<string, unknown>[]
-  evaluations: Record<string, unknown>[]
+/** One evaluation of a deed (rule-based live, or AI shadow in M4b); scores vary by method. */
+export type AdminEvaluation = {
+  id: string
+  method: string
+  status: string
+  mode: string
+  created_at: string
+  config_version: number
+  [score: string]: unknown
 }
 
-/** `GET /admin/scoring/months/{YYYY-MM}` (#10, admin only): finalization status. */
+/** `GET /admin/scoring/deeds/{deed_id}` (#9, admin only; §3.4 item 3). */
+export type AdminDeedScoring = {
+  deed_id: string
+  ledger: (LedgerEntry & {
+    breakdown: Record<string, unknown>
+    config_version: number
+    reverses_entry_id: string | null
+  })[]
+  evaluations: AdminEvaluation[]
+}
+
+/** `GET /admin/scoring/months/{YYYY-MM}` (#10, admin only; §3.4 item 3): finalization status. */
 export type MonthFinalization = {
-  month: string
+  period_month: string
   cutoff_at: string
   pending_scoring_events: number
   finalized_at: string | null
+  final_snapshots: number
 }
 
 // ----------------------------------------------------------------- errors
@@ -220,7 +250,7 @@ export const scoringApi = {
   regions: ({ kind = 'ward', q }: RegionSearchParams = {}) =>
     apiGet<RegionOption[]>(`/leaderboards/regions${queryString({ kind, q })}`),
   heroes: ({ region, year }: HeroesParams = {}) =>
-    apiGet<HeroMonth[]>(`/leaderboards/heroes${queryString({ region, year })}`),
+    apiGet<Heroes>(`/leaderboards/heroes${queryString({ region, year })}`),
   adminDeed: (deedId: string) => apiGet<AdminDeedScoring>(`/admin/scoring/deeds/${seg(deedId)}`),
   adminMonth: (month: string) => apiGet<MonthFinalization>(`/admin/scoring/months/${seg(month)}`),
 }

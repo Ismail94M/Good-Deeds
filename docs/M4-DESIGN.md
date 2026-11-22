@@ -353,6 +353,8 @@ Rate limits: per account and per IP on #2–#8 (`scoring.rate_*`).
 7. **`MyScoring.boards[].region`** = `{id, code, name, kind}` (code added, so cards link to `/leaderboard/{code}`).
 8. **D47 refinement:** `scoring` may import exactly one name from `media.service`, the event class `DeedPhotoReady` (needed by `@subscribe`); nothing else from `media`. B34's architecture test enforces this allow-list, so scoring still has no way to read photo state (Q29).
 9. **Evidence as of the window end:** `reconcile_deed` reads the deed text as of `verified_at + withdraw_window_hours` (`deeds.service.content_as_of`) and counts the photo bonus only if the evidence was recorded by then, so any later re-score (prize-rank change, late handler) can never pick up a post-window edit or photo.
+10. **#6 `finalizes_at`:** the leaderboard response carries `finalizes_at` (the month's earliest finalization time: month end + withdraw window + safety margin, in UTC; `null` once final), so the client never computes cutoffs. #5 also returns `reason_label`.
+11. **#1 `levels[]`** = `{kind, enabled, hero_min_deeds, hero_min_reporters, titled_places}` (from `leaderboard` config), so the "no Hero this month" copy can name the minimums.
 
 ---
 

@@ -59,12 +59,15 @@ __all__ = [
     "content_as_of",
     "deed_region",
     "deeds_for_doer",
+    "default_region",
     "get_deed",
     "get_deeds",
     "pair_ordinal",
+    "region_ancestor_map",
     "region_ancestors",
     "region_by_code",
     "regions",
+    "regions_by_id",
     "revision_time",
     "same_act_group_view",
     "scoring_inputs",
@@ -408,3 +411,34 @@ async def regions(
         stmt = stmt.where(Region.name.icontains(q.strip(), autoescape=True))
     rows = await session.scalars(stmt.order_by(Region.name, Region.id).limit(limit))
     return [_region_view(r) for r in rows]
+
+
+async def regions_by_id(session: AsyncSession, region_ids: Iterable[int]) -> dict[int, RegionView]:
+    """Views of the regions found, by id, in one query. Unknown ids are left out."""
+    ids = set(region_ids)
+    if not ids:
+        return {}
+    rows = await session.scalars(select(Region).where(Region.id.in_(ids)))
+    return {r.id: _region_view(r) for r in rows}
+
+
+async def region_ancestor_map(session: AsyncSession, kind: RegionKind) -> dict[int, int]:
+    """For every region at or below ``kind``, the id of its ancestor of that kind (a region of
+    that kind maps to itself). Leaderboards use it so each deed counts once per level (D66):
+    a region has exactly one ancestor of each kind."""
+    rows = await session.execute(
+        select(RegionClosure.descendant_id, RegionClosure.ancestor_id)
+        .join(Region, Region.id == RegionClosure.ancestor_id)
+        .where(Region.kind == kind)
+    )
+    return {descendant: ancestor for descendant, ancestor in rows}
+
+
+async def default_region(session: AsyncSession) -> RegionView:
+    """The region a deed without a ward counts in (``fallback_region_code``, the city): also the
+    default leaderboard (docs/M4-DESIGN.md §3.3 #6)."""
+    _, limits = await load_limits(session)
+    region = await region_by_code(session, limits.fallback_region_code)
+    if region is None:
+        raise RuntimeError(f"No region with fallback_region_code {limits.fallback_region_code!r}")
+    return region

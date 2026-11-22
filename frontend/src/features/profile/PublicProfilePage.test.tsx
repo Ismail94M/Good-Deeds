@@ -47,12 +47,16 @@ describe('PublicProfilePage', () => {
     expect(screen.getByText(/joined november 2026/i)).toBeInTheDocument()
   })
 
-  it('signed out: Verified Deeds, Followers and Following as plain numbers, no scoring', async () => {
-    const api = mockApi({
+  it('signed out: tier, badges and titles from the public scoring read, never points', async () => {
+    mockApi({
       'GET /users/asha': { body: ASHA },
       'GET /users/asha/deed-counts': { body: { verified: 31 } },
       'GET /users/asha/social': {
         body: { followers: 12, following: 45, is_following: null, is_me: false },
+      },
+      // #4 is public (§3.4 item 4). Even if points leaked into the reply, none are shown.
+      'GET /scoring/users/asha': {
+        body: { ...ASHA_SCORING, total_points: 987, doer_points: 987, provisional_points: 3 },
       },
     })
     renderApp('/u/asha')
@@ -60,10 +64,11 @@ describe('PublicProfilePage', () => {
     expect(await within(counts).findByText('31')).toBeVisible()
     expect(within(counts).getByText('Verified Deeds')).toBeVisible()
     expect(await within(counts).findByText('12')).toBeVisible()
-    expect(within(counts).queryByText('Badges')).not.toBeInTheDocument()
+    expect(await within(counts).findByRole('button', { name: '3 Badges' })).toBeVisible()
+    expect(within(counts).getByRole('button', { name: '1 Hero titles' })).toBeVisible()
     expect(within(counts).queryByRole('link')).not.toBeInTheDocument()
-    // The scoring read needs a signed-in user (§3.3 #4), so it isn't called.
-    expect(api.calls('GET /scoring/users/asha')).toHaveLength(0)
+    expect(screen.getByText('Tree')).toHaveTextContent('Tier: Tree')
+    expect(document.body).not.toHaveTextContent(/987|points/i)
     expect(
       screen.getByText(/were confirmed in person by someone who saw them\./).closest('p'),
     ).toHaveTextContent('Verified Deeds were confirmed in person by someone who saw them.')

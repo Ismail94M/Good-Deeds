@@ -42,7 +42,7 @@ export function useLedger(role: LedgerRole | null = null) {
   })
 }
 
-/** `GET /scoring/users/{handle}` (#4): tier, badges and titles; no points. Needs sign-in. */
+/** `GET /scoring/users/{handle}` (#4): tier, badges and titles; no points. Public (§3.4). */
 export function useUserScoring(handle: string, enabled = true) {
   return useQuery({
     queryKey: scoringKeys.user(handle),

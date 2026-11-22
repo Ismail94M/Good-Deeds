@@ -95,6 +95,17 @@ async def is_active(session: AsyncSession, user_id: uuid.UUID) -> bool:
     return status == UserStatus.ACTIVE
 
 
+async def active_user_ids(session: AsyncSession, user_ids: Iterable[uuid.UUID]) -> set[uuid.UUID]:
+    """The ids among ``user_ids`` whose accounts exist and are active, in one query."""
+    ids = set(user_ids)
+    if not ids:
+        return set()
+    rows = await session.scalars(
+        select(User.id).where(User.id.in_(ids), User.status == UserStatus.ACTIVE)
+    )
+    return set(rows)
+
+
 async def get_user_by_handle(session: AsyncSession, handle: str) -> User | None:
     return await session.scalar(select(User).where(User.handle == handle.lower()))
 
@@ -585,6 +596,8 @@ async def set_role(
 
 # Moderators and admins (M3 D43, Q34): photo and comment report review.
 ReviewerUser = Annotated[User, Depends(require_role(Role.MODERATOR, Role.ADMIN))]
+# Admins only (M4 scoring admin endpoints; moderators get 403).
+AdminUser = Annotated[User, Depends(require_role(Role.ADMIN))]
 
 
 def device_id_header(

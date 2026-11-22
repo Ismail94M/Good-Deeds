@@ -30,6 +30,7 @@ import {
   secondaryButtonClass,
   StatusBadge,
 } from './deedUi'
+import { DeedPointsLine } from '../scoring/DeedPointsLine'
 import { useScoringOptions } from '../scoring/scoringQueries'
 import { WithdrawDeedDialog } from './WithdrawDeedDialog'
 import { formatWithdrawUntil, useCanWithdraw, windowClosedNote } from './withdrawWindow'
@@ -41,7 +42,7 @@ export type DeedDetailState = { notice?: string } | null
  * `/me/deeds/:id` (F6 canvas): the private owner view of one deed. The reporter gets Edit and
  * Withdraw while allowed, and the withdrawn notice. M3: photos with review outcomes, remove and
  * add (`DeedPhotos`, M3-DESIGN §6.3), and a "Shown in feed" / "Hidden from feed" chip for verified
- * deeds (read from the feed's deed detail).
+ * deeds (read from the feed's deed detail). M4: the viewer's own points line (§6.3).
  */
 export function DeedDetailPage() {
   const { id = '' } = useParams()
@@ -151,6 +152,11 @@ export function DeedDetailPage() {
           </>
         )}
       </dl>
+      {/* Own points line (§6.3, #5): the API answers only the doer or reporter, never pending. */}
+      <DeedPointsLine
+        deedId={deed.id}
+        enabled={deed.status !== 'pending' && deed.status !== 'unverified'}
+      />
       {viewer === 'reporter' && deed.status === 'withdrawn' && deed.withdrawn_at && (
         <div
           role="status"

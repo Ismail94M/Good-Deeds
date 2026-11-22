@@ -29,7 +29,9 @@ const MY_SCORING = {
       place: 1,
     },
   ],
-  doer_points: 110,
+  total_points: 124,
+  // Deliberately not adding up to total_points: the page shows the server's total (§3.4 item 5).
+  doer_points: 100,
   reporter_points: 14,
   provisional_points: 12,
   boards: [],

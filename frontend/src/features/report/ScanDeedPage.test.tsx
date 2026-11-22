@@ -144,6 +144,8 @@ describe('deed form', () => {
 
     expect(await screen.findByRole('heading', { name: 'Deed verified' })).toHaveFocus()
     expect(screen.getByText('Thanks, Priya. It now counts on Ahmed Khan’s profile.')).toBeVisible()
+    // M4 §6.3: the counted report says the doer earns points, with no number.
+    expect(screen.getByText('Ahmed earns points for this deed.')).toBeVisible()
     expect(api.calls('POST /deeds')[0].body).toEqual({
       method: 'qr_scan',
       scan_id: SCAN_ID,
@@ -216,6 +218,7 @@ describe('deed form', () => {
         'Others already reported this act. Your report backs theirs up, but it doesn’t count a second time on Ahmed’s profile.',
       ),
     ).toBeVisible()
+    expect(screen.queryByText(/earns points/)).not.toBeInTheDocument()
   })
 
   it('shows API validation errors inline and keeps the form', async () => {
