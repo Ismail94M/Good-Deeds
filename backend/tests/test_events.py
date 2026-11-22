@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -87,3 +88,87 @@ def test_duplicate_event_type_is_rejected() -> None:
 
         class Clash(DomainEvent):
             event_type = "test.something_happened"
+
+
+# --------------------------------------------------- unprocessed_before (M4 D64)
+
+
+class BarrierEvent(DomainEvent):
+    event_type = "test.barrier_event"
+    thing_id: uuid.UUID
+
+
+class UnwatchedEvent(DomainEvent):
+    event_type = "test.unwatched_event"
+    thing_id: uuid.UUID
+
+
+@subscribe(BarrierEvent)
+async def barrier_first(session: AsyncSession, event: BarrierEvent) -> None:
+    pass
+
+
+@subscribe(BarrierEvent)
+async def barrier_second(session: AsyncSession, event: BarrierEvent) -> None:
+    pass
+
+
+@subscribe(UnwatchedEvent)
+async def unwatched(session: AsyncSession, event: UnwatchedEvent) -> None:
+    pass
+
+
+FIRST = f"{__name__}.barrier_first"
+SECOND = f"{__name__}.barrier_second"
+UNWATCHED = f"{__name__}.unwatched"
+
+
+async def _event_at(session: AsyncSession, event: DomainEvent, at: datetime) -> OutboxEvent:
+    row = emit(session, event)
+    row.occurred_at = at
+    await session.flush()
+    return row
+
+
+def test_handler_names_with_prefix() -> None:
+    names = events.handler_names_with_prefix(f"{__name__}.barrier_")
+    assert names == [FIRST, SECOND]
+    assert events.handler_names_with_prefix("no.such.prefix.") == []
+
+
+async def test_unprocessed_before_counts_events_waiting_for_any_named_handler(
+    session: AsyncSession,
+) -> None:
+    cutoff = datetime(2026, 12, 2, 1, 0, tzinfo=UTC)
+    before = await _event_at(
+        session, BarrierEvent(thing_id=uuid.uuid4()), cutoff - timedelta(microseconds=1)
+    )
+    await _event_at(session, BarrierEvent(thing_id=uuid.uuid4()), cutoff)  # at cutoff: excluded
+    await _event_at(
+        session, UnwatchedEvent(thing_id=uuid.uuid4()), cutoff - timedelta(days=1)
+    )  # no named handler subscribes to it
+
+    assert await events.unprocessed_before(session, [FIRST, SECOND], cutoff) == 1
+    # Dispatched but not yet handled still waits.
+    before.dispatched_at = cutoff
+    await session.flush()
+    assert await events.unprocessed_before(session, [FIRST, SECOND], cutoff) == 1
+
+    assert await events.run_handler(session, before.id, FIRST) is True
+    # The second handler hasn't run yet.
+    assert await events.unprocessed_before(session, [FIRST, SECOND], cutoff) == 1
+    assert await events.unprocessed_before(session, [FIRST], cutoff) == 0
+
+    assert await events.run_handler(session, before.id, SECOND) is True
+    assert await events.unprocessed_before(session, [FIRST, SECOND], cutoff) == 0
+
+
+async def test_unprocessed_before_ignores_unknown_handlers_and_other_subscribers(
+    session: AsyncSession,
+) -> None:
+    cutoff = datetime(2026, 12, 2, 1, 0, tzinfo=UTC)
+    await _event_at(session, UnwatchedEvent(thing_id=uuid.uuid4()), cutoff - timedelta(hours=1))
+    assert await events.unprocessed_before(session, [], cutoff) == 0
+    assert await events.unprocessed_before(session, ["no.such.handler"], cutoff) == 0
+    assert await events.unprocessed_before(session, [FIRST, SECOND], cutoff) == 0
+    assert await events.unprocessed_before(session, [UNWATCHED], cutoff) >= 1

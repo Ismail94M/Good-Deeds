@@ -264,20 +264,22 @@ async def test_writes_are_rate_limited_per_account_and_per_ip(
 # --------------------------------------------------- profile counts (§3.2 #13)
 
 
-async def test_counts_are_public_and_count_self_logs(
+async def test_counts_are_public_and_never_show_self_logs(
     client: AsyncClient, session: AsyncSession
 ) -> None:
+    """M4 D69 (PO Q55): the public counts are ``{verified}`` only; the Self-log Deeds count is
+    no longer public (the owner sees their self-logs in their own list)."""
     owner = await make_member(session)
-    assert await _counts(client, owner.handle) == {"self_logged": 0, "verified": 0}
-    first = await _create(client, owner)
+    assert await _counts(client, owner.handle) == {"verified": 0}
+    await _create(client, owner)
     await _create(client, owner)
     body = await _counts(client, owner.handle)
-    assert body == {"self_logged": 2, "verified": 0}
+    assert body == {"verified": 0}
     # Handles are case-insensitive, like the public profile.
     assert await _counts(client, owner.handle.upper()) == body
-
-    await client.delete(f"/api/me/self-logs/{first['id']}", headers=owner.headers)
-    assert (await _counts(client, owner.handle))["self_logged"] == 1
+    # The owner still has them in their own list.
+    own = await client.get("/api/me/self-logs", headers=owner.headers)
+    assert len(own.json()["items"]) == 2
 
 
 async def test_verified_counts_counted_reports(client: AsyncClient, session: AsyncSession) -> None:
@@ -288,7 +290,7 @@ async def test_verified_counts_counted_reports(client: AsyncClient, session: Asy
         out = await scan_and_report(session, w, doer, east_m=i * 10)
         assert out.same_act is not None
     await session.commit()
-    assert await _counts(client, doer.handle) == {"self_logged": 0, "verified": 5}
+    assert await _counts(client, doer.handle) == {"verified": 5}
     # The witnesses' own counts are unaffected: reporting isn't doing.
     assert (await _counts(client, witnesses[0].handle))["verified"] == 0
 
@@ -317,7 +319,7 @@ async def test_only_verified_deeds_count(client: AsyncClient, session: AsyncSess
     assert body["verified"] == 1, kept
     # Self-logs never change the verified count.
     await _create(client, doer)
-    assert await _counts(client, doer.handle) == {"self_logged": 1, "verified": 1}
+    assert await _counts(client, doer.handle) == {"verified": 1}
 
 
 async def test_counts_404_for_unknown_or_inactive_handle(

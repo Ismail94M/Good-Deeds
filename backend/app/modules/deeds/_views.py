@@ -6,16 +6,34 @@ deed is never revealed, not even to the reporter.
 
 import uuid
 from collections.abc import Mapping
+from datetime import datetime, timedelta
 
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.deeds._areas import area_names, display_name
+from app.modules.deeds._common import utcnow
+from app.modules.deeds._limits import load_limits
 from app.modules.deeds.models import Deed, DeedStatus, SameActGroup
 from app.modules.deeds.schemas import DeedOut, InviteOut, SameActOut, UserRef
 from app.modules.identity import service as identity
 
 _CHANGEABLE = frozenset({DeedStatus.PENDING, DeedStatus.VERIFIED})
+
+
+def withdrawable_until(deed: Deed, window_hours: int) -> datetime | None:
+    """End (exclusive) of a verified deed's withdrawal window (M4 D64); None for any other
+    status (a pending invite can be cancelled at any time)."""
+    if deed.status != DeedStatus.VERIFIED or deed.verified_at is None:
+        return None
+    return deed.verified_at + timedelta(hours=window_hours)
+
+
+def can_withdraw_at(deed: Deed, window_hours: int, now: datetime) -> bool:
+    if deed.status == DeedStatus.PENDING:
+        return True
+    until = withdrawable_until(deed, window_hours)
+    return until is not None and now < until
 
 
 async def deed_out(
@@ -27,9 +45,12 @@ async def deed_out(
     invite: InviteOut | None = None,
     summaries: Mapping[uuid.UUID, BaseModel] | None = None,
     areas: dict[int, str] | None = None,
+    window_hours: int | None = None,
+    now: datetime | None = None,
 ) -> DeedOut:
-    """``summaries`` and ``areas`` let a caller building a page of deeds prefetch every name in
-    one query each; ``summaries`` must contain the reporter and (unless pending) the doer."""
+    """``summaries``, ``areas`` and ``window_hours`` let a caller building a page of deeds
+    prefetch every name in one query each (and the config once); ``summaries`` must contain the
+    reporter and (unless pending) the doer."""
     show_doer = deed.doer_user_id is not None and deed.status != DeedStatus.PENDING
     if summaries is None:
         ids = [deed.reporter_user_id]
@@ -47,6 +68,8 @@ async def deed_out(
         group = await session.get(SameActGroup, deed.same_act_group_id)
     if areas is None:
         areas = await area_names(session, [deed.area_id])
+    if window_hours is None:
+        window_hours = (await load_limits(session))[1].withdraw_window_hours
     is_reporter = viewer_id == deed.reporter_user_id
     changeable = is_reporter and deed.status in _CHANGEABLE
     return DeedOut(
@@ -74,6 +97,7 @@ async def deed_out(
         has_location=deed.location is not None,
         area_name=display_name(deed.area_id, areas),
         can_edit=changeable,
-        can_withdraw=changeable,
+        can_withdraw=changeable and can_withdraw_at(deed, window_hours, now or utcnow()),
+        withdrawable_until=withdrawable_until(deed, window_hours),
         invite=invite if is_reporter else None,
     )

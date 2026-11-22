@@ -14,6 +14,9 @@ index is a normal metadata ``Index`` that Alembic can compare).
 M3 (docs/M3-DESIGN.md §2.1, migration 0013): ``areas`` is reference data (Bangalore ward
 boundaries with a familiar display name), and ``deeds.area_id`` is resolved from the deed's own
 point in this module, so no other module ever sees coordinates (D39).
+
+M4 (docs/M4-DESIGN.md §2.2, D65, migration 0019): the location hierarchy ``regions`` (country,
+state, city, ward) with its closure table ``region_closure``; each area is one ward region.
 """
 
 import uuid
@@ -109,6 +112,63 @@ class VerificationEventKind(StrEnum):
     REJECTED = "rejected"
 
 
+class RegionKind(StrEnum):
+    COUNTRY = "country"
+    STATE = "state"
+    CITY = "city"
+    WARD = "ward"
+
+
+class Region(Base):
+    """One place in the location hierarchy ward → city → state → country (M4 D65, §2.2).
+
+    Seeded by migration 0019 (India, Karnataka, Bangalore and one ward per ``areas`` row); more
+    are added only through ``python -m app.modules.deeds.cli add-region`` (audited, no HTTP
+    route). Database triggers (0019) enforce the parent kind (ward under a city, city under a
+    state, state under a country), keep ``kind``, ``parent_id`` and ``code`` fixed once written,
+    and fill ``region_closure``. ``code`` is stable (``IN``, ``IN-KA``, ``IN-KA-BLR``, a ward is
+    the city code plus its ``areas.ward_code``, e.g. ``IN-KA-BLR-GBA-C040``); only ``name`` is
+    ever shown.
+    """
+
+    __tablename__ = "regions"
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_regions_code"),
+        CheckConstraint("(kind = 'country') = (parent_id IS NULL)", name="parent_by_kind"),
+        CheckConstraint("length(btrim(name)) BETWEEN 1 AND 80", name="name_length"),
+        CheckConstraint("code ~ '^[A-Z0-9]+(-[A-Z0-9]+)*$'", name="code_format"),
+        Index("ix_regions_parent_id", "parent_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    kind: Mapped[RegionKind] = mapped_column(_enum(RegionKind, "region_kind"))
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("regions.id", ondelete="RESTRICT"))
+    name: Mapped[str] = mapped_column(String(80))
+    code: Mapped[str] = mapped_column(String(40))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class RegionClosure(Base):
+    """Every (ancestor, descendant) pair of ``regions``, including each region with itself at
+    depth 0 (§2.2). Written only by the ``regions_add_closure`` trigger when a region is
+    inserted; rows are never updated (trigger) and go with their region."""
+
+    __tablename__ = "region_closure"
+    __table_args__ = (
+        CheckConstraint("(depth = 0) = (ancestor_id = descendant_id)", name="depth_valid"),
+        CheckConstraint("depth BETWEEN 0 AND 3", name="depth_range"),
+        Index("ix_region_closure_descendant_id", "descendant_id"),
+    )
+
+    ancestor_id: Mapped[int] = mapped_column(
+        ForeignKey("regions.id", ondelete="CASCADE"), primary_key=True
+    )
+    descendant_id: Mapped[int] = mapped_column(
+        ForeignKey("regions.id", ondelete="CASCADE"), primary_key=True
+    )
+    depth: Mapped[int] = mapped_column(SmallInteger)
+
+
 class Area(Base):
     """A Bangalore area (one ward of the official boundary dataset). M3-DESIGN §2.1, D39.
 
@@ -121,6 +181,7 @@ class Area(Base):
     __tablename__ = "areas"
     __table_args__ = (
         UniqueConstraint("ward_code", name="uq_areas_ward_code"),
+        UniqueConstraint("region_id", name="uq_areas_region_id"),
         CheckConstraint("length(btrim(name)) BETWEEN 1 AND 40", name="name_length"),
         Index("ix_areas_boundary", "boundary", postgresql_using="gist"),
     )
@@ -132,6 +193,10 @@ class Area(Base):
     # Dataset name, publisher, publication date and licence (attribution on /terms if needed).
     source: Mapped[str] = mapped_column(String(120))
     ward_code: Mapped[str] = mapped_column(String(20))
+    # The ward region of this area (M4 D65; one each, backfilled by 0019). An insert without it
+    # takes the ward region coded ``<city region code>-<ward_code>`` (trigger
+    # ``areas_assign_region``), so a ward re-import keeps its regions; it must be a ward.
+    region_id: Mapped[int] = mapped_column(ForeignKey("regions.id", ondelete="RESTRICT"))
 
 
 class QrScan(Base):

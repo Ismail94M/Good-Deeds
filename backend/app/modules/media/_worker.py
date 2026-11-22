@@ -30,9 +30,11 @@ from typing import Any
 from sqlalchemy import and_, case, exists, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.events import emit
 from app.core.storage import ObjectNotFound, ObjectStorage, ObjectTooLarge
 from app.modules.media import _keys, _pipeline
 from app.modules.media._limits import MediaLimits, load_limits
+from app.modules.media.events import DeedPhotoReady
 from app.modules.media.models import (
     Photo,
     PhotoPurpose,
@@ -317,6 +319,21 @@ async def _finish_ready(
     photo.height = display.height
     photo.content_sha256 = sha
     photo.processed_at = now
+    if (
+        photo.purpose == PhotoPurpose.DEED
+        and photo.deed_id is not None
+        and photo.attached_at is not None
+    ):
+        # Photo evidence for scoring (M4 D51), committed with the ``ready`` state.
+        emit(
+            session,
+            DeedPhotoReady(
+                photo_id=photo.id,
+                deed_id=photo.deed_id,
+                uploader_id=photo.uploader_user_id,
+                attached_at=photo.attached_at,
+            ),
+        )
     await session.commit()
     await _delete_staging(session, storage, claimed, now)
 

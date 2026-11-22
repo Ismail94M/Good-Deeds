@@ -314,7 +314,7 @@ async def test_self_log_content_never_leaks_through_public_or_other_endpoints(
         _assert_absent(r.text, _coordinate_strings(NORTH, EAST), str(r.request.url))
         assert "2026-06-01" not in r.text, r.text  # not even the date
     counts = responses[0].json()
-    assert counts == {"self_logged": 1, "verified": 1}
+    assert counts == {"verified": 1}
     doer_view = responses[8].json()["items"]
     assert len(doer_view) == 1 and doer_view[0]["description"] != secret
     assert responses[4].status_code == responses[5].status_code == 404

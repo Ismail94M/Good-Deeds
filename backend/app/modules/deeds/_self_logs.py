@@ -172,15 +172,12 @@ async def delete_log(session: AsyncSession, owner_id: uuid.UUID, log_id: uuid.UU
 
 
 async def deed_counts(session: AsyncSession, handle: str) -> DeedCountsOut:
-    """Both public profile counts. ``verified`` counts **counted** verified reports (D15), so it
-    equals the leaderboard figure: twenty witnesses of one act count as the cap (5). Self-logs
-    never contribute to it."""
+    """The public profile count. ``verified`` counts **counted** verified reports (D15): twenty
+    witnesses of one act count as the cap (5). Self-logs never contribute to it, and their count
+    is no longer public (M4 D69)."""
     user = await identity.get_user_by_handle(session, handle)
     if user is None or user.status != "active":
         raise NotFound("We couldn't find that person.", code="user_not_found")
-    self_logged = await session.scalar(
-        select(func.count()).select_from(SelfLog).where(SelfLog.user_id == user.id)
-    )
     verified = await session.scalar(
         select(func.count())
         .select_from(Deed)
@@ -190,4 +187,4 @@ async def deed_counts(session: AsyncSession, handle: str) -> DeedCountsOut:
             Deed.counts_for_points.is_(True),
         )
     )
-    return DeedCountsOut(self_logged=int(self_logged or 0), verified=int(verified or 0))
+    return DeedCountsOut(verified=int(verified or 0))

@@ -7,12 +7,12 @@ transaction as the handler's work, so every handler's effect happens exactly onc
 """
 
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterable
 from datetime import UTC, datetime
 from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import DateTime, ForeignKey, String, func, select
+from sqlalchemy import DateTime, ForeignKey, String, and_, exists, func, or_, select
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
@@ -91,6 +91,12 @@ def handlers_for(event_type: str) -> dict[str, Handler]:
     return dict(_handlers.get(event_type, {}))
 
 
+def handler_names_with_prefix(prefix: str) -> list[str]:
+    """Every registered handler whose name (``module.qualname``) starts with ``prefix``, for
+    example ``"app.modules.scoring."``. Only handlers of imported modules are registered."""
+    return sorted({name for subs in _handlers.values() for name in subs if name.startswith(prefix)})
+
+
 def emit(session: AsyncSession, event: DomainEvent) -> OutboxEvent:
     """Add an event to the outbox. It is committed (or rolled back) with the caller's work."""
     row = OutboxEvent(event_type=event.event_type, payload=event.model_dump(mode="json"))
@@ -139,3 +145,45 @@ async def run_handler(session: AsyncSession, event_id: uuid.UUID, handler_name: 
     session.add(ProcessedEvent(event_id=event_id, handler=handler_name))
     await session.flush()
     return True
+
+
+async def unprocessed_before(
+    session: AsyncSession, handler_names: Iterable[str], cutoff: datetime
+) -> int:
+    """How many outbox events that occurred before ``cutoff`` still wait for at least one of
+    ``handler_names`` (docs/M4-DESIGN.md D64: monthly finalization waits for this to be 0).
+
+    An event waits for a handler when the handler is subscribed to its type and there is no
+    ``processed_events`` row for the pair, whether or not it has been dispatched yet. Handler
+    names unknown to the registry are ignored, so the caller passes names of loaded modules.
+    Events not visible to this transaction (still uncommitted) can't be counted; callers leave
+    a margin after the cutoff for that.
+    """
+    wanted = set(handler_names)
+    pairs = [
+        (event_type, name)
+        for event_type, subs in _handlers.items()
+        for name in subs
+        if name in wanted
+    ]
+    if not pairs:
+        return 0
+    waiting = [
+        and_(
+            OutboxEvent.event_type == event_type,
+            ~exists().where(
+                ProcessedEvent.event_id == OutboxEvent.id, ProcessedEvent.handler == name
+            ),
+        )
+        for event_type, name in pairs
+    ]
+    count = await session.scalar(
+        select(func.count())
+        .select_from(OutboxEvent)
+        .where(
+            OutboxEvent.occurred_at < cutoff,
+            OutboxEvent.event_type.in_({event_type for event_type, _ in pairs}),
+            or_(*waiting),
+        )
+    )
+    return int(count or 0)

@@ -152,7 +152,12 @@ class DeedOut(BaseModel):
     # M3 (§3.1, D39): the deed's area name, "Bangalore" when it has none. Never coordinates.
     area_name: str
     can_edit: bool
+    # M4 (D64): false for a verified deed once its withdrawal window has ended.
     can_withdraw: bool
+    # M4 (D64): a verified deed's ``verified_at + withdraw_window_hours`` (exclusive); null for
+    # any other status (a pending invite can be cancelled at any time). Display only: the
+    # server checks the window again under the deed row lock.
+    withdrawable_until: datetime | None
     # Reporter only.
     invite: InviteOut | None
 
@@ -220,9 +225,9 @@ class SelfLogPage(BaseModel):
 
 
 class DeedCountsOut(BaseModel):
-    """Public profile counts (D4). ``verified`` counts counted verified reports (D15)."""
+    """Public profile count (D4). ``verified`` counts counted verified reports (D15). The
+    Self-log Deeds count is no longer public (M4 D69, PO Q55)."""
 
-    self_logged: int
     verified: int
 
 

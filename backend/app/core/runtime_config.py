@@ -62,6 +62,17 @@ async def load[T: RuntimeConfig](session: AsyncSession, model: type[T]) -> tuple
     return row.version, model.model_validate(row.values)
 
 
+async def load_version[T: RuntimeConfig](session: AsyncSession, model: type[T], version: int) -> T:
+    """The values of one specific version of ``model.namespace`` (for example the version a
+    ledger row or snapshot recorded). Raises ``LookupError`` if that version doesn't exist, and
+    a pydantic ``ValidationError`` if its values don't match the current model (an old version
+    from before a key was added)."""
+    row = await session.get(ConfigVersion, (model.namespace, version))
+    if row is None:
+        raise LookupError(f"No config version {version} for namespace {model.namespace!r}")
+    return model.model_validate(row.values)
+
+
 async def publish(
     session: AsyncSession,
     values: RuntimeConfig,
