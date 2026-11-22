@@ -167,7 +167,7 @@ async def test_owner_only_everywhere(client: AsyncClient, session: AsyncSession)
     log = await _create(client, owner)
 
     listed = (await client.get("/api/me/self-logs", headers=other.headers)).json()
-    assert listed["items"] == []
+    assert listed["items"] == [] and listed["total"] == 0
     for method, body in (
         ("PATCH", {"description": "Taken over by someone else"}),
         ("DELETE", None),
@@ -209,12 +209,20 @@ async def test_list_pages_newest_first(client: AsyncClient, session: AsyncSessio
         )
     await session.commit()
 
+    other = await make_member(session)
+    session.add(
+        SelfLog(user_id=other.user_id, category="animals", description="Not mine", occurred_at=base)
+    )
+    await session.commit()
+
     seen: list[str] = []
     cursor: str | None = None
     while True:
         params: dict[str, Any] = {"limit": 2} | ({"cursor": cursor} if cursor else {})
         page = (await client.get("/api/me/self-logs", params=params, headers=owner.headers)).json()
         seen.extend(i["description"] for i in page["items"])
+        # Every page carries the owner's whole count (My deeds, M4 D69), never anyone else's.
+        assert page["total"] == 5
         cursor = page["next_cursor"]
         if cursor is None:
             break

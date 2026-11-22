@@ -40,6 +40,7 @@ from app.modules.deeds.models import (
 __all__ = [
     "DEFAULT_AREA_NAME",
     # Events other modules subscribe to (M3 feed projection §5; M4 scoring §5)
+    "DeedContent",
     "DeedCountsForPointsChanged",
     "DeedEdited",
     "DeedPrizeRankChanged",
@@ -55,6 +56,7 @@ __all__ = [
     "VerificationMethod",
     "area_name",
     "category_labels",
+    "content_as_of",
     "deed_region",
     "deeds_for_doer",
     "get_deed",
@@ -293,6 +295,37 @@ async def revision_time(session: AsyncSession, revision_id: uuid.UUID) -> dateti
     return await session.scalar(
         select(DeedRevision.created_at).where(DeedRevision.id == revision_id)
     )
+
+
+@dataclass(frozen=True)
+class DeedContent:
+    """The scored content of a deed at some moment (in-process only, never stored by scoring)."""
+
+    category: str
+    description: str
+
+
+async def content_as_of(
+    session: AsyncSession, deed_id: uuid.UUID, at: datetime
+) -> DeedContent | None:
+    """The deed's category and description as they were at ``at``: the live values with every
+    edit saved after ``at`` undone (from ``deed_revisions``). Scoring reads the content as of the
+    end of the withdrawal window, so an edit after the window never changes points, whenever the
+    re-score runs (D56). None if the deed doesn't exist."""
+    deed = await session.get(Deed, deed_id)
+    if deed is None:
+        return None
+    values: dict[str, str] = {"category": deed.category, "description": deed.description}
+    later = await session.scalars(
+        select(DeedRevision)
+        .where(DeedRevision.deed_id == deed_id, DeedRevision.created_at > at)
+        .order_by(DeedRevision.created_at.desc(), DeedRevision.id.desc())
+    )
+    for revision in later:
+        for field in values:
+            if field in revision.old_values:
+                values[field] = revision.old_values[field]
+    return DeedContent(category=values["category"], description=values["description"])
 
 
 async def withdraw_window_hours(session: AsyncSession) -> int:

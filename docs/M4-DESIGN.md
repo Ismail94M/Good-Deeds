@@ -351,6 +351,8 @@ Rate limits: per account and per IP on #2–#8 (`scoring.rate_*`).
 5. **`MyScoring.total_points`** = doer + reporter points, computed on the server (the client never sums points).
 6. **`LedgerEntry.reason_label`**: display text from the server (from `reason_labels`), so the client never maps slugs.
 7. **`MyScoring.boards[].region`** = `{id, code, name, kind}` (code added, so cards link to `/leaderboard/{code}`).
+8. **D47 refinement:** `scoring` may import exactly one name from `media.service`, the event class `DeedPhotoReady` (needed by `@subscribe`); nothing else from `media`. B34's architecture test enforces this allow-list, so scoring still has no way to read photo state (Q29).
+9. **Evidence as of the window end:** `reconcile_deed` reads the deed text as of `verified_at + withdraw_window_hours` (`deeds.service.content_as_of`) and counts the photo bonus only if the evidence was recorded by then, so any later re-score (prize-rank change, late handler) can never pick up a post-window edit or photo.
 
 ---
 

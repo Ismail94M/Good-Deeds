@@ -112,9 +112,13 @@ async def list_for_owner(
         )
     )
     page, more = rows[:limit], len(rows) > limit
+    total = await session.scalar(
+        select(func.count()).select_from(SelfLog).where(SelfLog.user_id == owner_id)
+    )
     return SelfLogPage(
         items=[_out(log) for log in page],
         next_cursor=_cursor.encode(page[-1].created_at, page[-1].id) if more else None,
+        total=int(total or 0),
     )
 
 

@@ -222,6 +222,9 @@ class SelfLogOut(BaseModel):
 class SelfLogPage(BaseModel):
     items: list[SelfLogOut]
     next_cursor: str | None
+    # All of the owner's self-logs (not just this page): the owner-only Self-log Deeds count
+    # shown in My deeds, now that the public profile no longer has it (M4 D69).
+    total: int
 
 
 class DeedCountsOut(BaseModel):

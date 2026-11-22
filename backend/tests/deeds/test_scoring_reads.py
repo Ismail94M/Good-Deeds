@@ -85,6 +85,48 @@ async def test_revision_time_and_window_hours(session: AsyncSession) -> None:
     assert await deeds.withdraw_window_hours(session) == limits.withdraw_window_hours == 24
 
 
+async def test_content_as_of_undoes_later_edits(session: AsyncSession) -> None:
+    """Scoring reads the text as it was at the end of the withdrawal window (D56)."""
+    witness, doer = await members(session, 2)
+    out = await scan_and_report(session, witness, doer)
+    original = (out.category, out.description)
+    # Two saved edits at known times (inserted directly: ``created_at`` is the server's clock).
+    t1, t2 = NOV_1, NOV_1 + DAY
+    session.add_all(
+        [
+            DeedRevision(
+                deed_id=out.id,
+                editor_user_id=witness.user_id,
+                old_values={"category": out.category},
+                new_values={"category": "community"},
+                created_at=t1,
+            ),
+            DeedRevision(
+                deed_id=out.id,
+                editor_user_id=witness.user_id,
+                old_values={"category": "community", "description": out.description},
+                new_values={"category": "other", "description": "Second text of the deed"},
+                created_at=t2,
+            ),
+        ]
+    )
+    await session.execute(
+        update(Deed)
+        .where(Deed.id == out.id)
+        .values(category="other", description="Second text of the deed")
+    )
+
+    async def at(moment: datetime) -> tuple[str, str]:
+        content = await deeds.content_as_of(session, out.id, moment)
+        assert content is not None
+        return content.category, content.description
+
+    assert await at(t1 - timedelta(seconds=1)) == original
+    assert await at(t1) == ("community", out.description)
+    assert await at(t2 + DAY) == ("other", "Second text of the deed")
+    assert await deeds.content_as_of(session, uuid.uuid4(), t1) is None
+
+
 async def test_deed_region_is_the_ward_or_the_city(session: AsyncSession) -> None:
     witness, doer, other = await members(session, 3)
     in_ward = await scan_and_report(session, witness, doer)
