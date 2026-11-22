@@ -9,6 +9,7 @@ import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Literal
 
 from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -291,6 +292,30 @@ async def pair_ordinal(
         )
     )
     return int(count or 0)
+
+
+async def day_order(
+    session: AsyncSession,
+    *,
+    role: Literal["doer", "reporter"],
+    user_id: uuid.UUID,
+    start: datetime,
+    end: datetime,
+) -> list[uuid.UUID]:
+    """The user's deeds that take a daily-cap place in ``[start, end)``, in cap order: by
+    ``verified_at``, ties by deed id (docs/M4-DESIGN.md D52, PO QA3). As doer, every report that
+    was ever verified and counted for points; as reporter, every report that was ever verified.
+    Status is not filtered, so a withdrawal keeps its place and never moves a later report up."""
+    owner = Deed.doer_user_id if role == "doer" else Deed.reporter_user_id
+    query = select(Deed.id).where(
+        owner == user_id,
+        Deed.verified_at.is_not(None),
+        Deed.verified_at >= start,
+        Deed.verified_at < end,
+    )
+    if role == "doer":
+        query = query.where(Deed.counts_for_points.is_(True))
+    return list(await session.scalars(query.order_by(Deed.verified_at, Deed.id)))
 
 
 async def revision_time(session: AsyncSession, revision_id: uuid.UUID) -> datetime | None:

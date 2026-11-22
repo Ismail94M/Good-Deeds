@@ -14,12 +14,17 @@ Rules:
   (D57).
 - **Reporter:** a verified report earns ``reporter_points`` if counted, else
   ``reporter_points_beyond_cap``, times the pair multiplier.
-- **Daily caps (D52):** on a role's first entry, if the user already has entries (awards or cap
-  decisions, standing or since reversed) for ``cap`` other deeds on the IST day of verification,
-  the deed gets a zero-point ``decision`` instead. Decisions are never promoted.
-- **Award-time freeze (D50, D66):** the cap outcome, pair ordinal, multiplier and region are taken
-  from the deed's first entry on every later re-score. Every entry copies them, so any earlier
-  entry of the role carries them.
+- **Daily caps (D52, PO QA3):** strict order by verification time. The user's deeds that take a
+  place on the IST day of verification (``deeds.day_order``: as doer, every report ever verified
+  and counted; as reporter, every report ever verified) are ordered by ``verified_at``, ties by
+  deed id. The first ``cap`` earn points; the rest get a zero-point ``decision``. A withdrawal
+  keeps its place, so it never moves a later report up. The order comes from the deeds, not from
+  which handler ran first, so a worker running late or out of order gives the same result: when
+  a deed takes a place ahead of one that already has points (a later commit of an earlier
+  verification, or a same-act promotion), the later deed's award is reversed in the same
+  transaction (``_settle_day``), and the day never holds more than ``cap`` awards.
+- **Award-time freeze (D50, D66):** the pair ordinal, multiplier and region are taken from the
+  deed's first award (region: first entry) on every later re-score.
 - **Window (D56, D51):** content is read as of ``verified_at + withdraw_window_hours`` (later
   edits are undone), and the photo bonus needs photo evidence recorded by then. So a re-score
   after the window, for any reason, can't move points through content or photos.
@@ -35,11 +40,12 @@ Never imports or reads AI evaluations (D62).
 
 import uuid
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta, tzinfo
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.core.db import advisory_xact_lock
 from app.core.events import emit
@@ -103,8 +109,10 @@ def _decision(cap: int) -> Target:
 @dataclass
 class _RoleEntries:
     active: PointsLedger | None = None
-    # Any non-reversal entry (they all carry the frozen inputs); the active one if there is one.
-    frozen: PointsLedger | None = None
+    # The role has had an award or decision before (standing or since reversed).
+    earlier: bool = False
+    # The first award of the role: it carries the frozen pair ordinal and multiplier.
+    award: PointsLedger | None = None
 
 
 def _by_role(entries: list[PointsLedger]) -> dict[LedgerRole, _RoleEntries]:
@@ -114,29 +122,21 @@ def _by_role(entries: list[PointsLedger]) -> dict[LedgerRole, _RoleEntries]:
         if entry.kind == LedgerKind.REVERSAL:
             continue
         slot = out[entry.role]
+        slot.earlier = True
         if entry.id not in reversed_ids:
             slot.active = entry
-            slot.frozen = entry
-        elif slot.frozen is None:
-            slot.frozen = entry
+        if entry.kind == LedgerKind.AWARD and slot.award is None:
+            slot.award = entry
     return out
 
 
-async def _decisions_that_day(
-    session: AsyncSession, user_id: uuid.UUID, role: LedgerRole, day: date, deed_id: uuid.UUID
-) -> int:
-    """Other deeds with an award or cap decision for this user and role on this IST day, whether
-    they still stand or not (D52: a withdrawal doesn't free a slot)."""
-    count = await session.scalar(
-        select(func.count(func.distinct(PointsLedger.deed_id))).where(
-            PointsLedger.user_id == user_id,
-            PointsLedger.role == role,
-            PointsLedger.earned_on == day,
-            PointsLedger.kind.in_(_ACTIVE_KINDS),
-            PointsLedger.deed_id != deed_id,
-        )
-    )
-    return int(count or 0)
+async def day_order(
+    session: AsyncSession, role: LedgerRole, user_id: uuid.UUID, day: date, zone: tzinfo
+) -> list[uuid.UUID]:
+    """The user's deeds holding daily-cap places on ``day`` (in ``zone``), in cap order."""
+    start = datetime.combine(day, time(), tzinfo=zone)
+    end = datetime.combine(day + timedelta(days=1), time(), tzinfo=zone)
+    return await deeds.day_order(session, role=role.value, user_id=user_id, start=start, end=end)
 
 
 @dataclass(frozen=True)
@@ -186,8 +186,10 @@ class _Reconciler:
         return _Pair(self._ordinal, self.config.pair_percent(role, self._ordinal))
 
     async def _capped(self, role: LedgerRole, user_id: uuid.UUID, cap: int) -> bool:
-        used = await _decisions_that_day(self.session, user_id, role, self.day, self.inputs.id)
-        return used >= cap
+        """Whether the deed is past the first ``cap`` places of the user's day (strict order)."""
+        order = await day_order(self.session, role, user_id, self.day, self.config.zone)
+        place = order.index(self.inputs.id) if self.inputs.id in order else len(order)
+        return place >= cap
 
     async def rules(self, window_end_hours: int) -> tuple[RuleResult, int, EvidenceLevel]:
         """Rule result, photo bonus and evidence level, from content and evidence as of the end
@@ -216,14 +218,9 @@ class _Reconciler:
     ) -> Target | None:
         if rules is None:
             return None
-        frozen = entries.frozen
-        if frozen is not None and frozen.kind == LedgerKind.DECISION:
+        if await self._capped(LedgerRole.DOER, self.doer_id, self.config.doer_daily_cap):
             return _decision(self.config.doer_daily_cap)
-        if frozen is None and await self._capped(
-            LedgerRole.DOER, self.doer_id, self.config.doer_daily_cap
-        ):
-            return _decision(self.config.doer_daily_cap)
-        pair = await self._pair("doer", frozen)
+        pair = await self._pair("doer", entries.award)
         result, bonus, _ = rules
         return Target(
             kind=LedgerKind.AWARD,
@@ -243,13 +240,10 @@ class _Reconciler:
     async def reporter_target(self, entries: _RoleEntries) -> Target | None:
         if self.inputs.status != deeds.DeedStatus.VERIFIED:
             return None
-        frozen = entries.frozen
         cap = self.config.reporter_daily_cap
-        if frozen is not None and frozen.kind == LedgerKind.DECISION:
+        if await self._capped(LedgerRole.REPORTER, self.inputs.reporter_id, cap):
             return _decision(cap)
-        if frozen is None and await self._capped(LedgerRole.REPORTER, self.inputs.reporter_id, cap):
-            return _decision(cap)
-        pair = await self._pair("reporter", frozen)
+        pair = await self._pair("reporter", entries.award)
         counted = self.inputs.counts_for_points
         base = self.config.reporter_points if counted else self.config.reporter_points_beyond_cap
         return Target(
@@ -289,9 +283,11 @@ class _Reconciler:
         old = entries.active
         if old is None:
             # A first entry, or a re-award after the entry was lost (only a promotion does that).
-            if entries.frozen is not None or hint == LedgerReason.PROMOTED:
+            if entries.earlier or hint == LedgerReason.PROMOTED:
                 return LedgerReason.PROMOTED
             return LedgerReason.VERIFIED
+        if old.kind == LedgerKind.DECISION:
+            return LedgerReason.PROMOTED  # back inside the daily cap
         if old.counts_for_prize_rank != target.counts_for_prize_rank:
             return LedgerReason.PRIZE_RANK_CHANGED
         if old.breakdown.get("counted") != target.breakdown.get("counted"):
@@ -435,19 +431,102 @@ async def reconcile_deed(
     hint: LedgerReason | None = None,
     source_event_id: uuid.UUID | None = None,
 ) -> list[PointsLedger]:
-    """Bring the deed's ledger entries in line with its current state. Returns the rows written
-    (none when nothing changed). ``hint`` only names the reason of a first award (``promoted``
-    for a report promoted after a withdrawal). The caller commits."""
+    """Bring the deed's ledger entries in line with its current state, then settle the daily
+    caps of its doer-day and reporter-day (PO QA3). Returns the rows written (none when nothing
+    changed). ``hint`` only names the reason of a first award (``promoted`` for a report promoted
+    after a withdrawal). The caller commits."""
     inputs = await deeds.scoring_inputs(session, deed_id)
     if inputs is None or inputs.doer_id is None or inputs.verified_at is None:
         return []  # never verified: nothing was ever scored
     version, config = await load_scoring(session)
-    r = _Reconciler(session, inputs, config, version, source_event_id)
-    await advisory_xact_lock(session, "points_doer_day", str(r.doer_id), r.day.isoformat())
+    day = inputs.verified_at.astimezone(config.zone).date()
+    # Lock keys use doer, reporter and verified_at, which never change once a deed is verified.
+    await advisory_xact_lock(session, "points_doer_day", str(inputs.doer_id), day.isoformat())
     await advisory_xact_lock(
-        session, "points_reporter_day", str(inputs.reporter_id), r.day.isoformat()
+        session, "points_reporter_day", str(inputs.reporter_id), day.isoformat()
     )
+    written = await _reconcile_locked(
+        session, deed_id, set(LedgerRole), version, config, hint, source_event_id
+    )
+    # Holding both day locks: the doer-day lock covers every doer row of that day and the
+    # reporter-day lock every reporter row of that day, so the settling needs no other lock.
+    written += await _settle_day(
+        session, LedgerRole.DOER, inputs.doer_id, day, deed_id, version, config, source_event_id
+    )
+    written += await _settle_day(
+        session,
+        LedgerRole.REPORTER,
+        inputs.reporter_id,
+        day,
+        deed_id,
+        version,
+        config,
+        source_event_id,
+    )
+    return written
 
+
+async def _settle_day(
+    session: AsyncSession,
+    role: LedgerRole,
+    user_id: uuid.UUID,
+    day: date,
+    skip: uuid.UUID,
+    version: int,
+    config: ScoringConfig,
+    source_event_id: uuid.UUID | None,
+) -> list[PointsLedger]:
+    """Re-score, for ``role`` only, the user's other deeds of ``day`` whose active entry is on
+    the wrong side of the cap: an award past the first ``cap`` places, or a decision inside them.
+    Deeds without an active entry are left to their own handlers. Earlier places are settled
+    first, so a reversal is written before the award that replaces it."""
+    cap = config.doer_daily_cap if role == LedgerRole.DOER else config.reporter_daily_cap
+    order = await day_order(session, role, user_id, day, config.zone)
+    others = [deed for deed in order if deed != skip]
+    if not others:
+        return []
+    reversal = aliased(PointsLedger)
+    actives = await session.scalars(
+        select(PointsLedger)
+        .where(
+            PointsLedger.deed_id.in_(others),
+            PointsLedger.role == role,
+            PointsLedger.kind.in_(_ACTIVE_KINDS),
+            ~exists().where(reversal.reverses_entry_id == PointsLedger.id),
+        )
+        .execution_options(populate_existing=True)
+    )
+    active_kind = {entry.deed_id: entry.kind for entry in actives}
+    wrong = [
+        deed
+        for place, deed in enumerate(order)
+        if deed in active_kind and (active_kind[deed] == LedgerKind.AWARD) != (place < cap)
+    ]
+    # Bumps (awards past the cap) first, so the day never holds more than ``cap`` awards.
+    wrong.sort(key=lambda deed: active_kind[deed] != LedgerKind.AWARD)
+    written: list[PointsLedger] = []
+    for deed in wrong:
+        written += await _reconcile_locked(
+            session, deed, {role}, version, config, None, source_event_id
+        )
+    return written
+
+
+async def _reconcile_locked(
+    session: AsyncSession,
+    deed_id: uuid.UUID,
+    roles: set[LedgerRole],
+    version: int,
+    config: ScoringConfig,
+    hint: LedgerReason | None,
+    source_event_id: uuid.UUID | None,
+) -> list[PointsLedger]:
+    """Reconcile ``roles`` of one deed. The caller holds the day locks of those roles. The deed
+    is read after the locks, so a withdrawal committed while waiting is seen."""
+    inputs = await deeds.scoring_inputs(session, deed_id)
+    if inputs is None or inputs.doer_id is None or inputs.verified_at is None:
+        return []
+    r = _Reconciler(session, inputs, config, version, source_event_id)
     entries = list(
         await session.scalars(
             select(PointsLedger)
@@ -456,11 +535,19 @@ async def reconcile_deed(
             .execution_options(populate_existing=True)
         )
     )
-    roles = _by_role(entries)
+    by_role = _by_role(entries)
     doer_counts = inputs.status == deeds.DeedStatus.VERIFIED and inputs.counts_for_points
-    rules = await r.rules(await deeds.withdraw_window_hours(session)) if doer_counts else None
-    doer_target = await r.doer_target(roles[LedgerRole.DOER], rules)
-    reporter_target = await r.reporter_target(roles[LedgerRole.REPORTER])
+    rules = None
+    if LedgerRole.DOER in roles and doer_counts:
+        rules = await r.rules(await deeds.withdraw_window_hours(session))
+    doer_target = (
+        await r.doer_target(by_role[LedgerRole.DOER], rules) if LedgerRole.DOER in roles else None
+    )
+    reporter_target = (
+        await r.reporter_target(by_role[LedgerRole.REPORTER])
+        if LedgerRole.REPORTER in roles
+        else None
+    )
 
     if entries:
         region_id = entries[0].region_id  # frozen at the first entry (D66)
@@ -471,19 +558,22 @@ async def reconcile_deed(
         assert region is not None
         region_id = region.id
 
-    # One rule-based evaluation per new doer entry (D54), linked from that entry.
-    doer_active = roles[LedgerRole.DOER].active
-    evaluation = None
-    if (
-        rules is not None
-        and doer_target is not None
-        and (doer_active is None or not doer_target.same_as(doer_active))
-    ):
-        evaluation = _evaluation(deed_id, rules, version)
-    written = await r.apply(
-        LedgerRole.DOER, roles[LedgerRole.DOER], doer_target, region_id, hint, evaluation
-    )
-    written += await r.apply(
-        LedgerRole.REPORTER, roles[LedgerRole.REPORTER], reporter_target, region_id, hint
-    )
+    written: list[PointsLedger] = []
+    if LedgerRole.DOER in roles:
+        # One rule-based evaluation per new doer entry (D54), linked from that entry.
+        doer_active = by_role[LedgerRole.DOER].active
+        evaluation = None
+        if (
+            rules is not None
+            and doer_target is not None
+            and (doer_active is None or not doer_target.same_as(doer_active))
+        ):
+            evaluation = _evaluation(deed_id, rules, version)
+        written += await r.apply(
+            LedgerRole.DOER, by_role[LedgerRole.DOER], doer_target, region_id, hint, evaluation
+        )
+    if LedgerRole.REPORTER in roles:
+        written += await r.apply(
+            LedgerRole.REPORTER, by_role[LedgerRole.REPORTER], reporter_target, region_id, hint
+        )
     return written

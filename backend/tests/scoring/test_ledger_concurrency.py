@@ -118,7 +118,8 @@ async def test_two_deeds_racing_for_the_last_daily_slot_get_one_award(
             row = await active(s, deed_id, LedgerRole.DOER)
             assert row is not None
             kinds.append(row.kind)
-    assert sorted(kinds) == [LedgerKind.AWARD, LedgerKind.DECISION]
+    # Strict order by verification time (PO QA3): the earlier deed wins, whichever ran first.
+    assert kinds == [LedgerKind.AWARD, LedgerKind.DECISION]
 
 
 async def test_two_runs_for_one_deed_write_one_entry(

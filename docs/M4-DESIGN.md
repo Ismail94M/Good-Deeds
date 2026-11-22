@@ -20,7 +20,7 @@ Decision numbers continue from M3 (D46 onwards) and question numbers from Q45, s
 | D49 | **One idempotent `reconcile_deed(deed_id)`** computes the target doer and reporter entries from the deed's current state (read live through `deeds.service`), the frozen evidence and the frozen award inputs, and writes reversal + award only when they differ. Every handler calls it. | Same pattern as M3 D37 `sync_post`: handlers can run late, twice or out of order. | §4.2 |
 | D50 | **Award-time freeze.** On a deed's first doer decision, the inputs that depend on *other* deeds are frozen in the entry's `breakdown`: the daily-cap outcome, the pair ordinal and the multiplier, and the deed's `region_id` (D66). Re-scores inside the withdrawal window reuse them. | One withdrawal must not cascade re-scores across a doer's month. | §4.2 |
 | D51 | **Photo evidence is a high-water mark (Q29).** `scoring_evidence.first_photo_ready_at` is set once by the `DeedPhotoReady` handler for a photo attached within the 24 h add window, and a trigger forbids changing or clearing it. The photo bonus and the AI evidence level read only this record. No scoring handler exists for any photo removal. | A QR deed is verified before photos are attached (M3 D31), so "freeze at verification" would never give it the bonus. "Ever had a processed photo in the add window" can only grow, so a removal by the doer, the uploader or an admin can't change points. | §2.3, §4.3 |
-| D52 | **Daily cap (10 per doer per IST day of verification) counts doer decisions, not standing deeds.** The 11th deed gets a zero-point `doer_daily_cap` decision. A withdrawal of one of the first 10 doesn't promote the 11th. | PRD §5. The verification day is set on our server (Asia/Kolkata), never from the client's `occurred_at`. With no promotion the cap stays stable (D50) and matches the pair-day rule. | §4.2 |
+| D52 | **Daily cap (10 per doer per IST day of verification) in strict verification order** (refined by PO QA3, 2026-11-22). The doer's reports that were ever verified and counted that day are ordered by `verified_at`, ties by deed id; the first 10 earn points and the rest get a zero-point `doer_daily_cap` decision. The order comes from the deeds, not from the order the worker scores them; if an earlier deed takes a place after a later one already has points, the later award is reversed (`doer_daily_cap`) and the earlier deed awarded, in one transaction. A withdrawal keeps its place, so it never promotes the 11th. The reporter daily cap works the same way over every verified report of the reporter that day. | PRD §5. The verification day is set on our server (Asia/Kolkata), never from the client's `occurred_at`. Strict order is fair and deterministic; keeping withdrawn places stops withdraw-and-resubmit gaming. | §4.2 |
 | D53 | **Points are whole numbers.** A multiplier result is rounded half-up, and any award is at least 1 point. | Profiles that add up on screen. | §2.3 |
 | D54 | **Rule-based scoring is per counted report**, from that report's own category and evidence (PO Q46 = A). Every run writes an `impact_evaluations` row (`method='rule_based'`, `mode='live'`). | Reports in one act can carry different categories (M2 D2). | §2.3 |
 | D55 | **Text rules:** keyword lists and a few fixed patterns from config, matched on the normalised description (≤ 1000 chars). `spam_or_empty` gives `min_points` and sets `needs_review` (read by an M5 queue). `category_mismatch` is recorded only. Patterns are validated when the config loads and run with `re` on bounded input. | PRD §9: "every verified deed gets a minimum score". English keyword lists are crude, so a mismatch shouldn't cost the doer points. | §4.4 |
@@ -369,11 +369,11 @@ Rate limits: per account and per IP on #2–#8 (`scoring.rate_*`).
 1. Load the inputs, the active doer and reporter entries, the evidence and the active config.
 2. **Doer target:**
    - Not `verified` or not `counts_for_points` → none (reverse any active award: `withdrawn`, `rejected`, `counts_for_points_lost`).
-   - First decision: count distinct deeds with a doer award or decision on `(doer, ist_day)`; at or above `doer_daily_cap` → `decision` row (0, `doer_daily_cap`). Otherwise freeze `pair_ordinal`, `pair_percent` and `region_id`.
-   - An existing cap decision stays (D52).
+   - Daily cap (D52, QA3): the deed's place in `deeds.day_order(doer, ist_day)` (reports ever verified and counted that day, by `verified_at` then id). At or past `doer_daily_cap` → `decision` row (0, `doer_daily_cap`). Otherwise award; the first award freezes `pair_ordinal` and `pair_percent`, the first entry `region_id`.
    - Points = round_half_up((10, or `min_points` if `spam_or_empty`, + 2 if photo evidence) × pair_percent / 100), minimum 1. `counts_for_prize_rank = prize_rank_eligible`; `deed_units = 1`.
 3. **Reporter target:** verified → 2 if `counts_for_points` else 1; reporter daily cap counted the same way; pair multiplier; `counts_for_prize_rank=false`, `deed_units=0`. Otherwise none.
 4. Write reversal + award only where the target differs on `(points, counts_for_prize_rank, deed_units)`. Emit `PointsChanged`.
+4a. **Settle the day (QA3):** still holding both day locks, re-score (that role only) every other deed of the doer-day and of the reporter-day whose active entry is on the wrong side of the cap: bumps (award past the cap → reversal + decision) first, then any decision now inside the cap (→ award, `promoted`). The doer-day lock covers all doer rows of that day and the reporter-day lock all reporter rows, so no further lock is taken and there is no new lock cycle. The deed is re-read after the locks are taken.
 5. **Content after the window:** the `DeedEdited` handler compares `revision_time(revision_id)` with `verified_at + window`; after the window it does nothing (D56). Status changes after the window come only from M5/M7 (rejection or removal); they write reversals, and finalized boards stay frozen (D64).
 
 Worked example (Q47): Priya reports Ahmed 12 times in November → reports 1–3 earn Ahmed 10 each, 4–7 earn 8 (7.5 rounded up), 8–12 earn 5; Priya earns 2, 2, 2, then 2 (1.5 rounded up) ×4, then 1 ×5.
@@ -703,6 +703,18 @@ Options:
 - B. Dense ranking (1, 1, 2): Sneha is #2. If three share #1, the next person is #2 and still gets "Top 3", so up to 5 people may hold city titles.
 Recommendation: **A.** Familiar from sport, and the number of people with a title stays close to the number of places. 
 **PO: B (2026-11-22): dense ranking 1, 1, 2. If Ahmed and Kavya share #1, Ravi is #2 and the next person #3, so "Top 3" titles can go to more than three people. Seeded as `shared_rank_style: "dense"` (config).**
+
+**QA1. Shared #1 where one person is below the ward minimum** (raised by QA, M4a build)
+Example: Ahmed and Priya share #1 in Koramangala. Ahmed has 4 deeds from 3 reporters; Priya has 3 deeds, all from one reporter.
+**PO: A (2026-11-22): only people who meet the ward minimum get the title. Ahmed gets "#1 Koramangala Kindness Hero"; Priya still shows #1 on the board, without the title. As built.**
+
+**QA2. An account that is suspended or deleted at finalization** (raised by QA, M4a build)
+Example: Ravi finishes #1 in Bangalore for March but is suspended on 31 March; the month finalizes on 2 April.
+**PO: A (2026-11-22): suspended and deleted accounts are excluded when the month is finalized; the remaining eligible users move up and receive the corresponding titles (Kavya becomes #1 and the City Kindness Hero). A finalized month is immutable: if the account is reinstated later, nothing is recalculated and no title is reassigned. As built.**
+
+**QA3. Daily cap order when the worker falls behind** (raised by QA, M4a build; refines D52)
+Example: Ahmed has 12 deeds verified on 5 March; after an outage the worker scores the 17:00 deed before the 10:00 deed.
+**PO: B (2026-11-22): strict order by verification time. The 10 counted deeds of a doer-day are the first 10 by `verified_at`, ties broken by deed id. If a later deed already has points and an earlier deed takes its place, the later deed's award is reversed (recorded in the ledger) and the earlier deed is awarded, with its own ward credit. Idempotent and safe under concurrent processing; never more than 10 counted deeds per user per day. Correctness over processing cost.**
 
 ---
 
