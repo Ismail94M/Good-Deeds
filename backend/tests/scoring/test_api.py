@@ -5,6 +5,7 @@ scores in public shapes, points to their owner only, #4 public with a per-IP lim
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +18,9 @@ from app.modules.scoring._limits import load_scoring
 from tests.deeds.helpers import Member, members, scan_and_report
 from tests.scoring.board_helpers import city, counted, ist, month, publish_board, ward
 from tests.scoring.helpers import run_scoring
+
+# The level hierarchy is tested with City on (it is off in the seeded config, migration 0022).
+pytestmark = pytest.mark.usefixtures("city_board_on")
 
 PRIVATE_KEYS = {"points", "doer_points", "reporter_points", "rank_score", "total_points"}
 

@@ -104,7 +104,7 @@ function Boards({ boards }: { boards: MyBoard[] }) {
       {boards.length === 0 ? (
         <p className="text-slate-600">
           You’re not on a leaderboard yet. Deeds that witnesses verify put you on the board for your
-          ward and for the city.{' '}
+          area.{' '}
           <Link to="/leaderboard" className={`font-semibold text-brand-700 underline ${focusRing}`}>
             See the leaderboard
           </Link>

@@ -75,6 +75,7 @@ Each milestone is built, tested and reviewed by the product owner before the nex
 - Photo storage (PO decision 2026-11-18): Google Cloud Storage in the Mumbai region (asia-south1) at launch. The code talks to storage through the provider-neutral S3-compatible interface, so switching provider is a settings change. Local development uses a free S3-compatible stand-in container. **Built** with SeaweedFS in docker-compose; the production GCS bucket and HMAC keys are not set up yet.
 
 **M4 Scoring, Points & Leaderboard**
+- Good Deeds Stories (PO 2026-11-23, D73 in `docs/M4-DESIGN.md`): Instagram-style rings at the top of the home feed for deeds verified in the last 24 hours, blue for reported (witnessed), green for verified (own deed); full-screen viewer; seen state on the server. **Built**, awaiting PO review.
 - Rule-based scoring: category base points, keyword/regex text rules, fixed photo bonus. Removing a photo (by the doer, the uploader or an admin) never changes points: the M4 design must make the photo bonus and evidence caps independent of later photo removals (PO decision Q29, 2026-11-19).
 - Ledger with diminishing pair returns, a daily cap of 10, the reporter daily cap, and reporter points excluded from prize rank.
 - Configurable rank score.

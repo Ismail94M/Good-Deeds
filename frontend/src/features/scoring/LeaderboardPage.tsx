@@ -1,10 +1,14 @@
 import { useId, useMemo } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router'
+import { Link, Navigate, useParams, useSearchParams } from 'react-router'
 import { ErrorAlert, inputClass, Loading } from '../../components/ui'
 import { ApiError, errorMessage } from '../../lib/api'
 import { useAuth } from '../auth/authContext'
 import { formatWithdrawUntil } from '../deeds/withdrawWindow'
-import { Avatar, FeedMain, focusRing, secondaryButton } from '../feed/feedUi'
+import { Avatar, FeedMain, focusRing, LockIcon, secondaryButton } from '../feed/feedUi'
+import { FeaturedCity } from './FeaturedCity'
+import { DEFAULT_LEVEL, LEVEL_LABEL, LEVEL_NOUN, levelHref, openLevels, parseLevel } from './levels'
+import { LevelTabs } from './LevelTabs'
+import { RegionPicker } from './RegionPicker'
 import type { BoardTitle, Leaderboard, LeaderboardRow, RegionKind } from './scoringApi'
 import { useHeroes, useLeaderboard, useMyScoring, useScoringOptions } from './scoringQueries'
 import {
@@ -16,33 +20,57 @@ import {
   recentMonths,
 } from './scoringText'
 import { TierChip } from './TierChip'
-import { WardPicker } from './WardPicker'
 
 /** How many months the month picker offers, the current one included. */
 const MONTHS_SHOWN = 12
 
-const KIND_LABEL: Record<RegionKind, string> = {
-  country: 'Country',
-  state: 'State',
-  city: 'City',
-  ward: 'Ward',
-}
-
 /**
- * `/leaderboard` (the city board) and `/leaderboard/:regionCode` (a ward, or any region code)
- * (M4-DESIGN §6.3, F17). `?month=YYYY-MM` picks a past month; without it the API shows the
- * current IST month. Rows show rank ("=2" for a shared place), name, tier and verified-deed
- * count, never points or scores (D69). Provisional boards say so; final boards list their
- * Kindness Heroes and mark title holders. Ranking is the server's; nothing is computed here.
+ * `/leaderboard[?level=<kind>]` (a level's landing) and `/leaderboard/:regionCode` (one board)
+ * (M4-DESIGN §6.3, F17). Level tabs Area · City · State · Country sit on top; levels the config
+ * has not opened are shown locked (PO 2026-11-23: Area only for now). A level's landing opens the
+ * user's own board of that level, or asks them to find a place. `?month=YYYY-MM` picks a past
+ * month; without it the API shows the current IST month. Rows show rank ("=2" for a shared place),
+ * name, tier and verified-deed count, never points or scores (D69). Provisional boards say so;
+ * final boards list their Kindness Heroes and mark title holders. Ranking is the server's.
  */
 export function LeaderboardPage() {
   const { regionCode = null } = useParams()
-  const [params, setParams] = useSearchParams()
+  const [params] = useSearchParams()
   const month = params.get('month')
+  const options = useScoringOptions()
+  const open = openLevels(options.data)
+  if (regionCode === null) {
+    const level = parseLevel(params.get('level')) ?? DEFAULT_LEVEL
+    return (
+      <FeedMain>
+        <LevelTabs active={level} open={open} month={month} />
+        {open.has(level) ? (
+          <LevelLanding level={level} month={month} />
+        ) : (
+          <LockedLevel level={level} month={month} />
+        )}
+      </FeedMain>
+    )
+  }
+  return <BoardView regionCode={regionCode} month={month} open={open} />
+}
+
+/** One board: `/leaderboard/:regionCode`. */
+function BoardView({
+  regionCode,
+  month,
+  open,
+}: {
+  regionCode: string
+  month: string | null
+  open: Set<RegionKind>
+}) {
+  const [params, setParams] = useSearchParams()
   const board = useLeaderboard(regionCode, month)
   const pages = board.data?.pages
   const first = pages?.[0]
   const rows = useMemo(() => pages?.flatMap((page) => page.items) ?? [], [pages])
+  const level = first?.region.kind ?? null
 
   const current = currentIstMonth()
   const months = recentMonths(current, MONTHS_SHOWN)
@@ -57,7 +85,10 @@ export function LeaderboardPage() {
 
   return (
     <FeedMain>
-      <BoardSwitch regionCode={regionCode} month={month} />
+      <LevelTabs active={level} open={open} month={month} />
+      <MyBoards level={level ?? DEFAULT_LEVEL} regionCode={regionCode} month={month} />
+      <RegionPicker kind={level ?? DEFAULT_LEVEL} month={month} />
+      <FeaturedCity month={month} />
       {board.isPending ? (
         <Loading label="Loading the leaderboard…" />
       ) : board.isError && !first ? (
@@ -69,7 +100,7 @@ export function LeaderboardPage() {
               {first.region.name}
             </h1>
             <p className="text-slate-600">
-              {KIND_LABEL[first.region.kind]} leaderboard · {formatMonth(first.month)}
+              {LEVEL_LABEL[first.region.kind]} leaderboard · {formatMonth(first.month)}
             </p>
           </header>
           <MonthPicker months={months} value={selected} onChange={setMonth} />
@@ -94,47 +125,98 @@ export function LeaderboardPage() {
   )
 }
 
-/** City board, my wards (from my board places) and the ward search. */
-function BoardSwitch({ regionCode, month }: { regionCode: string | null; month: string | null }) {
+/**
+ * An open level with no place chosen: go to my own board of that level (the month asked for,
+ * else the newest), or ask me to find a place.
+ */
+function LevelLanding({ level, month }: { level: RegionKind; month: string | null }) {
+  const mine = useMyScoring()
+  if (mine.isPending) return <Loading label="Loading your leaderboard…" />
+  const boards = (mine.data?.boards ?? []).filter((b) => b.region.kind === level)
+  const target = boards.find((b) => b.period_month === month) ?? boards[0]
+  if (target) {
+    const suffix = month ? `?month=${month}` : ''
+    return (
+      <Navigate replace to={`/leaderboard/${encodeURIComponent(target.region.code)}${suffix}`} />
+    )
+  }
+  const noun = LEVEL_NOUN[level]
+  return (
+    <>
+      <header className="flex flex-col gap-1">
+        <h1 className="text-[26px] leading-tight font-bold tracking-tight text-slate-900">
+          {LEVEL_LABEL[level]} leaderboard
+        </h1>
+        <p className="text-slate-600">
+          Find your {noun.one} to see who is leading this month. Once a witness verifies one of your
+          deeds, your {noun.one}’s board opens here for you.
+        </p>
+      </header>
+      <RegionPicker kind={level} month={month} />
+      <FeaturedCity month={month} />
+    </>
+  )
+}
+
+/** A level the config has not opened yet (e.g. `?level=city`). */
+function LockedLevel({ level, month }: { level: RegionKind; month: string | null }) {
+  return (
+    <section
+      aria-labelledby="locked-level-h"
+      className="flex flex-col items-start gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6"
+    >
+      <span className="inline-flex size-10 items-center justify-center rounded-full bg-slate-200 text-slate-600">
+        <LockIcon className="size-5" />
+      </span>
+      <h1 id="locked-level-h" className="text-[22px] leading-tight font-bold text-slate-900">
+        {LEVEL_LABEL[level]} leaderboards are locked
+      </h1>
+      <p className="text-slate-600">
+        They’re coming soon. For now, see who is leading in your area.
+      </p>
+      <Link to={levelHref(DEFAULT_LEVEL, month)} className={secondaryButton}>
+        {LEVEL_LABEL[DEFAULT_LEVEL]} leaderboard
+      </Link>
+    </section>
+  )
+}
+
+/** Shortcuts to my own boards of this level (e.g. the areas I'm ranked in). */
+function MyBoards({
+  level,
+  regionCode,
+  month,
+}: {
+  level: RegionKind
+  regionCode: string
+  month: string | null
+}) {
   const mine = useMyScoring()
   const suffix = month ? `?month=${month}` : ''
-  const boards = mine.data?.boards ?? []
-  const city = boards.find((b) => b.region.kind === 'city')
-  const wards = boards
-    .filter((b) => b.region.kind === 'ward')
+  const boards = (mine.data?.boards ?? [])
+    .filter((b) => b.region.kind === level)
     .filter((b, i, all) => all.findIndex((o) => o.region.code === b.region.code) === i)
+  if (boards.length === 0) return null
   const chip = (active: boolean) =>
     `inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold ${focusRing} ${
-      active ? 'bg-brand-700 text-white' : 'border border-slate-200 bg-white text-slate-800'
+      active ? 'bg-brand-100 text-brand-900' : 'border border-slate-200 bg-white text-slate-800'
     }`
   return (
-    <div className="flex flex-col gap-3">
-      <nav aria-label="Leaderboards">
-        <ul className="flex flex-wrap gap-2">
-          <li>
+    <nav aria-label="Your leaderboards">
+      <ul className="flex flex-wrap gap-2">
+        {boards.map((b) => (
+          <li key={b.region.code}>
             <Link
-              to={`/leaderboard${suffix}`}
-              aria-current={regionCode === null ? 'page' : undefined}
-              className={chip(regionCode === null)}
+              to={`/leaderboard/${encodeURIComponent(b.region.code)}${suffix}`}
+              aria-current={regionCode === b.region.code ? 'page' : undefined}
+              className={chip(regionCode === b.region.code)}
             >
-              {city?.region.name ?? 'City'}
+              {b.region.name}
             </Link>
           </li>
-          {wards.map((b) => (
-            <li key={b.region.code}>
-              <Link
-                to={`/leaderboard/${encodeURIComponent(b.region.code)}${suffix}`}
-                aria-current={regionCode === b.region.code ? 'page' : undefined}
-                className={chip(regionCode === b.region.code)}
-              >
-                {b.region.name}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
-      <WardPicker month={month} />
-    </div>
+        ))}
+      </ul>
+    </nav>
   )
 }
 
@@ -368,11 +450,11 @@ function BoardError({ error, retry }: { error: unknown; retry: () => void }) {
       <div className="flex flex-col items-start gap-3">
         <h1 className="text-[26px] leading-tight font-bold text-slate-900">Board not found</h1>
         <p className="text-slate-600">
-          We couldn’t find a leaderboard for that place. Search for a ward above, or open the city
-          board.
+          We couldn’t find an open leaderboard for that place. Search for an area above, or open
+          your area board.
         </p>
         <Link to="/leaderboard" className={secondaryButton}>
-          City leaderboard
+          Area leaderboard
         </Link>
       </div>
     )
@@ -389,7 +471,7 @@ function BoardError({ error, retry }: { error: unknown; retry: () => void }) {
 }
 
 /** Past Kindness Heroes of this region (§3.3 #8): final months only, newest first. */
-function HeroesHistory({ regionCode }: { regionCode: string | null }) {
+function HeroesHistory({ regionCode }: { regionCode: string }) {
   const heroes = useHeroes(regionCode)
   if (!heroes.data) return null
   return (

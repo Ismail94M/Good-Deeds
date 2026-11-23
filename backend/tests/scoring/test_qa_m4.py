@@ -47,6 +47,9 @@ from tests.deeds.test_self_logs import _create as create_self_log
 from tests.scoring.board_helpers import city, counted, entries, ist, month, ward
 from tests.scoring.helpers import active, ledger, points, run_scoring
 
+# The level hierarchy is tested with City on (it is off in the seeded config, migration 0022).
+pytestmark = pytest.mark.usefixtures("city_board_on")
+
 DOER, REPORTER = LedgerRole.DOER, LedgerRole.REPORTER
 IST = ZoneInfo("Asia/Kolkata")
 SPAM = "Helped someone today, follow me for more"

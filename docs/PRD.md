@@ -282,7 +282,7 @@ The "people helped" count used for scoring is capped per category, and counts ab
 
 **Kindness Hero titles:**
 - Titles are taken automatically from the final ranking of each board. Everyone on a shared titled place gets the title, and one person can hold several titles in one month.
-- City level: #1 is "Bangalore City Kindness Hero", and #2 and #3 are "Top 3 in Bangalore". There is no minimum.
+- City level: #1 is "Bangalore City Kindness Hero", and #2 and #3 are "Top 3 in Bangalore". There is no minimum. **Not live at launch (PO 2026-11-23):** only Area (ward) leaderboards are open; City, State and Country appear in the app as locked, upcoming levels, and no City titles are awarded until City is switched on in config (M4-DESIGN D71). Under the Area search, a **Featured City Top Performers** section shows the top 5 members registered in Bengaluru this month (podium, then list) with rank, name, points and verified-deed count, ranked by the same rules; showing points here is an exception to the points-are-private rule, for this section only. Featured cities are config, so other cities or a national list can be added later (M4-DESIGN D72).
 - Ward level: #1 is "Kindness Hero · {ward} · {month}". It needs at least 3 counted deeds in that ward that month from at least 2 different reporters; if nobody qualifies, there is no ward Hero that month (the board is still shown).
 - Places and minimums are config. Admins can revoke a title for confirmed fraud (M5). Cash prizes are separate (M8).
 

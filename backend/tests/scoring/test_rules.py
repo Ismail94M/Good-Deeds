@@ -48,7 +48,10 @@ async def test_seeded_configs_load_with_the_po_values(session: AsyncSession) -> 
         ] * 8
     _, board = await load_leaderboard(session)
     assert board.shared_rank_style == "dense"
-    assert [lvl.kind for lvl in board.levels if lvl.enabled] == ["ward", "city"]
+    # Area only (PO 2026-11-23, migration 0022); City keeps its titles so it can be reopened.
+    assert [lvl.kind for lvl in board.levels if lvl.enabled] == ["ward"]
+    city = next(lvl for lvl in board.levels if lvl.kind == "city")
+    assert [t.key for t in city.titles] == ["hero", "top3"]
 
 
 async def test_every_deeds_category_has_base_points(session: AsyncSession) -> None:

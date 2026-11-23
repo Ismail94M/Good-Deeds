@@ -41,6 +41,15 @@ DESIGN_V1: dict[str, Any] = {
     "rate_public_deed_ip": "120/900",
     "rate_feed_read_user": "600/900",
 }
+# Migration 0024 (Stories, D73) adds these to the latest version.
+STORY_KEYS: dict[str, Any] = {
+    "story_window_hours": 24,
+    "story_max_people": 50,
+    "story_max_per_person": 20,
+    "story_seconds": 5,
+    "story_seen_retention_hours": 48,
+    "rate_story_seen_user": "600/900",
+}
 EN_SUBSTITUTIONS = {"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s"}
 
 
@@ -49,6 +58,11 @@ async def _v1(session: AsyncSession) -> dict[str, Any]:
     assert row is not None
     assert row.created_by is None
     return dict(row.values)
+
+
+async def _current(session: AsyncSession) -> dict[str, Any]:
+    """v1 plus the keys later versions added (what FeedLimits validates today)."""
+    return {**await _v1(session), **STORY_KEYS}
 
 
 async def test_feed_v1_is_the_design_seed(session: AsyncSession) -> None:
@@ -63,8 +77,8 @@ async def test_feed_v1_is_the_design_seed(session: AsyncSession) -> None:
     # Words common in descriptions of good deeds are not blocked.
     assert not {"trash", "useless", "dirty", "garbage"} & set(en["blocked_terms"])
 
-    limits = FeedLimits.model_validate(await _v1(session))
-    assert set(FeedLimits.model_fields) == {*DESIGN_V1, "comment_filter_languages"}
+    limits = FeedLimits.model_validate(await _current(session))
+    assert set(FeedLimits.model_fields) == {*DESIGN_V1, *STORY_KEYS, "comment_filter_languages"}
     assert limits.comment_filter_enabled_languages == ("en",)
     assert [limits.top_days(p) for p in ("week", "month", "year")] == [7, 30, 365]
     assert [limits.top_refresh_minutes(p) for p in ("week", "month", "year")] == [10, 30, 60]
@@ -72,11 +86,12 @@ async def test_feed_v1_is_the_design_seed(session: AsyncSession) -> None:
 
 async def test_load_limits_returns_the_active_version(session: AsyncSession) -> None:
     version, limits = await load_limits(session)
-    assert version >= 1 and isinstance(limits, FeedLimits)
+    assert version >= 2 and isinstance(limits, FeedLimits)
+    assert {k: getattr(limits, k) for k in STORY_KEYS} == STORY_KEYS
 
 
 async def test_feed_limits_have_no_defaults_and_no_extras(session: AsyncSession) -> None:
-    values = await _v1(session)
+    values = await _current(session)
     for key in values:
         partial = {k: v for k, v in values.items() if k != key}
         with pytest.raises(ValidationError):
@@ -92,7 +107,7 @@ async def test_feed_limits_have_no_defaults_and_no_extras(session: AsyncSession)
 
 async def test_a_language_is_enabled_by_config_only(session: AsyncSession) -> None:
     """Q35: adding a language is a new pack plus its code in the enabled list."""
-    values = await _v1(session)
+    values = await _current(session)
     hi = {
         "blocked_terms": ["test"],
         "substitutions": {},
@@ -128,12 +143,17 @@ async def test_a_language_is_enabled_by_config_only(session: AsyncSession) -> No
         {"top_like_weight": -1},
         {"rate_comment_user": "5 per minute"},
         {"rate_like_user": "120/0"},
+        {"story_window_hours": 0},
+        {"story_window_hours": 200},
+        {"story_seen_retention_hours": 12},  # must cover the window
+        {"story_seconds": 0},
+        {"rate_story_seen_user": "lots"},
     ],
 )
 async def test_feed_limits_reject_inconsistent_values(
     session: AsyncSession, change: dict[str, Any]
 ) -> None:
-    values = await _v1(session)
+    values = await _current(session)
     with pytest.raises(ValidationError):
         FeedLimits.model_validate({**values, **change})
 
@@ -151,7 +171,7 @@ async def test_feed_limits_reject_inconsistent_values(
 async def test_language_packs_are_validated(
     session: AsyncSession, pack_change: dict[str, Any]
 ) -> None:
-    values = await _v1(session)
+    values = await _current(session)
     pack = {**values["comment_filter_languages"]["en"], **pack_change}
     with pytest.raises(ValidationError):
         FeedLimits.model_validate({**values, "comment_filter_languages": {"en": pack}})

@@ -47,6 +47,27 @@ export function useFeed(tab: FeedTab, period: TopPeriod = DEFAULT_TOP_PERIOD) {
   })
 }
 
+/** The stories bar (D73): who in my network has stories. Counts only, so it is cheap. */
+export function useStoryRings() {
+  return useQuery({
+    queryKey: feedKeys.stories,
+    queryFn: feedApi.storyRings,
+    staleTime: 60_000,
+    retry: retryUnlessClientError,
+  })
+}
+
+/** One person's stories with signed photo URLs; loaded only when their ring is opened. */
+export function useStoryPerson(handle: string | null) {
+  return useQuery({
+    queryKey: feedKeys.storyPerson(handle ?? ''),
+    queryFn: () => feedApi.storyPerson(handle ?? ''),
+    enabled: handle !== null,
+    staleTime: 5 * 60_000,
+    retry: retryUnlessClientError,
+  })
+}
+
 /** `PostDetail` for `/deeds/:id`. */
 export function useFeedDeed(deedId: string) {
   return useQuery({

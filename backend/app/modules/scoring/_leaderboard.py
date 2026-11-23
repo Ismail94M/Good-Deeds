@@ -34,7 +34,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.deeds import service as deeds
 from app.modules.identity import service as identity
-from app.modules.scoring._limits import LeaderboardConfig, LevelRule, load_leaderboard, load_scoring
+from app.modules.scoring._limits import (
+    FeaturedCity,
+    LeaderboardConfig,
+    LevelRule,
+    load_leaderboard,
+    load_scoring,
+)
 from app.modules.scoring.models import (
     LeaderboardEntry,
     LeaderboardSnapshot,
@@ -153,6 +159,35 @@ def rank_rows(
             )
         )
     return ranked
+
+
+async def featured_city_rows(
+    session: AsyncSession, month: date, city: FeaturedCity, config: LeaderboardConfig
+) -> list[BoardRow]:
+    """Every member registered in ``city`` with a counted deed in ``month``, ranked by the same
+    rules as the boards (D59, D67, ``shared_rank_style``) over all their counted deeds that month,
+    wherever they were done (D72). Computed on read: it is one month of ledger rows."""
+    counted = await _counted_deeds(session, month)
+    members = await identity.active_user_ids_in_city(
+        session, {d.user_id for d in counted}, city.registered_city_names
+    )
+    per_user: dict[uuid.UUID, list[_CountedDeed]] = defaultdict(list)
+    for deed in counted:
+        if deed.user_id in members:
+            per_user[deed.user_id].append(deed)
+    return rank_rows(
+        (
+            (
+                user_id,
+                len(items),
+                sum(d.points for d in items),
+                len({d.reporter_id for d in items if d.reporter_id is not None}),
+                len({d.earned_on for d in items}),
+            )
+            for user_id, items in per_user.items()
+        ),
+        config,
+    )
 
 
 def enabled_levels(config: LeaderboardConfig) -> list[LevelRule]:

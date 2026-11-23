@@ -158,6 +158,35 @@ class LeaderboardRow(BaseModel):
     deed_count: int
 
 
+class FeaturedCityRef(BaseModel):
+    key: str
+    name: str
+
+
+class FeaturedRow(BaseModel):
+    """A featured city's top performer (D72). ``points`` (net doer points counted for rank this
+    month) is shown only when the city's config says so; otherwise null."""
+
+    rank: int
+    shared: bool
+    user: UserSummary
+    tier: TierOut
+    deed_count: int
+    points: int | None
+
+
+class FeaturedCityBoard(BaseModel):
+    """#11 ``GET /leaderboards/featured``: the top performers of a featured city this month.
+    ``cities`` lists every enabled featured city (the first is the default) so a city switcher
+    can be added without an API change."""
+
+    city: FeaturedCityRef
+    cities: list[FeaturedCityRef]
+    month: str
+    final: bool
+    items: list[FeaturedRow]
+
+
 class BoardTitle(BaseModel):
     place: int
     label: str

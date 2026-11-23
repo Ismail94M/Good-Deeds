@@ -185,6 +185,22 @@ class Badge(_Frozen):
     threshold: int = Field(ge=1)
 
 
+class FeaturedCity(_Frozen):
+    """A city whose top performers are featured on the leaderboard screen (PO 2026-11-23, D72).
+    Members count for it by their registered city (``users.city``), matched case-insensitively
+    against ``registered_city_names``; they are ranked with the same rules as every board (D59,
+    D67) over the month's counted deeds. Several cities can be listed; the first enabled one is
+    the default."""
+
+    key: str = Field(min_length=1, max_length=40, pattern=r"^[a-z0-9-]+$")
+    name: str = Field(min_length=1, max_length=60)
+    registered_city_names: tuple[str, ...] = Field(min_length=1)
+    top_n: int = Field(ge=1, le=20)
+    # The PO asked for points here (2026-11-23), an exception to D69 for this section only.
+    show_points: bool
+    enabled: bool
+
+
 class RankWeights(_Frozen):
     deeds: int = Field(ge=0)
     points: int = Field(ge=0)
@@ -206,9 +222,13 @@ class LeaderboardConfig(RuntimeConfig):
     levels: tuple[LevelRule, ...]
     tiers: tuple[Tier, ...] = Field(min_length=1)
     badges: tuple[Badge, ...]
+    featured_cities: tuple[FeaturedCity, ...]
 
     @model_validator(mode="after")
     def _valid(self) -> Self:
+        keys = [c.key for c in self.featured_cities]
+        if len(set(keys)) != len(keys):
+            raise ValueError("featured city keys must be unique")
         kinds = [level.kind for level in self.levels]
         if len(set(kinds)) != len(kinds):
             raise ValueError("each level kind may appear once")

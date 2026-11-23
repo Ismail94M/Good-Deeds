@@ -26,6 +26,7 @@ from app.modules.scoring.schemas import (
     AdminDeedScoring,
     AdminMonth,
     DeedPoints,
+    FeaturedCityBoard,
     Heroes,
     Leaderboard,
     LedgerPage,
@@ -142,6 +143,19 @@ async def leaderboard_regions(
 ) -> list[RegionOption]:
     await _limit(session, limiter, request, user.id)
     return await _reads.region_options(session, kind, q)
+
+
+@router.get("/leaderboards/featured", response_model=FeaturedCityBoard, tags=["leaderboards"])
+async def leaderboard_featured(
+    request: Request,
+    user: CurrentUser,
+    session: Session,
+    limiter: Limiter,
+    city: Annotated[str | None, Query(max_length=40)] = None,
+    month: str | None = None,
+) -> FeaturedCityBoard:
+    await _limit(session, limiter, request, user.id)
+    return await _reads.featured_city(session, city_key=city, month=month)
 
 
 @router.get("/leaderboards/heroes", response_model=Heroes, tags=["leaderboards"])

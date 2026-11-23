@@ -106,6 +106,25 @@ async def active_user_ids(session: AsyncSession, user_ids: Iterable[uuid.UUID]) 
     return set(rows)
 
 
+async def active_user_ids_in_city(
+    session: AsyncSession, user_ids: Iterable[uuid.UUID], city_names: Iterable[str]
+) -> set[uuid.UUID]:
+    """The active accounts among ``user_ids`` whose registered city is one of ``city_names``
+    (trimmed, case-insensitive), in one query."""
+    ids = set(user_ids)
+    names = {name.strip().lower() for name in city_names}
+    if not ids or not names:
+        return set()
+    rows = await session.scalars(
+        select(User.id).where(
+            User.id.in_(ids),
+            User.status == UserStatus.ACTIVE,
+            func.lower(func.trim(User.city)).in_(names),
+        )
+    )
+    return set(rows)
+
+
 async def get_user_by_handle(session: AsyncSession, handle: str) -> User | None:
     return await session.scalar(select(User).where(User.handle == handle.lower()))
 

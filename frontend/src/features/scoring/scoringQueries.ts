@@ -66,7 +66,11 @@ export function useDeedPoints(deedId: string, enabled = true) {
  * `GET /leaderboards` (#6) for one region and month (null = city board / current IST month).
  * Keeps the previous board on screen while another month or region loads.
  */
-export function useLeaderboard(region: string | null = null, month: string | null = null) {
+export function useLeaderboard(
+  region: string | null = null,
+  month: string | null = null,
+  enabled = true,
+) {
   return useInfiniteQuery({
     queryKey: scoringKeys.leaderboard(region, month),
     queryFn: ({ pageParam }) => scoringApi.leaderboard({ region, month, cursor: pageParam }),
@@ -74,6 +78,7 @@ export function useLeaderboard(region: string | null = null, month: string | nul
     getNextPageParam: nextCursor,
     retry: retryUnlessClientError,
     placeholderData: keepPreviousData,
+    enabled,
   })
 }
 
@@ -89,12 +94,27 @@ export function useRegionSearch(q: string, kind: RegionKind = 'ward') {
   })
 }
 
+/** `GET /leaderboards/featured` (#11, D72): a featured city's top performers this month. */
+export function useFeaturedCity(city: string | null = null, month: string | null = null) {
+  return useQuery({
+    queryKey: scoringKeys.featured(city, month),
+    queryFn: () => scoringApi.featured({ city, month }),
+    retry: retryUnlessClientError,
+    staleTime: 60_000,
+  })
+}
+
 /** `GET /leaderboards/heroes` (#8): final titles per month for a region and year. */
-export function useHeroes(region: string | null = null, year: number | null = null) {
+export function useHeroes(
+  region: string | null = null,
+  year: number | null = null,
+  enabled = true,
+) {
   return useQuery({
     queryKey: scoringKeys.heroes(region, year),
     queryFn: () => scoringApi.heroes({ region, year }),
     retry: retryUnlessClientError,
+    enabled,
   })
 }
 

@@ -5,6 +5,7 @@ competition numbering (Q58), provisional snapshots and their refresh."""
 import uuid
 from datetime import timedelta
 
+import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +15,9 @@ from app.modules.scoring._limits import RankWeights, load_leaderboard
 from app.modules.scoring.models import LeaderboardSnapshot
 from tests.deeds.helpers import members
 from tests.scoring.board_helpers import city, counted, ist, month, publish_board, reverse, ward
+
+# The level hierarchy is tested with City on (it is off in the seeded config, migration 0022).
+pytestmark = pytest.mark.usefixtures("city_board_on")
 
 SEP = month(2026, 9)
 

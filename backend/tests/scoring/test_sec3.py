@@ -5,6 +5,7 @@ photo evidence time, L6 inactive accounts on final boards. L3 is in ``test_cap_o
 import uuid
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +19,9 @@ from app.modules.scoring.models import LedgerRole
 from tests.deeds.helpers import members, scan_and_report
 from tests.scoring.board_helpers import city, counted, ist, month, ward
 from tests.scoring.helpers import points, run_scoring
+
+# The level hierarchy is tested with City on (it is off in the seeded config, migration 0022).
+pytestmark = pytest.mark.usefixtures("city_board_on")
 
 SEP = month(2026, 9)
 AFTER = ist(2026, 10, 2, 1, 1)  # just after September's cutoff

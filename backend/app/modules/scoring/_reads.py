@@ -42,6 +42,9 @@ from app.modules.scoring.schemas import (
     BoardRegion,
     BoardTitle,
     DeedPoints,
+    FeaturedCityBoard,
+    FeaturedCityRef,
+    FeaturedRow,
     Heroes,
     HeroMonth,
     Leaderboard,
@@ -266,6 +269,10 @@ async def my_scoring(
         session, user_id, [current, _leaderboard.previous_month(current)]
     )
     regions = await deeds.regions_by_id(session, {s.region_id for s, _ in entries})
+    # Boards of a disabled level (e.g. City while only Area is open) are not shown: their reads
+    # return 404, and old snapshots of them may still exist.
+    _, board_config = await load_leaderboard(session)
+    open_kinds = {level.kind for level in board_config.levels if level.enabled}
     boards = [
         MyBoard(
             region=RegionRef(
@@ -280,7 +287,7 @@ async def my_scoring(
             final=snapshot.final,
         )
         for snapshot, entry in entries
-        if (r := regions.get(snapshot.region_id)) is not None
+        if (r := regions.get(snapshot.region_id)) is not None and r.kind.value in open_kinds
     ]
 
     today = now.astimezone(scoring.zone).date()
@@ -586,6 +593,53 @@ async def region_options(
 ) -> list[RegionOption]:
     found = await deeds.regions(session, kind, q, limit=MAX_REGION_RESULTS)
     return [RegionOption(code=r.code, name=r.name) for r in found]
+
+
+async def featured_city(
+    session: AsyncSession,
+    *,
+    city_key: str | None,
+    month: str | None,
+    now: datetime | None = None,
+) -> FeaturedCityBoard:
+    """#11: the featured city's top ``top_n`` members of the month (D72), default the first
+    enabled featured city. Unknown or disabled cities are 404."""
+    now = now or datetime.now(UTC)
+    _, config = await load_leaderboard(session)
+    enabled = [c for c in config.featured_cities if c.enabled]
+    city = next((c for c in enabled if c.key == city_key), None) if city_key else None
+    if city_key is None and enabled:
+        city = enabled[0]
+    if city is None:
+        raise _board_not_found()
+    period = parse_month(month) if month else await _now_month(session, now)
+    final = await _leaderboard.is_finalized(session, period)
+    final = final or await _finalize.closed_without_deeds(session, period, now)
+    ranked = await _leaderboard.featured_city_rows(session, period, city, config)
+    per_rank: dict[int, int] = defaultdict(int)
+    for row in ranked:
+        per_rank[row.rank] += 1
+    top = ranked[: city.top_n]
+    users = {r.user_id for r in top}
+    people = await _board_summaries(session, users)
+    tiers = await _badges.tiers_for(session, users, now=now)
+    return FeaturedCityBoard(
+        city=FeaturedCityRef(key=city.key, name=city.name),
+        cities=[FeaturedCityRef(key=c.key, name=c.name) for c in enabled],
+        month=_labels.month_param(period),
+        final=final,
+        items=[
+            FeaturedRow(
+                rank=r.rank,
+                shared=per_rank[r.rank] > 1,
+                user=people[r.user_id],
+                tier=_tier_out(tiers[r.user_id]),
+                deed_count=r.deed_count,
+                points=r.doer_points if city.show_points else None,
+            )
+            for r in top
+        ],
+    )
 
 
 async def heroes(

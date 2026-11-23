@@ -847,10 +847,11 @@ def test_config_seed_is_safe_to_rerun(sync_conn: Connection) -> None:
     count = text(
         "SELECT count(*) FROM config_versions WHERE namespace IN ('scoring', 'leaderboard')"
     )
-    assert sync_conn.execute(count).scalar_one() == 2
+    # The two 0020 seeds plus the leaderboard versions of 0022 (City off) and 0023 (featured).
+    assert sync_conn.execute(count).scalar_one() == 4
     with Operations.context(MigrationContext.configure(sync_conn)):
         m.seed_config()
-    assert sync_conn.execute(count).scalar_one() == 2
+    assert sync_conn.execute(count).scalar_one() == 4
 
 
 def test_downgrade_and_upgrade_round_trip(sync_conn: Connection) -> None:
@@ -859,8 +860,8 @@ def test_downgrade_and_upgrade_round_trip(sync_conn: Connection) -> None:
     m = _load_m20()
     seeds = text(
         "SELECT namespace, version, values FROM config_versions "
-        "WHERE namespace IN ('scoring', 'leaderboard') ORDER BY namespace"
-    )
+        "WHERE namespace IN ('scoring', 'leaderboard') AND version = 1 ORDER BY namespace"
+    )  # version 1 = the 0020 seeds (later migrations append more versions)
     before = sync_conn.execute(seeds).all()
     tables = text(
         "SELECT count(*) FROM information_schema.tables WHERE table_name = ANY(:t)"

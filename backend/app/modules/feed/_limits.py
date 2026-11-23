@@ -72,6 +72,13 @@ class FeedLimits(RuntimeConfig):
     top_year_refresh_minutes: int = Field(gt=0)
     # Follows
     max_following: int = Field(gt=0)
+    # Stories (D73): listed deeds verified within the window, in the reporter's ring (blue) and
+    # the doer's ring (green)
+    story_window_hours: int = Field(gt=0, le=168)
+    story_max_people: int = Field(gt=0, le=200)
+    story_max_per_person: int = Field(gt=0, le=100)
+    story_seconds: int = Field(gt=0, le=60)
+    story_seen_retention_hours: int = Field(gt=0)
     # Rate limits ("<count>/<seconds>")
     rate_comment_user: str = Field(pattern=RATE_SPEC)
     rate_comment_user_daily: str = Field(pattern=RATE_SPEC)
@@ -86,6 +93,7 @@ class FeedLimits(RuntimeConfig):
     rate_share_user: str = Field(pattern=RATE_SPEC)
     rate_public_deed_ip: str = Field(pattern=RATE_SPEC)
     rate_feed_read_user: str = Field(pattern=RATE_SPEC)
+    rate_story_seen_user: str = Field(pattern=RATE_SPEC)
 
     @model_validator(mode="after")
     def _consistent(self) -> Self:
@@ -100,6 +108,8 @@ class FeedLimits(RuntimeConfig):
             raise ValueError(f"enabled languages without a pack: {sorted(missing)}")
         if not self.top_week_days <= self.top_month_days <= self.top_year_days:
             raise ValueError("Top windows must grow: week <= month <= year")
+        if self.story_seen_retention_hours < self.story_window_hours:
+            raise ValueError("story_seen_retention_hours must cover story_window_hours")
         if self.top_badge_ranks > self.top_size:
             raise ValueError("top_badge_ranks must not exceed top_size")
         return self

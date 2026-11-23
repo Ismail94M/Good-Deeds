@@ -69,6 +69,15 @@ export function DotsIcon() {
   )
 }
 
+export function LockIcon({ className = 'size-4' }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <rect x="5" y="11" width="14" height="9" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </Svg>
+  )
+}
+
 export function CheckIcon({ className = 'size-3.5' }: { className?: string }) {
   return (
     <Svg className={className} strokeWidth="2.8">
@@ -167,6 +176,7 @@ const AVATAR_SIZES = {
   md: 'size-10 text-sm',
   lg: 'size-11 text-[15px]',
   xl: 'size-22 text-[30px]',
+  story: 'size-15 text-lg',
 }
 
 /** Initials avatar; decorative (the name is always shown next to it). */

@@ -219,6 +219,27 @@ export type Heroes = {
 
 export type HeroesParams = { region?: string | null; year?: number | null }
 
+/** A featured city (D72): `key` for the API, `name` to show. */
+export type FeaturedCityRef = { key: string; name: string }
+
+/** A featured city's top performer. `points` is null when the city's config hides points. */
+export type FeaturedRow = LeaderboardRow & { points: number | null }
+
+/**
+ * `GET /leaderboards/featured` (#11, D72): the top members registered in a featured city this
+ * month, ranked by the board rules. `cities` lists every enabled featured city (first = default).
+ */
+export type FeaturedCityBoard = {
+  city: FeaturedCityRef
+  cities: FeaturedCityRef[]
+  /** `YYYY-MM`. */
+  month: string
+  final: boolean
+  items: FeaturedRow[]
+}
+
+export type FeaturedParams = { city?: string | null; month?: string | null }
+
 // ----------------------------------------------------------------- #9–#10 admin
 
 /** One evaluation of a deed (rule-based live, or AI shadow in M4b); scores vary by method. */
@@ -269,6 +290,8 @@ export const scoringApi = {
     apiGet<Leaderboard>(`/leaderboards${queryString({ region, month, cursor })}`),
   regions: ({ kind = 'ward', q }: RegionSearchParams = {}) =>
     apiGet<RegionOption[]>(`/leaderboards/regions${queryString({ kind, q })}`),
+  featured: ({ city, month }: FeaturedParams = {}) =>
+    apiGet<FeaturedCityBoard>(`/leaderboards/featured${queryString({ city, month })}`),
   heroes: ({ region, year }: HeroesParams = {}) =>
     apiGet<Heroes>(`/leaderboards/heroes${queryString({ region, year })}`),
   adminDeed: (deedId: string) => apiGet<AdminDeedScoring>(`/admin/scoring/deeds/${seg(deedId)}`),
@@ -291,6 +314,8 @@ export const scoringKeys = {
   regions: (kind: RegionKind, q: string) => ['scoring', 'regions', kind, q.trim()] as const,
   heroes: (region: string | null = null, year: number | null = null) =>
     ['scoring', 'heroes', region, year] as const,
+  featured: (city: string | null = null, month: string | null = null) =>
+    ['leaderboard', 'featured', city, month] as const,
   adminDeed: (deedId: string) => ['admin', 'scoring', 'deed', deedId] as const,
   adminMonth: (month: string) => ['admin', 'scoring', 'month', month] as const,
 }

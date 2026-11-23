@@ -6,7 +6,7 @@ import { makeMe, mockApi, renderApp, signedIn } from '../test/utils'
 
 const ROUTES = [
   ['/me/points', 'My points'],
-  ['/leaderboard', 'Bangalore'],
+  ['/leaderboard', 'Area leaderboard'],
   ['/leaderboard/IN-KA-BLR-W150', 'Koramangala'],
 ] as const
 

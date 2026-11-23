@@ -22,6 +22,7 @@ import {
 } from './feedUi'
 import { FeedNotices } from './FeedNotices'
 import { PostList } from './PostList'
+import { StoriesBar } from './StoriesBar'
 
 function parseTab(value: string | null): FeedTab {
   return FEED_TABS.includes(value as FeedTab) ? (value as FeedTab) : DEFAULT_FEED_TAB
@@ -107,6 +108,7 @@ export function FeedPage() {
   return (
     <FeedMain>
       <h1 className="sr-only">Good deeds</h1>
+      <StoriesBar />
       <FeedNotices />
       <SegmentedTabs
         label="Feed"

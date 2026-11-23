@@ -7,6 +7,7 @@ are the ones a test back-dates on purpose."""
 import uuid
 from datetime import UTC, date, datetime, timedelta
 
+import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,6 +25,9 @@ from tests.deeds.helpers import Member, members, scan_and_report
 from tests.deeds.invite_helpers import withdraw
 from tests.scoring.board_helpers import IST, city, counted, entries, ist, month, reverse, ward
 from tests.scoring.helpers import run_scoring
+
+# The level hierarchy is tested with City on (it is off in the seeded config, migration 0022).
+pytestmark = pytest.mark.usefixtures("city_board_on")
 
 SEP, OCT = month(2026, 9), month(2026, 10)
 # September finalizes at 2 October 01:00 IST (month end + 24 h window + 60 min margin).

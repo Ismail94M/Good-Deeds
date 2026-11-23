@@ -26,9 +26,10 @@ export function makeOptions(overrides: Partial<ScoringOptions> = {}): ScoringOpt
     badges: [{ slug: 'first', label: 'First recognition', description: 'Your first deed.' }],
     levels: [
       { kind: 'ward', enabled: true, hero_min_deeds: 3, hero_min_reporters: 2, titled_places: [1] },
+      // City is locked for now (PO 2026-11-23, migration 0022): only Area boards are open.
       {
         kind: 'city',
-        enabled: true,
+        enabled: false,
         hero_min_deeds: 0,
         hero_min_reporters: 0,
         titled_places: [1, 2, 3],

@@ -4,17 +4,27 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { makeMe, mockApi, renderApp, signedIn } from '../../test/utils'
-import { ASHA, makeLeaderboard, makeMyScoring, makeRow, PRIYA, RAVI } from './testFixtures'
+import {
+  ASHA,
+  makeLeaderboard,
+  makeMyScoring,
+  makeOptions,
+  makeRow,
+  PRIYA,
+  RAVI,
+} from './testFixtures'
 
 const ME = makeMe({ handle: PRIYA.handle, display_name: PRIYA.display_name })
-const NO_HEROES = { region: { code: 'IN-KA-BLR', name: 'Bangalore', kind: 'city' }, items: [] }
+const KORA = { code: 'W150', name: 'Koramangala', kind: 'ward' } as const
+const NO_HEROES = { region: KORA, items: [] }
 
 function setup(handlers: Parameters<typeof mockApi>[0] = {}) {
   return mockApi({
     ...signedIn(ME),
-    'GET /leaderboards': { body: makeLeaderboard() },
+    'GET /leaderboards': { body: makeLeaderboard({ region: KORA }) },
     'GET /leaderboards/heroes': { body: NO_HEROES },
     'GET /scoring/me': { body: makeMyScoring() },
+    'GET /scoring/options': { body: makeOptions() },
     ...handlers,
   })
 }
@@ -22,11 +32,12 @@ function setup(handlers: Parameters<typeof mockApi>[0] = {}) {
 const ranking = async () => screen.findByRole('list', { name: 'Ranking' })
 
 describe('LeaderboardPage', () => {
-  it('shows a provisional city board: banner with the date, dense shared ranks, tier and deeds', async () => {
+  it('opens my area board from /leaderboard: banner with the date, dense shared ranks, tier and deeds', async () => {
     const api = setup()
-    renderApp('/leaderboard')
-    expect(await screen.findByRole('heading', { level: 1, name: 'Bangalore' })).toBeVisible()
-    expect(screen.getByText('City leaderboard · November 2026')).toBeVisible()
+    const { router } = renderApp('/leaderboard')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Koramangala' })).toBeVisible()
+    expect(router.state.location.pathname).toBe('/leaderboard/W150')
+    expect(screen.getByText('Area leaderboard · November 2026')).toBeVisible()
     expect(
       screen.getByText('Provisional until 2 Dec, 01:00 IST.').closest('[role="status"]'),
     ).toBeVisible()
@@ -45,8 +56,8 @@ describe('LeaderboardPage', () => {
       'href',
       '/u/asha',
     )
-    // The default board: no region or month sent.
-    expect([...api.calls('GET /leaderboards')[0].query.keys()]).toEqual([])
+    // My own area board; no month sent.
+    expect([...api.calls('GET /leaderboards')[0].query.entries()]).toEqual([['region', 'W150']])
     // Provisional boards show no Heroes.
     expect(screen.queryByRole('heading', { name: 'Kindness Heroes' })).not.toBeInTheDocument()
   })
@@ -107,7 +118,7 @@ describe('LeaderboardPage', () => {
     })
     renderApp('/leaderboard/W150?month=2026-10')
     expect(await screen.findByRole('heading', { level: 1, name: 'Koramangala' })).toBeVisible()
-    expect(screen.getByText('Ward leaderboard · October 2026')).toBeVisible()
+    expect(screen.getByText('Area leaderboard · October 2026')).toBeVisible()
     expect(screen.getByText('Final.')).toBeVisible()
     expect(screen.queryByText(/Provisional/)).not.toBeInTheDocument()
     const heroes = screen.getByRole('region', { name: 'Kindness Heroes' })
@@ -181,25 +192,23 @@ describe('LeaderboardPage', () => {
     )
   })
 
-  it('finds a ward by name and links to its board; lists my wards', async () => {
+  it('finds an area by name and links to its board; lists my areas only', async () => {
     const api = setup({
       'GET /leaderboards/regions': { body: [{ code: 'W151', name: 'Koramangala East' }] },
     })
-    renderApp('/leaderboard')
-    const boards = await screen.findByRole('navigation', { name: 'Leaderboards' })
+    renderApp('/leaderboard/W150')
+    const boards = await screen.findByRole('navigation', { name: 'Your leaderboards' })
     expect(await within(boards).findByRole('link', { name: 'Koramangala' })).toHaveAttribute(
-      'href',
-      '/leaderboard/W150',
-    )
-    expect(within(boards).getByRole('link', { name: 'Bangalore' })).toHaveAttribute(
       'aria-current',
       'page',
     )
+    // My city board (an old snapshot) is never offered while City is locked.
+    expect(within(boards).queryByRole('link', { name: 'Bangalore' })).not.toBeInTheDocument()
     const user = userEvent.setup()
-    await user.type(screen.getByRole('searchbox', { name: 'Find a ward' }), 'k')
+    await user.type(screen.getByRole('searchbox', { name: 'Find an area' }), 'k')
     expect(screen.getByText('Type at least 2 letters.')).toBeVisible()
-    await user.type(screen.getByRole('searchbox', { name: 'Find a ward' }), 'ora')
-    const wards = await screen.findByRole('list', { name: 'Wards' })
+    await user.type(screen.getByRole('searchbox', { name: 'Find an area' }), 'ora')
+    const wards = await screen.findByRole('list', { name: 'Areas' })
     expect(within(wards).getByRole('link', { name: 'Koramangala East' })).toHaveAttribute(
       'href',
       '/leaderboard/W151',
@@ -209,13 +218,65 @@ describe('LeaderboardPage', () => {
     expect(search?.query.get('q')).toBe('kora')
   })
 
-  it('says when no ward matches', async () => {
+  it('says when no area matches', async () => {
     setup({ 'GET /leaderboards/regions': { body: [] } })
-    renderApp('/leaderboard')
+    renderApp('/leaderboard/W150')
     await userEvent
       .setup()
-      .type(await screen.findByRole('searchbox', { name: 'Find a ward' }), 'zzz')
-    expect(await screen.findByText(/No wards match that name/)).toBeVisible()
+      .type(await screen.findByRole('searchbox', { name: 'Find an area' }), 'zzz')
+    expect(await screen.findByText(/No areas match that name/)).toBeVisible()
+  })
+
+  it('shows Area open and City, State and Country locked, from config', async () => {
+    setup()
+    renderApp('/leaderboard/W150')
+    const levels = await screen.findByRole('navigation', { name: 'Leaderboard levels' })
+    const area = within(levels).getByRole('link', { name: 'Area' })
+    expect(area).toHaveAttribute('href', '/leaderboard')
+    await waitFor(() => expect(area).toHaveAttribute('aria-current', 'page'))
+    for (const name of ['City', 'State', 'Country']) {
+      const locked = within(levels).getByRole('link', { name: `${name}, locked` })
+      expect(locked).toHaveAttribute('aria-disabled', 'true')
+      expect(locked).not.toHaveAttribute('href')
+      expect(locked).toHaveTextContent(`${name}Locked`)
+    }
+    expect(screen.getByText('City, State and Country leaderboards are coming soon.')).toBeVisible()
+  })
+
+  it('opens a level as soon as config enables it, with no UI change', async () => {
+    const levels = makeOptions().levels.map((l) =>
+      l.kind === 'city' ? { ...l, enabled: true } : l,
+    )
+    setup({ 'GET /scoring/options': { body: makeOptions({ levels }) } })
+    renderApp('/leaderboard/W150?month=2026-10')
+    const nav = await screen.findByRole('navigation', { name: 'Leaderboard levels' })
+    expect(await within(nav).findByRole('link', { name: 'City' })).toHaveAttribute(
+      'href',
+      '/leaderboard?level=city&month=2026-10',
+    )
+    expect(within(nav).getByRole('link', { name: 'State, locked' })).toBeVisible()
+    expect(screen.getByText('State and Country leaderboards are coming soon.')).toBeVisible()
+  })
+
+  it('shows a locked level as locked and never asks for its board', async () => {
+    const api = setup()
+    renderApp('/leaderboard?level=city')
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'City leaderboards are locked' }),
+    ).toBeVisible()
+    expect(screen.getByRole('link', { name: 'Area leaderboard' })).toHaveAttribute(
+      'href',
+      '/leaderboard',
+    )
+    expect(api.calls('GET /leaderboards')).toHaveLength(0)
+  })
+
+  it('asks me to find my area when I am on no area board yet', async () => {
+    const api = setup({ 'GET /scoring/me': { body: makeMyScoring({ boards: [] }) } })
+    renderApp('/leaderboard')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Area leaderboard' })).toBeVisible()
+    expect(screen.getByRole('searchbox', { name: 'Find an area' })).toBeVisible()
+    expect(api.calls('GET /leaderboards')).toHaveLength(0)
   })
 
   it('shows past Kindness Heroes for the region', async () => {
@@ -259,7 +320,7 @@ describe('LeaderboardPage', () => {
     })
     renderApp('/leaderboard/NOPE')
     expect(await screen.findByRole('heading', { name: 'Board not found' })).toBeVisible()
-    expect(screen.getByRole('link', { name: 'City leaderboard' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Area leaderboard' })).toHaveAttribute(
       'href',
       '/leaderboard',
     )
