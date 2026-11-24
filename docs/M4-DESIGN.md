@@ -1,6 +1,6 @@
 # M4 Scoring, Points & Leaderboard: design
 
-**Status:** Revision 2 (2026-11-22). All PO questions Q45–Q58 are answered (§11). Q52 was replaced by a 24-hour withdrawal window with monthly finalization, and Q54 by a Kindness Hero for each level of a location hierarchy. Q58 = dense ranking (1, 1, 2). Revision 1 (2026-11-21) was the draft for PO review.
+**Status:** M4a and D71–D76 built and **approved by the PO on 2026-11-24** (merged to `main`). M4b (AI shadow evaluator) not built yet. Design: Revision 2 (2026-11-22). All PO questions Q45–Q58 are answered (§11). Q52 was replaced by a 24-hour withdrawal window with monthly finalization, and Q54 by a Kindness Hero for each level of a location hierarchy. Q58 = dense ranking (1, 1, 2). Revision 1 (2026-11-21) was the draft for PO review.
 **Baseline:** M3 as approved (`m3-feed`, commit b67120a; migrations up to 0018). Branch `m4-scoring`.
 **Sources used:** PRD §4, §5 (anti-collusion, monthly limits, edit/withdraw, profile counts), §6.4, §6.5 (visibility never affects points; photos, Q29, Q30), §6.9, §6.10, §8, §9, §10, §12; ROADMAP M4; `docs/M2-DESIGN.md` (D2, D4, D13, D15, §3.4b, §4 events); `docs/M3-DESIGN.md` (D30, D36, D37, D39, Q28); the code under `backend/app` (`modules/deeds`, `media`, `feed`, `core/runtime_config.py`, `core/events.py`, `tests/test_architecture.py`) and `frontend/src/features/profile/PublicProfilePage.tsx`.
 
