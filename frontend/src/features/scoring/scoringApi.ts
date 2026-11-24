@@ -30,6 +30,8 @@ export type HeroTitle = {
   period_month: string
   region_name: string
   place: number
+  /** Which level's board the title is from (D75): styles City and Area titles differently. */
+  level: RegionKind
 }
 
 /** The levels of the location hierarchy (D65). Only levels enabled in config have boards. */

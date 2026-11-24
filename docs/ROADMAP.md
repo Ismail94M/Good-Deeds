@@ -76,6 +76,8 @@ Each milestone is built, tested and reviewed by the product owner before the nex
 
 **M4 Scoring, Points & Leaderboard**
 - Good Deeds Stories (PO 2026-11-23, D73 in `docs/M4-DESIGN.md`): Instagram-style rings at the top of the home feed for deeds verified in the last 24 hours, blue for reported (witnessed), green for verified (own deed); full-screen viewer; seen state on the server. **Built**, awaiting PO review.
+- Achievement badge medals (PO 2026-11-24, D74 in `docs/M4-DESIGN.md`): badges as medals with ladder icons and colours, bronze/silver/gold rims, details on hover or tap, the next badge locked on my own profile, and a one-time unlock animation. UI only. **Built**, awaiting PO review.
+- Profile stats and Kindness Hero title cards (PO 2026-11-24, D75): icon stat tiles, City and Area titles with their own looks, plus a `level` field on each title in the scoring API. **Built**, awaiting PO review.
 - Rule-based scoring: category base points, keyword/regex text rules, fixed photo bonus. Removing a photo (by the doer, the uploader or an admin) never changes points: the M4 design must make the photo bonus and evidence caps independent of later photo removals (PO decision Q29, 2026-11-19).
 - Ledger with diminishing pair returns, a daily cap of 10, the reporter daily cap, and reporter points excluded from prize rank.
 - Configurable rank score.

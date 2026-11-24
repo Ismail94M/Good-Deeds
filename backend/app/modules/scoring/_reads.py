@@ -198,6 +198,7 @@ async def _user_titles(session: AsyncSession, user_id: uuid.UUID) -> list[TitleO
                 period_month=_labels.month_param(t.period_month),
                 region_name=name,
                 place=t.place,
+                level=t.level_kind.value,
             )
         )
     return out

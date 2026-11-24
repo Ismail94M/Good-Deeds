@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useId, useState, type ReactNode } from 'react'
+import { useId, useRef, useState, type ReactNode } from 'react'
 import { useParams } from 'react-router'
 import { ErrorAlert, LinkButton, Loading, Page } from '../../components/ui'
 import { ApiError, errorMessage } from '../../lib/api'
@@ -14,6 +14,7 @@ import { PostList } from '../feed/PostList'
 import { useToggleFollow } from '../feed/postActions'
 import { useToast } from '../feed/useToast'
 import { useUserScoring } from '../scoring/scoringQueries'
+import { CrownIcon } from '../scoring/HeroTitles'
 import { TierChip } from '../scoring/TierChip'
 import { BadgeList, TitlesList } from '../scoring/TitlesList'
 
@@ -60,15 +61,33 @@ export function PublicProfilePage() {
   return (
     <FeedMain>
       <section className="flex flex-col items-center gap-2 pt-2 text-center">
-        <Avatar name={data.display_name} handle={data.handle} size="xl" />
+        <span className="rounded-full bg-white p-1 shadow-[0_0_0_1px_#e2e8f0,0_8px_20px_-10px_rgba(36,66,184,0.45)]">
+          <Avatar name={data.display_name} handle={data.handle} size="xl" />
+        </span>
         <h1 className="mt-1 text-[26px] leading-tight font-bold tracking-tight break-words text-slate-900 sm:text-[32px]">
           {data.display_name}
         </h1>
         {/* Q22: "@handle" only; no city until there is more than one. */}
         <p className="text-slate-600">@{data.handle}</p>
         <ProfileTier handle={data.handle} />
-        {data.bio && <p className="whitespace-pre-line text-slate-800">{data.bio}</p>}
-        <p className="text-sm text-slate-500">
+        {data.bio && (
+          <p className="mt-1.5 max-w-md text-[15px] leading-relaxed whitespace-pre-line text-slate-800">
+            {data.bio}
+          </p>
+        )}
+        <p className="inline-flex items-center gap-1.5 text-[13px] text-slate-500">
+          <svg
+            aria-hidden
+            viewBox="0 0 24 24"
+            className="size-3.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          >
+            <rect x="3.5" y="5" width="17" height="15" rx="2.5" />
+            <path d="M3.5 10h17M8 3v4M16 3v4" />
+          </svg>
           Joined {joinedFormat.format(new Date(data.joined_at))}
         </p>
         {user ? (
@@ -145,12 +164,22 @@ function ProfileTier({ handle }: { handle: string }) {
   return <TierChip tier={scoring.data.tier} />
 }
 
-type ListName = 'badges' | 'titles'
+type Tone = 'emerald' | 'rose' | 'violet' | 'sky' | 'brand'
+
+const TONE: Record<Tone, string> = {
+  emerald: 'bg-emerald-50 text-emerald-600',
+  rose: 'bg-rose-50 text-rose-600',
+  violet: 'bg-violet-50 text-violet-600',
+  sky: 'bg-sky-50 text-sky-600',
+  brand: 'bg-brand-50 text-brand-700',
+}
 
 /**
- * Verified Deeds · Badges · Hero titles · Followers · Following, all plain numbers (Q36, D69).
- * Badges and Hero titles open their list (M4-DESIGN §6.3). There is no Self-log Deeds count
- * and no points on a public profile (D69, PO Q55).
+ * Verified Deeds · Badges · Hero titles · Followers · Following as stat tiles, each with its own
+ * icon and soft colour (PO 2026-11-24, D75). Badges opens the badge medals; Hero titles jumps to
+ * the title cards below. Followers and Following stay plain numbers (Q36), and there is no
+ * Self-log Deeds count and no points on a public profile (D69, PO Q55). Phone: the three
+ * achievement stats on top, the two social ones below; from `sm`, all five in one row.
  */
 function ProfileCounts({ handle }: { handle: string }) {
   const counts = useQuery({
@@ -160,87 +189,213 @@ function ProfileCounts({ handle }: { handle: string }) {
   })
   const social = useSocial(handle)
   const scoring = useUserScoring(handle)
-  const [open, setOpen] = useState<ListName | null>(null)
-  const listId = useId()
+  const [badgesOpen, setBadgesOpen] = useState(false)
+  const badgesId = useId()
+  const titlesHeading = useRef<HTMLHeadingElement>(null)
   const show = (failed: boolean, n: number | undefined) => (failed ? '–' : (n ?? '…'))
-  const toggle = (name: ListName) => setOpen((current) => (current === name ? null : name))
-  // Five tiles fit one row from `sm`; on a phone they wrap 3 + 2 with no empty cell.
   const top = 'col-span-2 sm:col-span-1'
   const bottom = 'col-span-3 sm:col-span-1'
-  const listButton = (name: ListName, n: number | undefined, label: string) =>
-    scoring.data ? (
-      <button
-        type="button"
-        aria-expanded={open === name}
-        aria-controls={listId}
-        onClick={() => toggle(name)}
-        className={`${countClass} ${top} hover:bg-slate-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-700`}
-      >
-        <CountText n={n} label={label} />
-      </button>
-    ) : (
-      <Count n={show(scoring.isError, n)} label={label} className={top} />
-    )
+  const titles = scoring.data?.titles ?? []
 
   return (
-    <div className="flex flex-col gap-3">
-      <div
-        role="group"
-        aria-label="Counts"
-        aria-busy={counts.isPending || social.isPending || scoring.isPending || undefined}
-        className="grid grid-cols-6 gap-px overflow-hidden rounded-2xl border border-slate-200 bg-slate-200 sm:grid-cols-5"
-      >
-        <Count
-          n={show(counts.isError, counts.data?.verified)}
-          label="Verified Deeds"
-          className={top}
-        />
-        {listButton('badges', scoring.data?.badges_total, 'Badges')}
-        {listButton('titles', scoring.data?.titles_total, 'Hero titles')}
-        <Count
-          n={show(social.isError, social.data?.followers)}
-          label="Followers"
-          className={bottom}
-        />
-        <Count
-          n={show(social.isError, social.data?.following)}
-          label="Following"
-          className={bottom}
-        />
-      </div>
-      {open && scoring.data && (
-        <section
-          id={listId}
-          aria-label={open === 'badges' ? 'Badges' : 'Hero titles'}
-          className="rounded-2xl border border-slate-200 bg-white p-4"
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-2.5">
+        <div
+          role="group"
+          aria-label="Counts"
+          aria-busy={counts.isPending || social.isPending || scoring.isPending || undefined}
+          className="grid grid-cols-6 gap-2 sm:grid-cols-5"
         >
-          {open === 'badges' ? (
+          <Stat
+            icon={<ShieldIcon />}
+            tone="emerald"
+            n={show(counts.isError, counts.data?.verified)}
+            label="Verified Deeds"
+            className={top}
+          />
+          <Stat
+            icon={<MedalIcon />}
+            tone="rose"
+            n={show(scoring.isError, scoring.data?.badges_total)}
+            label="Badges"
+            className={top}
+            button={
+              scoring.data
+                ? {
+                    onClick: () => setBadgesOpen((v) => !v),
+                    expanded: badgesOpen,
+                    controls: badgesId,
+                  }
+                : undefined
+            }
+          />
+          <Stat
+            icon={<CrownIcon className="size-[18px]" />}
+            tone="violet"
+            n={show(scoring.isError, scoring.data?.titles_total)}
+            label="Hero titles"
+            className={top}
+            button={
+              titles.length > 0
+                ? {
+                    onClick: () => {
+                      const heading = titlesHeading.current
+                      heading?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+                      heading?.focus({ preventScroll: true })
+                    },
+                  }
+                : undefined
+            }
+          />
+          <Stat
+            icon={<PeopleIcon />}
+            tone="sky"
+            n={show(social.isError, social.data?.followers)}
+            label="Followers"
+            className={bottom}
+            row
+          />
+          <Stat
+            icon={<FollowingIcon />}
+            tone="brand"
+            n={show(social.isError, social.data?.following)}
+            label="Following"
+            className={bottom}
+            row
+          />
+        </div>
+        {badgesOpen && scoring.data && (
+          <section
+            id={badgesId}
+            aria-label="Badges"
+            className="rounded-2xl border border-slate-200 bg-white p-4"
+          >
             <BadgeList badges={scoring.data.badges} />
-          ) : (
-            <TitlesList titles={scoring.data.titles} />
-          )}
+          </section>
+        )}
+      </div>
+      {titles.length > 0 && (
+        <section aria-labelledby="hero-titles-h" className="flex scroll-mt-20 flex-col gap-2.5">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2
+              id="hero-titles-h"
+              ref={titlesHeading}
+              tabIndex={-1}
+              className="text-lg font-extrabold tracking-tight text-slate-900 focus:outline-none"
+            >
+              Kindness Hero titles
+            </h2>
+            <span className="text-sm font-semibold text-slate-500">{titles.length} earned</span>
+          </div>
+          <TitlesList titles={titles} />
         </section>
       )}
     </div>
   )
 }
 
-const countClass = 'flex flex-col items-center bg-white px-2 py-3.5'
-
-function Count({ n, label, className = '' }: { n: ReactNode; label: string; className?: string }) {
+function Stat({
+  icon,
+  tone,
+  n,
+  label,
+  className,
+  row = false,
+  button,
+}: {
+  icon: ReactNode
+  tone: Tone
+  n: ReactNode
+  label: string
+  className: string
+  /** Icon beside the number on a phone (the social stats), above it from `sm`. */
+  row?: boolean
+  button?: { onClick: () => void; expanded?: boolean; controls?: string }
+}) {
+  const layout = row
+    ? 'flex-row items-center gap-2.5 sm:flex-col sm:items-start sm:gap-1.5'
+    : 'flex-col items-start gap-1.5'
+  const body = (
+    <>
+      <span
+        aria-hidden
+        className={`flex size-8 shrink-0 items-center justify-center rounded-[10px] ${TONE[tone]}`}
+      >
+        {icon}
+      </span>
+      <span className="flex flex-col gap-1">
+        <span
+          className={`leading-none font-extrabold tracking-tight text-slate-900 ${row ? 'text-xl sm:text-2xl' : 'text-2xl'}`}
+        >
+          {n}
+        </span>{' '}
+        <span className="text-[12.5px] leading-tight font-medium text-slate-600">{label}</span>
+      </span>
+    </>
+  )
+  const base = `flex min-h-11 rounded-2xl border border-slate-200 bg-white p-3 text-left ${layout} ${className}`
+  if (!button) return <div className={base}>{body}</div>
   return (
-    <div className={`${countClass} ${className}`}>
-      <CountText n={n} label={label} />
-    </div>
+    <button
+      type="button"
+      onClick={button.onClick}
+      aria-expanded={button.expanded}
+      aria-controls={button.controls}
+      className={`${base} transition-shadow hover:border-slate-300 hover:shadow-[0_2px_8px_-4px_rgba(15,23,42,0.18)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 ${
+        button.expanded ? 'border-rose-300 ring-3 ring-rose-100' : ''
+      }`}
+    >
+      {body}
+    </button>
   )
 }
 
-function CountText({ n, label }: { n: ReactNode; label: string }) {
+const iconProps = {
+  'aria-hidden': true,
+  viewBox: '0 0 24 24',
+  className: 'size-[18px]',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 2.2,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+} as const
+
+function ShieldIcon() {
   return (
-    <>
-      <span className="text-[22px] leading-tight font-bold text-slate-900">{n}</span>{' '}
-      <span className="text-[13px] text-slate-600">{label}</span>
-    </>
+    <svg {...iconProps}>
+      <path d="M12 3l7 3v5.5c0 4.3-3 7.9-7 9.5-4-1.6-7-5.2-7-9.5V6z" />
+      <path d="M8.8 12.2l2.2 2.2 4.3-4.4" />
+    </svg>
+  )
+}
+
+function MedalIcon() {
+  return (
+    <svg {...iconProps}>
+      <circle cx="12" cy="9" r="5.5" />
+      <path d="M8.6 13.3L7 21l5-2.6 5 2.6-1.6-7.7" />
+    </svg>
+  )
+}
+
+function PeopleIcon() {
+  return (
+    <svg {...iconProps}>
+      <circle cx="9" cy="8.5" r="3.5" />
+      <path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5" />
+      <path d="M15.5 5.2a3.4 3.4 0 0 1 0 6.6M18 14.8c2 .7 3.2 2.4 3.5 5.2" />
+    </svg>
+  )
+}
+
+function FollowingIcon() {
+  return (
+    <svg {...iconProps}>
+      <circle cx="10" cy="8.5" r="3.5" />
+      <path d="M3.5 20c.6-3.6 3.2-5.5 6.5-5.5 1.6 0 3 .4 4.1 1.2" />
+      <path d="M15.5 18l2 2 4-4.2" />
+    </svg>
   )
 }
 

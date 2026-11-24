@@ -27,6 +27,7 @@ const MY_SCORING = {
       period_month: '2026-11',
       region_name: 'Koramangala',
       place: 1,
+      level: 'ward',
     },
   ],
   total_points: 124,

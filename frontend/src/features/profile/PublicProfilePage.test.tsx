@@ -29,6 +29,7 @@ const ASHA_SCORING = {
       period_month: '2026-11',
       region_name: 'Koramangala',
       place: 1,
+      level: 'ward',
     },
   ],
 }
@@ -217,7 +218,7 @@ describe('PublicProfilePage: tier, badges and titles (M4 F19, D69)', () => {
     expect(screen.getByText('Tree')).toHaveTextContent('Tier: Tree')
   })
 
-  it('opens the badge and title lists', async () => {
+  it('opens the badge medals, and shows Hero titles as cards the Hero titles tile jumps to (D75)', async () => {
     setup()
     const user = userEvent.setup()
     renderApp('/u/asha')
@@ -228,13 +229,78 @@ describe('PublicProfilePage: tier, badges and titles (M4 F19, D69)', () => {
     const list = screen.getByRole('region', { name: 'Badges' })
     expect(within(list).getByText('First recognition')).toBeVisible()
     expect(within(list).getByText('First witness')).toBeVisible()
-    await user.click(screen.getByRole('button', { name: '1 Hero titles' }))
-    expect(
-      within(screen.getByRole('region', { name: 'Hero titles' })).getByText(
-        'Kindness Hero · Koramangala · November 2026',
-      ),
-    ).toBeVisible()
+    await user.click(badges)
     expect(screen.queryByRole('region', { name: 'Badges' })).not.toBeInTheDocument()
+
+    // Titles are always shown (no toggle); the tile moves focus to their heading.
+    const titles = screen.getByRole('region', { name: 'Kindness Hero titles' })
+    const card = within(titles).getByRole('article')
+    expect(card).toHaveAttribute('data-look', 'area')
+    expect(card).toHaveTextContent('Area Kindness Hero · #1KoramangalaNovember 2026')
+    await user.click(screen.getByRole('button', { name: '1 Hero titles' }))
+    expect(screen.getByRole('heading', { name: 'Kindness Hero titles' })).toHaveFocus()
+    // Followers and Following stay plain numbers (Q36).
+    expect(screen.queryByRole('button', { name: /Followers|Following/ })).not.toBeInTheDocument()
+  })
+
+  it('styles City and Area titles differently, most prestigious first, folding extras away (D75)', async () => {
+    const title = (o: object) => ({
+      label: 'Kindness Hero · Koramangala · November 2026',
+      period_month: '2026-11',
+      region_name: 'Koramangala',
+      place: 1,
+      level: 'ward',
+      ...o,
+    })
+    setup({
+      'GET /scoring/users/asha': {
+        body: {
+          ...ASHA_SCORING,
+          titles_total: 5,
+          titles: [
+            title({}),
+            title({
+              label: 'Top 3 in Bangalore',
+              region_name: 'Bangalore',
+              level: 'city',
+              place: 2,
+              period_month: '2026-09',
+            }),
+            title({
+              label: 'Bangalore City Kindness Hero',
+              region_name: 'Bangalore',
+              level: 'city',
+              period_month: '2026-10',
+            }),
+            title({ label: 'Kindness Hero · Koramangala · August 2026', period_month: '2026-08' }),
+            title({
+              label: 'Kindness Hero · Indiranagar · July 2026',
+              region_name: 'Indiranagar',
+              period_month: '2026-07',
+            }),
+          ],
+        },
+      },
+    })
+    const user = userEvent.setup()
+    renderApp('/u/asha')
+    const titles = await screen.findByRole('region', { name: 'Kindness Hero titles' })
+    expect(titles).toHaveTextContent('5 earned')
+    const cards = within(titles).getAllByRole('article')
+    expect(cards.map((c) => c.dataset.look)).toEqual(['crown', 'podium', 'area'])
+    expect(cards[0]).toHaveTextContent(
+      'City Kindness Hero · #1Bangalore City Kindness HeroOctober 2026',
+    )
+    expect(cards[1]).toHaveTextContent('City · #2Top 3 in BangaloreSeptember 2026')
+    expect(cards[2]).toHaveTextContent('Area Kindness Hero · #1KoramangalaNovember 2026')
+    expect(within(titles).queryByText(/Indiranagar/)).not.toBeInTheDocument()
+    const more = within(titles).getByRole('button', { name: 'Show all 5 titles' })
+    await user.click(more)
+    expect(more).toHaveAttribute('aria-expanded', 'true')
+    expect(within(titles).getByText('Area Kindness Hero · #1 · Indiranagar')).toBeVisible()
+    expect(within(titles).getByText('July 2026')).toBeVisible()
+    await user.click(within(titles).getByRole('button', { name: 'Show fewer titles' }))
+    expect(within(titles).queryByText(/Indiranagar/)).not.toBeInTheDocument()
   })
 
   it('never shows points or a self-log count on another person’s profile', async () => {

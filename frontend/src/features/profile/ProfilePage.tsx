@@ -16,6 +16,7 @@ import { collectErrors, validateDisplayName, validateHandle } from '../auth/vali
 import { initials } from '../report/format'
 import { useSocial } from '../feed/feedQueries'
 import { useMyScoring } from '../scoring/scoringQueries'
+import { OwnBadges } from '../scoring/OwnBadges'
 import { TierChip } from '../scoring/TierChip'
 import { DeedCounts } from './DeedCounts'
 
@@ -75,6 +76,7 @@ export function ProfilePage() {
       <DeedCounts handle={user.handle} />
       <ConnectionsLine handle={user.handle} />
       <OwnPoints />
+      <OwnBadges handle={user.handle} />
       <div className="grid grid-cols-2 gap-2">
         <Link
           to="/me/self-logs/new"

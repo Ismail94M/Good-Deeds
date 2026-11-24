@@ -68,6 +68,9 @@ class TitleOut(BaseModel):
     period_month: str
     region_name: str
     place: int
+    # Which level's board the title is from (D75): lets the profile style City and Area titles
+    # differently without reading the wording. Added 2026-11-24; existing fields unchanged.
+    level: RegionKindName
 
 
 class PublicScoring(BaseModel):

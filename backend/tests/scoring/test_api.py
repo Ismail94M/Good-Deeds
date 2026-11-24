@@ -108,6 +108,10 @@ async def test_public_scoring_is_public_and_has_no_points(
     labels = sorted(t["label"] for t in body["titles"])
     assert all("September 2026" in label for label in labels)
     assert {t["period_month"] for t in body["titles"]} == {"2026-09"}
+    # D75: each title says which level's board it is from, matching its wording.
+    for t in body["titles"]:
+        assert t["level"] == ("city" if "Bangalore" in t["label"] else "ward"), t
+    assert {t["level"] for t in body["titles"]} == {"ward", "city"}
     assert (await client.get("/api/scoring/users/nobody-here")).status_code == 404
 
 
