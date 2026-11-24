@@ -1,0 +1,50 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-11-17T09:00:00Z"},
+  "title": "Good Deeds — F7 Feed",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 390, "h": 1650, "title": "Interactive prototype (mobile) — press Play", "is_interactive": true},
+
+    "M-FeedNearby.dc.html": {"x": 0, "y": 2050, "w": 390, "h": 1650, "title": "Mobile · Home feed — Nearby"},
+    "M-FeedFollowing.dc.html": {"x": 470, "y": 2050, "w": 390, "h": 1300, "title": "Mobile · Home feed — Following"},
+    "M-FeedTop.dc.html": {"x": 940, "y": 2050, "w": 390, "h": 1650, "title": "Mobile · Home feed — Top this week"},
+    "M-FeedLoading.dc.html": {"x": 1410, "y": 2050, "w": 390, "h": 844, "title": "Mobile · Feed loading"},
+    "M-FeedEmpty.dc.html": {"x": 1880, "y": 2050, "w": 390, "h": 844, "title": "Mobile · Following — empty"},
+    "M-ShareSheet.dc.html": {"x": 2350, "y": 2050, "w": 390, "h": 1650, "title": "Mobile · Share sheet"},
+
+    "M-Detail.dc.html": {"x": 0, "y": 4100, "w": 390, "h": 1500, "title": "Mobile · Deed page with comments (you reported it)"},
+    "M-CommentError.dc.html": {"x": 470, "y": 4100, "w": 390, "h": 1500, "title": "Mobile · Comment blocked by the word filter"},
+    "M-CommentDelete.dc.html": {"x": 940, "y": 4100, "w": 390, "h": 1500, "title": "Mobile · Delete a comment — confirm"},
+    "M-HideConfirm.dc.html": {"x": 1410, "y": 4100, "w": 390, "h": 1500, "title": "Mobile · Hide from feed — confirm"},
+    "M-Hidden.dc.html": {"x": 1880, "y": 4100, "w": 390, "h": 1500, "title": "Mobile · Hidden from feed"},
+
+    "M-Public.dc.html": {"x": 0, "y": 6000, "w": 390, "h": 1150, "title": "Mobile · Shared link — not logged in"},
+    "M-PublicUnavailable.dc.html": {"x": 470, "y": 6000, "w": 390, "h": 844, "title": "Mobile · Shared link — unavailable"},
+    "M-ProfileOther.dc.html": {"x": 940, "y": 6000, "w": 390, "h": 1300, "title": "Mobile · Ahmed's profile — Follow"},
+    "M-Followers.dc.html": {"x": 1410, "y": 6000, "w": 390, "h": 900, "title": "Mobile · Your followers"},
+    "M-Saved.dc.html": {"x": 1880, "y": 6000, "w": 390, "h": 1250, "title": "Mobile · Saved"},
+
+    "D-Feed.dc.html": {"x": 0, "y": 7700, "w": 1440, "h": 1500, "title": "Desktop · Home feed"},
+    "D-Detail.dc.html": {"x": 1520, "y": 7700, "w": 1440, "h": 1450, "title": "Desktop · Deed page with comments"},
+    "D-Public.dc.html": {"x": 3040, "y": 7700, "w": 1440, "h": 1150, "title": "Desktop · Shared link — not logged in"},
+    "D-Profile.dc.html": {"x": 4560, "y": 7700, "w": 1440, "h": 1300, "title": "Desktop · Ahmed's profile"}
+  },
+  "order": [
+    "Main.dc.html",
+    "M-FeedNearby.dc.html", "M-FeedFollowing.dc.html", "M-FeedTop.dc.html", "M-FeedLoading.dc.html", "M-FeedEmpty.dc.html", "M-ShareSheet.dc.html",
+    "M-Detail.dc.html", "M-CommentError.dc.html", "M-CommentDelete.dc.html", "M-HideConfirm.dc.html", "M-Hidden.dc.html",
+    "M-Public.dc.html", "M-PublicUnavailable.dc.html", "M-ProfileOther.dc.html", "M-Followers.dc.html", "M-Saved.dc.html",
+    "D-Feed.dc.html", "D-Detail.dc.html", "D-Public.dc.html", "D-Profile.dc.html"
+  ],
+  "notes": {
+    "t-proto": {"x": 0, "y": -300, "text": "F7 · Kindness feed — interactive prototype", "kind": "title1", "maxW": 1600},
+    "t-feed": {"x": 0, "y": 1750, "text": "1 · Home feed", "kind": "title1", "maxW": 2740},
+    "t-detail": {"x": 0, "y": 3800, "text": "2 · Deed page, comments, hide from feed", "kind": "title1", "maxW": 2270},
+    "t-public": {"x": 0, "y": 5700, "text": "3 · Shared link · profiles and follows · saved", "kind": "title1", "maxW": 2270},
+    "t-desk": {"x": 0, "y": 7400, "text": "Desktop · 1440 px — key screens", "kind": "title1", "maxW": 6000},
+    "behaviour": {"x": 470, "y": 0, "w": 620, "fill": "blue", "size": "m", "text": "Feed decisions (product owner, 2026-11-16/17 — PRD §6.5)\n\n• The feed is Home for signed-in people. Tabs: Nearby (Bangalore, newest) · Following · Top this week.\n• Top this week = likes + 3 × comments over 7 days. Display order only: never points, rank or prizes.\n• Every verified deed is published automatically. The doer or the reporter can hide it any time — visibility only; it still counts. Hiding also turns its share link off.\n• Withdrawn, rejected, flagged or removed deeds leave the feed. Self-logs and unverified deeds never appear.\n• Cards show an area name only — never GPS, phone numbers or private details.\n• Comments: any member; 300 characters; rate-limited; a kind-words filter. Authors delete their own; the doer and reporter can delete any comment on their deed. (\"You're commenting very fast — try again in a minute\" for the rate limit.)\n• Follows: open, one-way. You can remove followers.\n• Saves are private: a Saved list on your profile, no counts.\n• Shared links: one deed, visible without login; liking, commenting, following and browsing need sign-up.\n• Notifications come in M6.\n\nSample viewer: Priya Sharma. Press Play: like, save, share, follow, open Ahmed's deed (Priya reported it) → comment, delete a comment, hide from feed."}
+  },
+  "designSystems": []
+}

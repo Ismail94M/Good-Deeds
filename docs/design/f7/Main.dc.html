@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Kindness feed</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div style="position: relative; width: {{s.w}}px; min-height: {{s.h}}px; box-sizing: border-box; display: flex; flex-direction: column; background: #faf8f5; color: #0f172a; font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 16px; line-height: 1.5;">
+
+<sc-if value="{{f.loggedIn}}" hint-placeholder-val="{{ true }}">
+<header style="border-bottom: 1px solid #e2e8f0; background: #faf8f5;">
+  <div style="max-width: 1152px; margin: 0 auto; box-sizing: border-box; padding: 8px {{s.headPad}}px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px;">
+    <a href="#home" onClick="{{toFeed}}" style="order: 1; display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; color: #0f172a; text-decoration: none;">
+      <svg aria-hidden="true" viewBox="0 0 32 32" width="32" height="32"><rect width="32" height="32" rx="8" fill="#3659e3"></rect><path fill="#ffffff" d="M16 24.5s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 16 11.7a4.3 4.3 0 0 1 7.5 2.8c0 5.4-7.5 10-7.5 10z"></path></svg>
+      Good Deeds
+    </a>
+    <nav aria-label="Main" style="order: {{s.navOrder}}; width: {{s.navW}}; margin-left: {{s.navMl}};">
+      <ul style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, {{s.navCol}})); gap: 4px;">
+        <li><a href="#home" onClick="{{toFeed}}" aria-current="{{nav.home.cur}}" style="display: flex; min-height: 44px; align-items: center; justify-content: center; padding: 0 14px; border-radius: 8px; font-size: 14px; font-weight: {{nav.home.fw}}; color: {{nav.home.fg}}; background: {{nav.home.bg}}; text-decoration: none;">Home</a></li>
+        <li><a href="#qr" style="display: flex; min-height: 44px; align-items: center; justify-content: center; padding: 0 14px; border-radius: 8px; font-size: 14px; font-weight: 500; color: #475569; text-decoration: none;">My QR</a></li>
+        <li><a href="#profile" onClick="{{toSaved}}" aria-current="{{nav.profile.cur}}" style="display: flex; min-height: 44px; align-items: center; justify-content: center; padding: 0 14px; border-radius: 8px; font-size: 14px; font-weight: {{nav.profile.fw}}; color: {{nav.profile.fg}}; background: {{nav.profile.bg}}; text-decoration: none;">Profile</a></li>
+      </ul>
+    </nav>
+    <a href="#report" style="order: {{s.btnOrder}}; margin-left: {{s.btnMl}}; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 16px; border-radius: 8px; background: #3659e3; color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+      Record a deed
+    </a>
+  </div>
+</header>
+</sc-if>
+
+<sc-if value="{{f.loggedOut}}" hint-placeholder-val="{{ false }}">
+<header style="border-bottom: 1px solid #e2e8f0; background: #faf8f5;">
+  <div style="max-width: 1152px; margin: 0 auto; box-sizing: border-box; padding: 8px {{s.headPad}}px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+    <a href="#welcome" style="display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; color: #0f172a; text-decoration: none;">
+      <svg aria-hidden="true" viewBox="0 0 32 32" width="32" height="32"><rect width="32" height="32" rx="8" fill="#3659e3"></rect><path fill="#ffffff" d="M16 24.5s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 16 11.7a4.3 4.3 0 0 1 7.5 2.8c0 5.4-7.5 10-7.5 10z"></path></svg>
+      Good Deeds
+    </a>
+    <div style="display: flex; align-items: center; gap: 4px;">
+      <a href="#login" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; font-size: 15px; font-weight: 600; color: #3659e3; text-decoration: none;">Sign in</a>
+      <a href="#signup" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 8px; background: #3659e3; color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none;">Join</a>
+    </div>
+  </div>
+</header>
+</sc-if>
+
+<main style="width: 100%; max-width: {{s.maxW}}px; margin: 0 auto; box-sizing: border-box; padding: {{s.mainPad}}; display: flex; flex-direction: column; gap: 16px;">
+
+  <sc-if value="{{f.backLink}}" hint-placeholder-val="{{ false }}">
+  <button type="button" onClick="{{back}}" style="align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; margin: -6px 0 -6px; padding: 0 8px 0 0; border: 0; background: transparent; color: #3659e3; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;">
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"></path></svg>
+    {{backLabel}}
+  </button>
+  </sc-if>
+
+  <sc-if value="{{f.feedTop}}" hint-placeholder-val="{{ true }}">
+  <div role="tablist" aria-label="Feed" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 12px; background: #e9edf3;">
+    <sc-for list="{{tabs}}" as="t" hint-placeholder-count="3">
+    <button type="button" role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" style="min-height: 44px; border: 0; border-radius: 9px; background: {{t.bg}}; color: {{t.fg}}; box-shadow: {{t.sh}}; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer;">{{t.label}}</button>
+    </sc-for>
+  </div>
+  <p style="margin: 0; font-size: 14px; color: #475569;">{{tabIntro}}</p>
+  </sc-if>
+
+  <sc-if value="{{f.loading}}" hint-placeholder-val="{{ false }}">
+  <div role="status" aria-label="Loading the feed" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+      <div style="display: flex; gap: 12px; align-items: center;"><span style="width: 44px; height: 44px; border-radius: 999px; background: #eef1f5;"></span><span style="flex-grow: 1; display: flex; flex-direction: column; gap: 6px;"><span style="width: 55%; height: 14px; border-radius: 6px; background: #eef1f5;"></span><span style="width: 35%; height: 12px; border-radius: 6px; background: #eef1f5;"></span></span></div>
+      <div style="height: 220px; border-radius: 12px; background: #eef1f5;"></div>
+      <div style="width: 85%; height: 14px; border-radius: 6px; background: #eef1f5;"></div>
+    </div>
+    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+      <div style="display: flex; gap: 12px; align-items: center;"><span style="width: 44px; height: 44px; border-radius: 999px; background: #eef1f5;"></span><span style="flex-grow: 1; display: flex; flex-direction: column; gap: 6px;"><span style="width: 45%; height: 14px; border-radius: 6px; background: #eef1f5;"></span><span style="width: 30%; height: 12px; border-radius: 6px; background: #eef1f5;"></span></span></div>
+      <div style="width: 90%; height: 14px; border-radius: 6px; background: #eef1f5;"></div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{f.empty}}" hint-placeholder-val="{{ false }}">
+  <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 40px 16px; background: #ffffff; border: 1px dashed #cbd5e1; border-radius: 16px;">
+    <span aria-hidden="true" style="width: 56px; height: 56px; border-radius: 999px; background: #eef2fe; color: #3659e3; display: flex; align-items: center; justify-content: center;">
+      <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20a6.5 6.5 0 0 1 13 0"></path><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"></path></svg>
+    </span>
+    <h2 style="margin: 0; font-size: 18px; font-weight: 700;">You’re not following anyone yet</h2>
+    <p style="margin: 0; color: #475569; max-width: 300px;">Follow people from their deeds or profiles to see their good deeds here.</p>
+    <button type="button" onClick="{{toNearby}}" style="min-height: 48px; padding: 0 20px; border-radius: 8px; border: 0; background: #3659e3; color: #ffffff; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">Browse Nearby</button>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{f.detail}}" hint-placeholder-val="{{ false }}">
+  <sc-if value="{{f.visible}}" hint-placeholder-val="{{ true }}">
+  <div style="display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 14px; border-radius: 12px; border: 1px solid #e2e8f0; background: #ffffff; font-size: 14px; color: #334155;">
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#047857" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+    <span style="flex-grow: 1;">You reported this deed. It’s in the public feed.</span>
+    <button type="button" onClick="{{askHide}}" style="flex-shrink: 0; min-height: 44px; padding: 0 12px; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer;">Hide from feed</button>
+  </div>
+  </sc-if>
+  <sc-if value="{{f.hidden}}" hint-placeholder-val="{{ false }}">
+  <div role="status" style="display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 12px; border: 1px solid #cbd5e1; background: #f1f5f9; color: #334155; font-size: 15px;">
+    <div style="display: flex; gap: 10px; align-items: flex-start;">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px;"><path d="M3 3l18 18M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1M6.6 6.6C3.9 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6"></path></svg>
+      <span><strong style="display: block;">Hidden from the feed</strong>Only you and Ahmed can see it. It’s still verified and still counts on Ahmed’s profile. Its share link is turned off.</span>
+    </div>
+    <button type="button" onClick="{{showInFeed}}" style="align-self: flex-start; min-height: 44px; padding: 0 16px; border-radius: 8px; border: 0; background: #3659e3; color: #ffffff; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;">Show in feed</button>
+  </div>
+  </sc-if>
+  </sc-if>
+
+  <sc-if value="{{f.profileTop}}" hint-placeholder-val="{{ false }}">
+  <section style="display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center;">
+    <span aria-hidden="true" style="width: 88px; height: 88px; border-radius: 999px; background: #dfe6fc; color: #2442b8; font-size: 30px; font-weight: 700; display: flex; align-items: center; justify-content: center;">AK</span>
+    <h1 style="margin: 4px 0 0; font-size: {{s.h1}}px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em;">Ahmed Khan</h1>
+    <p style="margin: 0; color: #475569;">@ahmedk · Bangalore</p>
+    <button type="button" aria-pressed="{{prof.following}}" onClick="{{prof.toggle}}" style="margin-top: 6px; min-width: 160px; min-height: 48px; padding: 0 24px; border-radius: 999px; border: 1px solid {{prof.bd}}; background: {{prof.bg}}; color: {{prof.fg}}; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">{{prof.label}}</button>
+  </section>
+  <div role="group" aria-label="Counts" style="display: grid; grid-template-columns: {{s.countCols}}; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px;">
+    <div style="display: flex; flex-direction: column; align-items: center; padding: 14px 8px;"><span style="font-size: 22px; font-weight: 700;">31</span><span style="font-size: 13px; color: #475569;">Verified Deeds</span></div>
+    <div style="display: flex; flex-direction: column; align-items: center; padding: 14px 8px; border-left: 1px solid #e2e8f0;"><span style="font-size: 22px; font-weight: 700;">8</span><span style="font-size: 13px; color: #475569;">Self-log Deeds</span></div>
+    <div style="display: flex; flex-direction: column; align-items: center; padding: 14px 8px; border-left: {{s.countBorder3}}; border-top: {{s.countBorderTop}};"><span style="font-size: 22px; font-weight: 700;">{{prof.followers}}</span><span style="font-size: 13px; color: #475569;">Followers</span></div>
+    <div style="display: flex; flex-direction: column; align-items: center; padding: 14px 8px; border-left: 1px solid #e2e8f0; border-top: {{s.countBorderTop}};"><span style="font-size: 22px; font-weight: 700;">45</span><span style="font-size: 13px; color: #475569;">Following</span></div>
+  </div>
+  <h2 style="margin: 4px 0 0; font-size: 18px; font-weight: 700;">Ahmed’s deeds</h2>
+  </sc-if>
+
+  <sc-if value="{{f.savedTop}}" hint-placeholder-val="{{ false }}">
+  <h1 style="margin: 0; font-size: {{s.h1}}px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em;">Saved</h1>
+  <p style="margin: 0; display: flex; gap: 8px; align-items: center; color: #475569;">
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>
+    Only you can see what you save.
+  </p>
+  </sc-if>
+
+  <sc-if value="{{f.cards}}" hint-placeholder-val="{{ true }}">
+  <div style="display: flex; flex-direction: column; gap: 16px;">
+    <sc-for list="{{cards}}" as="p" hint-placeholder-count="2">
+    <article style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);">
+      <div style="display: flex; gap: 12px; align-items: center; padding: 14px 16px 6px;">
+        <button type="button" onClick="{{p.openProfile}}" aria-label="{{p.doer}}, open profile" style="flex-shrink: 0; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 999px; background: {{p.avBg}}; color: {{p.avFg}}; font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer;">{{p.initials}}</button>
+        <div style="flex-grow: 1; min-width: 0;">
+          <p style="margin: 0; font-size: 16px; font-weight: 700; line-height: 1.3;">{{p.doer}}</p>
+          <p style="margin: 0; font-size: 13px; color: #475569;">recognised by {{p.reporter}}</p>
+        </div>
+        <sc-if value="{{p.showFollow}}" hint-placeholder-val="{{ true }}">
+        <button type="button" aria-pressed="{{p.following}}" onClick="{{p.follow}}" style="flex-shrink: 0; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid {{p.fBd}}; background: {{p.fBg}}; color: {{p.fFg}}; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer;">{{p.followLabel}}</button>
+        </sc-if>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 0 16px 10px 72px; font-size: 13px; color: #475569;">
+        <span style="font-weight: 600; color: #2442b8;">{{p.cat}}</span>
+        <span aria-hidden="true">·</span>
+        <span>{{p.area}}</span>
+        <span aria-hidden="true">·</span>
+        <span>{{p.when}}</span>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 12px;">
+        <span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 999px; border: 1px solid #a7f3d0; background: #ecfdf5; color: #047857; font-size: 12px; font-weight: 600;">
+          <svg aria-hidden="true" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+          Verified by a witness
+        </span>
+        <sc-if value="{{p.hasRank}}" hint-placeholder-val="{{ false }}">
+        <span style="display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 999px; background: #fef3c7; color: #92400e; font-size: 12px; font-weight: 700;">{{p.rank}}</span>
+        </sc-if>
+      </div>
+      <sc-if value="{{p.hasPhotos}}" hint-placeholder-val="{{ true }}">
+      <div style="position: relative; height: {{s.photoH}}px; background: {{p.photoBg}}; color: #334155; display: flex; align-items: center; justify-content: center;">
+        <svg role="img" aria-label="Photo 1 of {{p.photoCount}}" viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M21 16l-5-5-9 9"></path></svg>
+        <sc-if value="{{p.multi}}" hint-placeholder-val="{{ false }}">
+        <span style="position: absolute; top: 10px; right: 10px; padding: 2px 10px; border-radius: 999px; background: rgba(15, 23, 42, 0.72); color: #ffffff; font-size: 12px; font-weight: 600;">1 / {{p.photoCount}}</span>
+        <span aria-hidden="true" style="position: absolute; bottom: 10px; left: 0; right: 0; display: flex; justify-content: center; gap: 6px;">
+          <sc-for list="{{p.dots}}" as="d" hint-placeholder-count="2">
+          <span style="width: 7px; height: 7px; border-radius: 999px; background: {{d.bg}};"></span>
+          </sc-for>
+        </span>
+        </sc-if>
+      </div>
+      </sc-if>
+      <p style="margin: 0; padding: 12px 16px 4px; font-size: 15px; color: #1e293b;">{{p.desc}}</p>
+      <div role="group" aria-label="Actions" style="display: flex; align-items: center; gap: 2px; padding: 2px 8px 8px;">
+        <button type="button" aria-pressed="{{p.liked}}" aria-label="Like. {{p.likes}} likes" onClick="{{p.like}}" style="display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: #334155; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;">
+          <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="{{p.heartFill}}" stroke="{{p.heartStroke}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.5s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.7a4.3 4.3 0 0 1 7.5 2.8c0 5.4-7.5 10-7.5 10z"></path></svg>
+          {{p.likes}}
+        </button>
+        <button type="button" aria-label="Comments. {{p.comments}} comments" onClick="{{p.open}}" style="display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: #334155; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;">
+          <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"></path></svg>
+          {{p.comments}}
+        </button>
+        <button type="button" onClick="{{p.share}}" style="display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: #334155; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;">
+          <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 9l5-5 5 5M5 14v5h14v-5"></path></svg>
+          Share
+        </button>
+        <span style="flex-grow: 1;"></span>
+        <button type="button" aria-pressed="{{p.saved}}" aria-label="{{p.saveLabel}}" onClick="{{p.save}}" style="display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: {{p.bmColor}}; cursor: pointer;">
+          <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="{{p.bmFill}}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h12v17l-6-4-6 4z"></path></svg>
+        </button>
+      </div>
+    </article>
+    </sc-for>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{f.feedEnd}}" hint-placeholder-val="{{ true }}">
+  <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding: 20px 8px 8px;">
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#047857" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.8 2.8L16 10"></path></svg>
+    <p style="margin: 0; font-weight: 600;">You’re all caught up</p>
+    <p style="margin: 0; font-size: 15px; color: #475569;">Saw something good today? Recognise the person while you’re both there.</p>
+    <a href="#report" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff; color: #1e293b; font-weight: 600; text-decoration: none;">Record a deed</a>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{f.detail}}" hint-placeholder-val="{{ false }}">
+  <p style="margin: -4px 0 0; font-size: 14px; color: #475569;">Helped 1 person · Checked by QR code and location</p>
+  <section aria-labelledby="cmt-h" style="display: flex; flex-direction: column; gap: 14px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px;">
+    <h2 id="cmt-h" style="margin: 0; font-size: 17px; font-weight: 700;">Comments ({{commentCount}})</h2>
+    <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 14px;">
+      <sc-for list="{{comments}}" as="c" hint-placeholder-count="5">
+      <li style="display: flex; gap: 10px; align-items: flex-start;">
+        <span aria-hidden="true" style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 999px; background: {{c.avBg}}; color: {{c.avFg}}; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center;">{{c.initials}}</span>
+        <div style="flex-grow: 1; min-width: 0;">
+          <p style="margin: 0; font-size: 14px;"><strong>{{c.name}}</strong> <span style="color: #586579;">· {{c.when}}</span></p>
+          <p style="margin: 2px 0 0; font-size: 15px; color: #1e293b;">{{c.text}}</p>
+        </div>
+        <button type="button" aria-label="Delete comment by {{c.name}}" onClick="{{c.del}}" style="flex-shrink: 0; min-height: 44px; padding: 0 8px; border: 0; background: transparent; color: #b91c1c; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;">Delete</button>
+      </li>
+      </sc-for>
+    </ul>
+    <p style="margin: 0; font-size: 13px; color: #586579;">You see Delete on every comment because you reported this deed. Ahmed sees it too.</p>
+    <div style="display: flex; flex-direction: column; gap: 6px; border-top: 1px solid #e2e8f0; padding-top: 14px;">
+      <div style="display: flex; gap: 8px; align-items: flex-end;">
+        <span aria-hidden="true" style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 999px; background: #dfe6fc; color: #2442b8; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center;">PS</span>
+        <textarea rows="2" aria-label="Add a comment" placeholder="Add a kind comment…" value="{{draft}}" onChange="{{onDraft}}" maxLength="300" aria-invalid="{{f.cmtError}}" aria-describedby="cmt-help" style="flex-grow: 1; min-width: 0; box-sizing: border-box; min-height: 48px; padding: 10px 12px; border-radius: 10px; border: {{s.cmtBd}}; background: #ffffff; color: #0f172a; font-family: inherit; font-size: 15px; line-height: 1.4; resize: vertical;"></textarea>
+        <button type="button" onClick="{{postComment}}" style="flex-shrink: 0; min-height: 48px; padding: 0 16px; border-radius: 10px; border: 0; background: #3659e3; color: #ffffff; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;">Post</button>
+      </div>
+      <sc-if value="{{f.cmtError}}" hint-placeholder-val="{{ false }}">
+      <p role="alert" style="margin: 0 0 0 44px; font-size: 14px; font-weight: 600; color: #b91c1c;">Please keep it kind. Your comment includes a word we don’t allow. Try rewording it.</p>
+      </sc-if>
+      <div style="display: flex; justify-content: space-between; gap: 8px; margin-left: 44px; font-size: 13px; color: #586579;">
+        <span id="cmt-help">Be kind. Comments are public.</span>
+        <span style="font-weight: 600;">{{draftLen}} / 300</span>
+      </div>
+    </div>
+  </section>
+  </sc-if>
+
+  <sc-if value="{{f.followers}}" hint-placeholder-val="{{ false }}">
+  <h1 style="margin: 0; font-size: {{s.h1}}px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em;">Priya Sharma</h1>
+  <div role="tablist" aria-label="Connections" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 12px; background: #e9edf3;">
+    <sc-for list="{{ftabs}}" as="t" hint-placeholder-count="2">
+    <button type="button" role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" style="min-height: 44px; border: 0; border-radius: 9px; background: {{t.bg}}; color: {{t.fg}}; box-shadow: {{t.sh}}; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;">{{t.label}}</button>
+    </sc-for>
+  </div>
+  <ul style="margin: 0; padding: 0; list-style: none; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;">
+    <sc-for list="{{people}}" as="u" hint-placeholder-count="5">
+    <li style="display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-top: {{u.border}};">
+      <span aria-hidden="true" style="flex-shrink: 0; width: 40px; height: 40px; border-radius: 999px; background: {{u.avBg}}; color: {{u.avFg}}; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center;">{{u.initials}}</span>
+      <span style="flex-grow: 1; min-width: 0;"><span style="display: block; font-weight: 600;">{{u.name}}</span><span style="display: block; font-size: 14px; color: #586579;">{{u.handle}}</span></span>
+      <button type="button" onClick="{{u.act}}" aria-label="{{u.actLabel}}" style="flex-shrink: 0; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid {{u.bd}}; background: {{u.bg}}; color: {{u.fg}}; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer;">{{u.btn}}</button>
+    </li>
+    </sc-for>
+  </ul>
+  <p style="margin: 0; font-size: 14px; color: #586579;">Removing a follower is quiet: they aren’t told, and they can follow you again later.</p>
+  </sc-if>
+
+  <sc-if value="{{f.public}}" hint-placeholder-val="{{ false }}">
+  <article style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;">
+    <div style="display: flex; gap: 12px; align-items: center; padding: 14px 16px 6px;">
+      <span aria-hidden="true" style="flex-shrink: 0; width: 44px; height: 44px; border-radius: 999px; background: #dfe6fc; color: #2442b8; font-size: 15px; font-weight: 700; display: flex; align-items: center; justify-content: center;">AK</span>
+      <div style="flex-grow: 1; min-width: 0;">
+        <p style="margin: 0; font-size: 16px; font-weight: 700; line-height: 1.3;">Ahmed Khan</p>
+        <p style="margin: 0; font-size: 13px; color: #475569;">recognised by Priya Sharma</p>
+      </div>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 0 16px 10px 72px; font-size: 13px; color: #475569;">
+      <span style="font-weight: 600; color: #2442b8;">Helping an elderly person</span><span aria-hidden="true">·</span><span>Koramangala</span><span aria-hidden="true">·</span><span>16 Nov</span>
+    </div>
+    <div style="padding: 0 16px 12px;">
+      <span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 999px; border: 1px solid #a7f3d0; background: #ecfdf5; color: #047857; font-size: 12px; font-weight: 600;">
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+        Verified by a witness
+      </span>
+    </div>
+    <div style="position: relative; height: {{s.photoH}}px; background: #dbeafe; color: #334155; display: flex; align-items: center; justify-content: center;">
+      <svg role="img" aria-label="Photo 1 of 2" viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M21 16l-5-5-9 9"></path></svg>
+      <span style="position: absolute; top: 10px; right: 10px; padding: 2px 10px; border-radius: 999px; background: rgba(15, 23, 42, 0.72); color: #ffffff; font-size: 12px; font-weight: 600;">1 / 2</span>
+    </div>
+    <p style="margin: 0; padding: 12px 16px 4px; font-size: 15px; color: #1e293b;">Helped an elderly man cross the busy junction at Silk Board and carried his bags to the bus stop.</p>
+    <p style="margin: 0; padding: 4px 16px 14px; font-size: 14px; color: #475569;">24 likes · 5 comments</p>
+  </article>
+  <section aria-labelledby="join-h" style="display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 16px; background: #eef2fe;">
+    <h2 id="join-h" style="margin: 0; font-size: 18px; font-weight: 700; color: #0f172a;">See more good deeds like this</h2>
+    <p style="margin: 0; color: #334155;">Join Good Deeds to like, comment, follow Ahmed and explore other people’s deeds.</p>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 4px;">
+      <a href="#signup" style="display: flex; align-items: center; justify-content: center; min-height: 48px; border-radius: 8px; background: #3659e3; color: #ffffff; font-weight: 600; text-decoration: none;">Join Good Deeds</a>
+      <a href="#login" style="display: flex; align-items: center; justify-content: center; min-height: 48px; border-radius: 8px; border: 1px solid #c7d2fe; background: #ffffff; color: #1e293b; font-weight: 600; text-decoration: none;">Sign in</a>
+    </div>
+  </section>
+  <p style="margin: 0; font-size: 14px; color: #586579;">Good Deeds only shows deeds confirmed in person by someone who saw them. Exact locations and contact details are never shown.</p>
+  </sc-if>
+
+  <sc-if value="{{f.unavailable}}" hint-placeholder-val="{{ false }}">
+  <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 48px 8px;">
+    <span aria-hidden="true" style="width: 60px; height: 60px; border-radius: 999px; background: #f1f5f9; color: #475569; display: flex; align-items: center; justify-content: center;">
+      <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1M6.6 6.6C3.9 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6"></path></svg>
+    </span>
+    <h1 style="margin: 0; font-size: 24px; font-weight: 700;">This deed isn’t available</h1>
+    <p style="margin: 0; color: #475569; max-width: 320px;">It may have been hidden or removed by the people involved.</p>
+    <a href="#signup" style="display: inline-flex; align-items: center; min-height: 48px; padding: 0 22px; border-radius: 8px; background: #3659e3; color: #ffffff; font-weight: 600; text-decoration: none;">Discover Good Deeds</a>
+  </div>
+  </sc-if>
+</main>
+
+<sc-if value="{{f.sheet}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; background: rgba(15, 23, 42, 0.5);"></div>
+<div role="dialog" aria-modal="true" aria-labelledby="share-h" style="position: absolute; left: {{s.sheetLeft}}; top: {{s.sheetTop}}px; transform: {{s.sheetTx}}; width: {{s.sheetW}}; box-sizing: border-box; background: #ffffff; border-radius: {{s.sheetRadius}}; padding: 12px 16px 20px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 -8px 32px rgba(15, 23, 42, 0.25);">
+  <span aria-hidden="true" style="align-self: center; width: 40px; height: 4px; border-radius: 999px; background: #cbd5e1;"></span>
+  <h2 id="share-h" style="margin: 4px 0 0; font-size: 18px; font-weight: 700;">Share this deed</h2>
+  <p style="margin: 0; font-size: 14px; color: #475569;">Ahmed Khan · Helping an elderly person</p>
+  <div style="display: flex; flex-direction: column; gap: 4px;">
+    <button type="button" onClick="{{closeSheet}}" style="display: flex; align-items: center; gap: 14px; min-height: 52px; padding: 0 8px; border: 0; border-radius: 10px; background: transparent; color: #0f172a; font-family: inherit; font-size: 16px; font-weight: 600; text-align: left; cursor: pointer;">
+      <span aria-hidden="true" style="width: 40px; height: 40px; border-radius: 999px; background: #dcfce7; color: #166534; display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 0 1-11.8 7L4 20l1.1-4.1A8 8 0 1 1 20 12z"></path></svg></span>
+      WhatsApp
+    </button>
+    <button type="button" onClick="{{closeSheet}}" style="display: flex; align-items: center; gap: 14px; min-height: 52px; padding: 0 8px; border: 0; border-radius: 10px; background: transparent; color: #0f172a; font-family: inherit; font-size: 16px; font-weight: 600; text-align: left; cursor: pointer;">
+      <span aria-hidden="true" style="width: 40px; height: 40px; border-radius: 999px; background: #eef2fe; color: #2442b8; display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"></path></svg></span>
+      Copy link
+    </button>
+    <button type="button" onClick="{{closeSheet}}" style="display: flex; align-items: center; gap: 14px; min-height: 52px; padding: 0 8px; border: 0; border-radius: 10px; background: transparent; color: #0f172a; font-family: inherit; font-size: 16px; font-weight: 600; text-align: left; cursor: pointer;">
+      <span aria-hidden="true" style="width: 40px; height: 40px; border-radius: 999px; background: #f1f5f9; color: #334155; display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 12h.01M12 12h.01M18 12h.01"></path></svg></span>
+      More options (Instagram and other apps)
+    </button>
+  </div>
+  <p style="margin: 0; padding: 10px 12px; border-radius: 10px; background: #f8fafc; font-size: 14px; color: #475569;">Anyone with the link can see this one deed, but not your profile or other deeds. If the deed is hidden, the link stops working.</p>
+  <button type="button" onClick="{{closeSheet}}" style="min-height: 48px; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">Cancel</button>
+</div>
+</sc-if>
+
+<sc-if value="{{f.dialog}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; background: rgba(15, 23, 42, 0.5);"></div>
+<div role="dialog" aria-modal="true" aria-labelledby="dlg-h" style="position: absolute; left: 50%; top: {{s.dialogTop}}px; transform: translateX(-50%); width: {{s.dialogW}}px; box-sizing: border-box; background: #ffffff; border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 20px 48px rgba(15, 23, 42, 0.3);">
+  <h2 id="dlg-h" style="margin: 0; font-size: 20px; font-weight: 700;">{{dlg.title}}</h2>
+  <p style="margin: 0; color: #334155;">{{dlg.body}}</p>
+  <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;">
+    <button type="button" onClick="{{dlg.confirm}}" style="width: 100%; min-height: 48px; border-radius: 8px; border: 0; background: {{dlg.yesBg}}; color: #ffffff; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">{{dlg.yes}}</button>
+    <button type="button" onClick="{{dlg.cancel}}" style="width: 100%; min-height: 48px; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">Cancel</button>
+  </div>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"device":{"editor":"enum","options":["mobile","desktop"],"default":"mobile"},"screen":{"editor":"enum","options":["live","feed-nearby","feed-following","feed-top","feed-loading","feed-empty","share-sheet","detail","comment-error","comment-delete","hide-confirm","hidden","public","public-unavailable","profile-other","followers","saved"],"default":"live"},"$preview":{"width":390,"height":1650}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      ui: 'feed', tab: 'nearby', ftab: 'followers', sheet: false, dlg: null, delIdx: -1, hidden: false, draft: '',
+      liked: { ahmed: false, kavya: true, imran: false, sneha: false, ahmed2: false },
+      saved: { ahmed: false, kavya: true, imran: false, sneha: true, ahmed2: false },
+      follow: { ahmed: false, kavya: true, imran: false, sneha: true },
+      comments: null, removed: {}, unfollowed: {}
+    };
+  }
+  live() {
+    return (this.props.screen ?? 'live') === 'live';
+  }
+  go(patch) {
+    if (this.live()) this.setState(patch);
+  }
+  posts() {
+    return {
+      ahmed: { id: 'ahmed', person: 'ahmed', initials: 'AK', avBg: '#dfe6fc', avFg: '#2442b8', doer: 'Ahmed Khan', reporter: 'you', cat: 'Helping an elderly person', area: 'Koramangala', when: '2 h ago', photos: ['#dbeafe', '#fde68a'], desc: 'Helped an elderly man cross the busy junction at Silk Board and carried his bags to the bus stop.', likes: 24, comments: 5 },
+      sneha: { id: 'sneha', person: 'sneha', initials: 'SR', avBg: '#e0e7ff', avFg: '#3730a3', doer: 'Sneha Rao', reporter: 'Arjun Mehta', cat: 'Environment & cleanliness', area: 'Indiranagar', when: '3 h ago', photos: ['#d1fae5', '#dbeafe', '#fde68a'], desc: 'Organised a weekend clean-up of the Ulsoor lake shore with 20 neighbours.', likes: 33, comments: 6 },
+      kavya: { id: 'kavya', person: 'kavya', initials: 'KN', avBg: '#fde68a', avFg: '#78350f', doer: 'Kavya Nair', reporter: 'Rohan Das', cat: 'Road & traffic help', area: 'HSR Layout', when: '5 h ago', photos: ['#d1fae5'], desc: 'Guided traffic around a broken-down bus on Hosur Road until the police arrived.', likes: 41, comments: 8 },
+      imran: { id: 'imran', person: 'imran', initials: 'IS', avBg: '#fce7f3', avFg: '#831843', doer: 'Imran Sheikh', reporter: 'Meera Iyer', cat: 'Animals', area: 'Jayanagar', when: 'Yesterday', photos: [], desc: 'Rescued a kitten stuck in a storm drain and took it to the animal shelter.', likes: 17, comments: 2 },
+      ahmed2: { id: 'ahmed2', person: 'ahmed', initials: 'AK', avBg: '#dfe6fc', avFg: '#2442b8', doer: 'Ahmed Khan', reporter: 'Sneha Rao', cat: 'Community help', area: 'Koramangala', when: '12 Nov', photos: [], desc: 'Set up chairs and water for the Koramangala blood donation camp.', likes: 12, comments: 1 }
+    };
+  }
+  baseComments() {
+    return [
+      { initials: 'RV', avBg: '#d1fae5', avFg: '#065f46', name: 'Rahul Verma', when: '1 h', text: 'This is so kind. Silk Board traffic is no joke.' },
+      { initials: 'SR', avBg: '#e0e7ff', avFg: '#3730a3', name: 'Sneha Rao', when: '58 min', text: 'Faith in humanity restored. Thank you, Ahmed.' },
+      { initials: 'KN', avBg: '#fde68a', avFg: '#78350f', name: 'Kavya Nair', when: '40 min', text: 'We need more people like this in Bangalore.' },
+      { initials: 'IS', avBg: '#fce7f3', avFg: '#831843', name: 'Imran Sheikh', when: '22 min', text: 'I saw this too. It was lovely to watch.' },
+      { initials: 'PS', avBg: '#dfe6fc', avFg: '#2442b8', name: 'Priya Sharma (you)', when: '10 min', text: 'Thank you for stopping to help, Ahmed.' }
+    ];
+  }
+  seg(on) {
+    return { on: on, bg: on ? '#ffffff' : 'transparent', fg: on ? '#0f172a' : '#475569', sh: on ? '0 1px 3px rgba(15, 23, 42, 0.12)' : 'none' };
+  }
+  pillBtn(on, onLabel, offLabel) {
+    return on
+      ? { label: onLabel, bd: '#cbd5e1', bg: '#ffffff', fg: '#1e293b' }
+      : { label: offLabel, bd: '#3659e3', bg: '#3659e3', fg: '#ffffff' };
+  }
+  card(p, liked, saved, following, rank) {
+    const baseLiked = p.id === 'kavya';
+    const likes = p.likes + (liked && !baseLiked ? 1 : 0) - (!liked && baseLiked ? 1 : 0);
+    const fb = this.pillBtn(following, 'Following', 'Follow');
+    const dots = p.photos.map((c, i) => ({ bg: i === 0 ? '#ffffff' : 'rgba(255, 255, 255, 0.55)' }));
+    return {
+      initials: p.initials, avBg: p.avBg, avFg: p.avFg, doer: p.doer, reporter: p.reporter, cat: p.cat, area: p.area, when: p.when, desc: p.desc,
+      hasPhotos: p.photos.length > 0, photoBg: p.photos[0] || '#e2e8f0', photoCount: p.photos.length, multi: p.photos.length > 1, dots: dots,
+      likes: likes, liked: liked, heartFill: liked ? '#e11d48' : 'none', heartStroke: liked ? '#e11d48' : '#334155',
+      comments: p.id === 'ahmed' ? this.commentList().length : p.comments,
+      saved: saved, saveLabel: saved ? 'Saved. Tap to unsave' : 'Save', bmFill: saved ? '#3659e3' : 'none', bmColor: saved ? '#3659e3' : '#334155',
+      showFollow: p.reporter !== 'you' || p.person === 'ahmed', following: following, followLabel: fb.label, fBd: fb.bd, fBg: fb.bg, fFg: fb.fg,
+      hasRank: !!rank, rank: rank || '',
+      like: () => { if (this.live()) { const l = Object.assign({}, this.state.liked); l[p.id] = !l[p.id]; this.setState({ liked: l }); } },
+      save: () => { if (this.live()) { const s = Object.assign({}, this.state.saved); s[p.id] = !s[p.id]; this.setState({ saved: s }); } },
+      follow: () => { if (this.live()) { const f = Object.assign({}, this.state.follow); f[p.person] = !f[p.person]; this.setState({ follow: f }); } },
+      share: () => this.go({ sheet: true }),
+      open: () => { if (p.id === 'ahmed') this.go({ ui: 'detail', sheet: false }); },
+      openProfile: () => { if (p.person === 'ahmed') this.go({ ui: 'profile', sheet: false }); }
+    };
+  }
+  commentList() {
+    const st = this.state;
+    if (!this.live()) return this.baseComments();
+    return st.comments || this.baseComments();
+  }
+  renderVals() {
+    const desktop = (this.props.device ?? 'mobile') === 'desktop';
+    const live = this.live();
+    const st = this.state;
+    const P = this.posts();
+    let screen = this.props.screen ?? 'live';
+    if (live) {
+      if (st.ui === 'feed') screen = st.sheet ? 'share-sheet' : 'feed-' + st.tab;
+      else if (st.ui === 'detail') screen = st.dlg === 'hide' ? 'hide-confirm' : (st.dlg === 'delete' ? 'comment-delete' : (st.hidden ? 'hidden' : 'detail'));
+      else if (st.ui === 'profile') screen = 'profile-other';
+      else screen = st.ui;
+    }
+    const liked = live ? st.liked : { ahmed: false, kavya: true, imran: false, sneha: false, ahmed2: false };
+    const saved = live ? st.saved : { ahmed: false, kavya: true, imran: false, sneha: true, ahmed2: false };
+    const follow = live ? st.follow : { ahmed: false, kavya: true, imran: false, sneha: true };
+    const hiddenNow = screen === 'hidden';
+    const mk = (id, rank) => this.card(P[id], !!liked[id], !!saved[id], !!follow[P[id].person], rank);
+
+    const isFeed = screen.indexOf('feed-') === 0 || screen === 'share-sheet';
+    let tab = 'nearby';
+    if (screen === 'feed-following' || screen === 'feed-empty') tab = 'following';
+    if (screen === 'feed-top') tab = 'top';
+    if (live && st.ui === 'feed') tab = st.tab;
+    const isDetail = ['detail', 'comment-error', 'comment-delete', 'hide-confirm', 'hidden'].indexOf(screen) >= 0;
+
+    let cards = [];
+    let empty = screen === 'feed-empty';
+    if (isFeed && screen !== 'feed-loading' && screen !== 'feed-empty') {
+      if (tab === 'nearby') cards = ['ahmed', 'kavya', 'imran'].filter((id) => !(live && st.hidden && id === 'ahmed')).map((id) => mk(id));
+      if (tab === 'top') cards = [mk('kavya', '#1 this week'), mk('ahmed', '#2 this week'), mk('imran', '#3 this week')];
+      if (tab === 'following') {
+        cards = ['ahmed', 'sneha', 'kavya', 'imran'].filter((id) => follow[P[id].person]).map((id) => mk(id));
+        if (live && cards.length === 0) empty = true;
+      }
+    }
+    if (isDetail) cards = [mk('ahmed')];
+    if (screen === 'profile-other') cards = [mk('ahmed'), mk('ahmed2')];
+    if (screen === 'saved') cards = ['ahmed', 'sneha', 'kavya', 'imran'].filter((id) => saved[id]).map((id) => mk(id));
+
+    const cl = this.commentList();
+    const comments = cl.map((c, i) => Object.assign({}, c, { del: () => this.go({ dlg: 'delete', delIdx: i }) }));
+    const draft = live ? st.draft : (screen === 'comment-error' ? 'This is stupid, people should just wait for the signal.' : '');
+    const cmtError = screen === 'comment-error' || (live && /stupid|idiot/i.test(st.draft));
+
+    const dlgHide = screen === 'hide-confirm';
+    const dlgDelete = screen === 'comment-delete';
+    const dlg = dlgHide
+      ? { title: 'Hide this deed from the feed?', body: 'It stays verified and still counts on Ahmed’s profile and for points. Its share link stops working. You or Ahmed can show it again at any time.', yes: 'Hide from feed', yesBg: '#1e293b', confirm: () => this.go({ dlg: null, hidden: true }), cancel: () => this.go({ dlg: null }) }
+      : { title: 'Delete this comment?', body: 'It’s removed for everyone. As the reporter of this deed, you can delete any comment on it.', yes: 'Delete comment', yesBg: '#b91c1c', confirm: () => { if (this.live()) { const c = this.commentList().slice(); c.splice(this.state.delIdx >= 0 ? this.state.delIdx : 3, 1); this.setState({ comments: c, dlg: null }); } }, cancel: () => this.go({ dlg: null }) };
+
+    const ftab = live ? st.ftab : 'followers';
+    const followersBase = [
+      { id: 'rv', initials: 'RV', avBg: '#d1fae5', avFg: '#065f46', name: 'Rahul Verma', handle: '@rahulv' },
+      { id: 'sr', initials: 'SR', avBg: '#e0e7ff', avFg: '#3730a3', name: 'Sneha Rao', handle: '@snehar' },
+      { id: 'kn', initials: 'KN', avBg: '#fde68a', avFg: '#78350f', name: 'Kavya Nair', handle: '@kavyan' },
+      { id: 'mi', initials: 'MI', avBg: '#fce7f3', avFg: '#831843', name: 'Meera Iyer', handle: '@meerai' },
+      { id: 'rd', initials: 'RD', avBg: '#f1f5f9', avFg: '#334155', name: 'Rohan Das', handle: '@rohand' }
+    ];
+    const followingBase = [
+      { id: 'kn', initials: 'KN', avBg: '#fde68a', avFg: '#78350f', name: 'Kavya Nair', handle: '@kavyan' },
+      { id: 'sr', initials: 'SR', avBg: '#e0e7ff', avFg: '#3730a3', name: 'Sneha Rao', handle: '@snehar' },
+      { id: 'am', initials: 'AM', avBg: '#d1fae5', avFg: '#065f46', name: 'Arjun Mehta', handle: '@arjunm' }
+    ];
+    const removed = live ? st.removed : {};
+    const unf = live ? st.unfollowed : {};
+    const followersShown = followersBase.filter((u) => !removed[u.id]);
+    let people;
+    if (ftab === 'followers') {
+      people = followersShown.map((u, i) => Object.assign({}, u, { border: i === 0 ? '0' : '1px solid #e2e8f0', btn: 'Remove', actLabel: 'Remove ' + u.name + ' as a follower', bd: '#e2e8f0', bg: '#ffffff', fg: '#1e293b', act: () => { if (this.live()) { const r = Object.assign({}, this.state.removed); r[u.id] = true; this.setState({ removed: r }); } } }));
+    } else {
+      people = followingBase.map((u, i) => {
+        const on = !unf[u.id];
+        const b = this.pillBtn(on, 'Following', 'Follow');
+        return Object.assign({}, u, { border: i === 0 ? '0' : '1px solid #e2e8f0', btn: b.label, actLabel: (on ? 'Unfollow ' : 'Follow ') + u.name, bd: b.bd, bg: b.bg, fg: b.fg, act: () => { if (this.live()) { const x = Object.assign({}, this.state.unfollowed); x[u.id] = !x[u.id]; this.setState({ unfollowed: x }); } } });
+      });
+    }
+    const ftabs = [
+      Object.assign({ label: 'Followers · ' + (86 - (5 - followersShown.length)), pick: () => this.go({ ftab: 'followers' }) }, this.seg(ftab === 'followers')),
+      Object.assign({ label: 'Following · 40', pick: () => this.go({ ftab: 'following' }) }, this.seg(ftab === 'following'))
+    ];
+
+    const tabs = [
+      Object.assign({ label: 'Nearby', pick: () => this.go({ ui: 'feed', tab: 'nearby' }) }, this.seg(tab === 'nearby')),
+      Object.assign({ label: 'Following', pick: () => this.go({ ui: 'feed', tab: 'following' }) }, this.seg(tab === 'following')),
+      Object.assign({ label: 'Top this week', pick: () => this.go({ ui: 'feed', tab: 'top' }) }, this.seg(tab === 'top'))
+    ];
+    const intros = { nearby: 'Good deeds verified around Bangalore, newest first.', following: 'Deeds by people you follow.', top: 'The most appreciated deeds of the last 7 days.' };
+
+    const pf = !!follow.ahmed;
+    const pb = this.pillBtn(pf, 'Following', 'Follow');
+    const prof = { following: pf, label: pb.label, bd: pb.bd, bg: pb.bg, fg: pb.fg, followers: 120 + (pf ? 1 : 0), toggle: () => { if (this.live()) { const f = Object.assign({}, this.state.follow); f.ahmed = !f.ahmed; this.setState({ follow: f }); } } };
+
+    const isPublic = screen === 'public' || screen === 'public-unavailable';
+    const backMap = { 'detail': 'Feed', 'comment-error': 'Feed', 'comment-delete': 'Feed', 'hide-confirm': 'Feed', 'hidden': 'Feed', 'profile-other': 'Feed', 'followers': 'Profile', 'saved': 'Profile' };
+    const navOn = { bg: '#eef2fe', fg: '#3659e3', fw: 600, cur: 'page' };
+    const navOff = { bg: 'transparent', fg: '#475569', fw: 500, cur: 'false' };
+    const onProfile = screen === 'followers' || screen === 'saved';
+
+    const hMobile = { 'feed-nearby': 1650, 'feed-following': 1300, 'feed-top': 1650, 'feed-loading': 844, 'feed-empty': 844, 'share-sheet': 1650, 'public': 1150, 'public-unavailable': 844, 'profile-other': 1300, 'followers': 900, 'saved': 1250 };
+    const hDesk = { 'feed-nearby': 1500, 'public': 1150, 'profile-other': 1300 };
+    let h = desktop ? (isDetail ? 1450 : (hDesk[screen] || 1500)) : (isDetail ? 1500 : (hMobile[screen] || 1650));
+    if (live) h = 1650;
+
+    return {
+      cards: cards,
+      tabs: tabs,
+      tabIntro: intros[tab],
+      ftabs: ftabs,
+      people: people,
+      comments: comments,
+      commentCount: cl.length,
+      draft: draft,
+      draftLen: draft.length,
+      dlg: dlg,
+      prof: prof,
+      backLabel: backMap[screen] || 'Back',
+      nav: { home: isFeed || isDetail || screen === 'profile-other' ? navOn : navOff, profile: onProfile ? navOn : navOff },
+      f: {
+        loggedIn: !isPublic,
+        loggedOut: isPublic,
+        backLink: !!backMap[screen],
+        feedTop: isFeed,
+        loading: screen === 'feed-loading',
+        empty: empty,
+        cards: cards.length > 0,
+        feedEnd: isFeed && cards.length > 0,
+        detail: isDetail,
+        visible: isDetail && !hiddenNow && !(live && st.hidden),
+        hidden: hiddenNow || (live && st.ui === 'detail' && st.hidden),
+        profileTop: screen === 'profile-other',
+        savedTop: screen === 'saved',
+        followers: screen === 'followers',
+        public: screen === 'public',
+        unavailable: screen === 'public-unavailable',
+        sheet: screen === 'share-sheet',
+        dialog: dlgHide || dlgDelete,
+        cmtError: cmtError
+      },
+      s: {
+        w: desktop ? 1440 : 390,
+        h: h,
+        headPad: desktop ? 24 : 16,
+        navOrder: desktop ? 2 : 3,
+        navW: desktop ? 'auto' : '100%',
+        navMl: desktop ? 'auto' : '0',
+        navCol: desktop ? 'auto' : '1fr',
+        btnOrder: desktop ? 3 : 2,
+        btnMl: desktop ? '0' : 'auto',
+        maxW: desktop ? 640 : 390,
+        mainPad: desktop ? '32px 24px 56px' : '16px 16px 40px',
+        h1: desktop ? 30 : 26,
+        photoH: desktop ? 360 : 260,
+        countCols: desktop ? 'repeat(4, minmax(0, 1fr))' : 'repeat(2, minmax(0, 1fr))',
+        countBorder3: desktop ? '1px solid #e2e8f0' : '0',
+        countBorderTop: desktop ? '0' : '1px solid #e2e8f0',
+        cmtBd: cmtError ? '2px solid #b91c1c' : '1px solid #cbd5e1',
+        sheetLeft: desktop ? '50%' : '0',
+        sheetTx: desktop ? 'translateX(-50%)' : 'none',
+        sheetW: desktop ? '440px' : '100%',
+        sheetTop: desktop ? 220 : 470,
+        sheetRadius: desktop ? '16px' : '20px 20px 0 0',
+        dialogTop: desktop ? 300 : 320,
+        dialogW: desktop ? 440 : 350
+      },
+      toFeed: () => this.go({ ui: 'feed', sheet: false }),
+      toNearby: () => this.go({ ui: 'feed', tab: 'nearby' }),
+      toSaved: () => this.go({ ui: 'saved', sheet: false }),
+      back: () => this.go({ ui: screen === 'followers' ? 'saved' : 'feed', dlg: null }),
+      closeSheet: () => this.go({ sheet: false }),
+      askHide: () => this.go({ dlg: 'hide' }),
+      showInFeed: () => this.go({ hidden: false }),
+      onDraft: (e) => { if (this.live()) this.setState({ draft: e.target.value }); },
+      postComment: () => {
+        if (!this.live()) return;
+        const d = this.state.draft.trim();
+        if (!d || /stupid|idiot/i.test(d)) return;
+        const c = this.commentList().slice();
+        c.push({ initials: 'PS', avBg: '#dfe6fc', avFg: '#2442b8', name: 'Priya Sharma (you)', when: 'Just now', text: d });
+        this.setState({ comments: c, draft: '' });
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Photos, consent and photo reports</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div style="position: relative; width: {{s.w}}px; min-height: {{s.h}}px; box-sizing: border-box; display: flex; flex-direction: column; background: #faf8f5; color: #0f172a; font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 16px; line-height: 1.5;">
+
+<sc-if value="{{f.protoBar}}" hint-placeholder-val="{{ true }}">
+<div style="padding: 8px 12px; background: #fff7ed; border-bottom: 1px dashed #fdba74; display: flex; flex-direction: column; gap: 6px;">
+  <span style="font-size: 12px; font-weight: 600; color: #9a3412;">Prototype only · view as</span>
+  <div role="tablist" aria-label="View as" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 3px; border-radius: 10px; background: #fde7cf;">
+    <sc-for list="{{personas}}" as="t" hint-placeholder-count="3">
+    <button type="button" role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" style="min-height: 40px; border: 0; border-radius: 8px; background: {{t.bg}}; color: {{t.fg}}; box-shadow: {{t.sh}}; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;">{{t.label}}</button>
+    </sc-for>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{f.memberHeader}}" hint-placeholder-val="{{ true }}">
+<header style="border-bottom: 1px solid #e2e8f0; background: #faf8f5;">
+  <div style="max-width: 1152px; margin: 0 auto; box-sizing: border-box; padding: 8px {{s.headPad}}px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px;">
+    <a href="#home" style="order: 1; display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; color: #0f172a; text-decoration: none;">
+      <svg aria-hidden="true" viewBox="0 0 32 32" width="32" height="32"><rect width="32" height="32" rx="8" fill="#3659e3"></rect><path fill="#ffffff" d="M16 24.5s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 16 11.7a4.3 4.3 0 0 1 7.5 2.8c0 5.4-7.5 10-7.5 10z"></path></svg>
+      Good Deeds
+    </a>
+    <nav aria-label="Main" style="order: {{s.navOrder}}; width: {{s.navW}}; margin-left: {{s.navMl}};">
+      <ul style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, {{s.navCol}})); gap: 4px;">
+        <li><a href="#home" aria-current="{{nav.home.cur}}" style="display: flex; min-height: 44px; align-items: center; justify-content: center; padding: 0 14px; border-radius: 8px; font-size: 14px; font-weight: {{nav.home.fw}}; color: {{nav.home.fg}}; background: {{nav.home.bg}}; text-decoration: none;">Home</a></li>
+        <li><a href="#qr" style="display: flex; min-height: 44px; align-items: center; justify-content: center; padding: 0 14px; border-radius: 8px; font-size: 14px; font-weight: 500; color: #475569; text-decoration: none;">My QR</a></li>
+        <li><a href="#profile" aria-current="{{nav.profile.cur}}" style="display: flex; min-height: 44px; align-items: center; justify-content: center; padding: 0 14px; border-radius: 8px; font-size: 14px; font-weight: {{nav.profile.fw}}; color: {{nav.profile.fg}}; background: {{nav.profile.bg}}; text-decoration: none;">Profile</a></li>
+      </ul>
+    </nav>
+    <a href="#report" style="order: {{s.btnOrder}}; margin-left: {{s.btnMl}}; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 16px; border-radius: 8px; background: #3659e3; color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+      Record a deed
+    </a>
+  </div>
+</header>
+</sc-if>
+
+<sc-if value="{{f.publicHeader}}" hint-placeholder-val="{{ false }}">
+<header style="border-bottom: 1px solid #e2e8f0; background: #faf8f5;">
+  <div style="max-width: 1152px; margin: 0 auto; box-sizing: border-box; padding: 8px {{s.headPad}}px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+    <a href="#welcome" style="display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; color: #0f172a; text-decoration: none;">
+      <svg aria-hidden="true" viewBox="0 0 32 32" width="32" height="32"><rect width="32" height="32" rx="8" fill="#3659e3"></rect><path fill="#ffffff" d="M16 24.5s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 16 11.7a4.3 4.3 0 0 1 7.5 2.8c0 5.4-7.5 10-7.5 10z"></path></svg>
+      Good Deeds
+    </a>
+    <div style="display: flex; align-items: center; gap: 4px;">
+      <a href="#login" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; font-size: 15px; font-weight: 600; color: #3659e3; text-decoration: none;">Sign in</a>
+      <a href="#signup" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 8px; background: #3659e3; color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none;">Join</a>
+    </div>
+  </div>
+</header>
+</sc-if>
+
+<sc-if value="{{f.adminHeader}}" hint-placeholder-val="{{ false }}">
+<header style="border-bottom: 1px solid #1e293b; background: #0f172a; color: #ffffff;">
+  <div style="max-width: 1152px; margin: 0 auto; box-sizing: border-box; padding: 8px {{s.headPad}}px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px;">
+    <span style="display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 18px; font-weight: 700;">
+      <svg aria-hidden="true" viewBox="0 0 32 32" width="32" height="32"><rect width="32" height="32" rx="8" fill="#3659e3"></rect><path fill="#ffffff" d="M16 24.5s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 16 11.7a4.3 4.3 0 0 1 7.5 2.8c0 5.4-7.5 10-7.5 10z"></path></svg>
+      Good Deeds
+      <span style="padding: 2px 8px; border-radius: 6px; background: #334155; font-size: 12px; font-weight: 600; letter-spacing: 0.04em;">ADMIN</span>
+    </span>
+    <nav aria-label="Admin" style="margin-left: auto;">
+      <a href="#reports" aria-current="page" onClick="{{toQueue}}" style="display: inline-flex; min-height: 44px; align-items: center; padding: 0 14px; border-radius: 8px; background: #1e293b; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none;">Photo reports</a>
+    </nav>
+  </div>
+</header>
+</sc-if>
+
+<main style="width: 100%; max-width: {{s.maxW}}px; margin: 0 auto; box-sizing: border-box; padding: {{s.mainPad}}; display: flex; flex-direction: column; gap: 16px;">
+
+  <sc-if value="{{f.backLink}}" hint-placeholder-val="{{ true }}">
+  <button type="button" onClick="{{back}}" style="align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; margin: -6px 0 -6px; padding: 0 8px 0 0; border: 0; background: transparent; color: #3659e3; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;">
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"></path></svg>
+    {{backLabel}}
+  </button>
+  </sc-if>
+
+  <!-- ===== Deed form: photos, consent, optional blur ===== -->
+  <sc-if value="{{f.form}}" hint-placeholder-val="{{ true }}">
+  <h1 style="margin: 0; font-size: {{s.h1}}px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em;">Record a deed</h1>
+  <div style="display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 12px; border: 1px solid #a7f3d0; background: #ecfdf5;">
+    <span aria-hidden="true" style="flex-shrink: 0; width: 44px; height: 44px; border-radius: 999px; background: #dfe6fc; color: #2442b8; font-size: 15px; font-weight: 700; display: flex; align-items: center; justify-content: center;">AK</span>
+    <div style="flex-grow: 1; min-width: 0;">
+      <p style="margin: 0; font-weight: 700;">Ahmed Khan</p>
+      <p style="margin: 0; font-size: 14px; color: #047857;">Verified just now · Koramangala</p>
+    </div>
+  </div>
+  <div style="display: flex; flex-direction: column; gap: 6px;">
+    <label for="desc" style="font-weight: 600;">What did they do?</label>
+    <textarea id="desc" rows="3" readonly="readonly" style="box-sizing: border-box; width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; font-family: inherit; font-size: 16px; line-height: 1.5; resize: none;">Helped an elderly man cross the busy junction at Silk Board and carried his bags to the bus stop.</textarea>
+  </div>
+
+  <section aria-labelledby="ph-h" style="display: flex; flex-direction: column; gap: 10px;">
+    <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 8px;">
+      <h2 id="ph-h" style="margin: 0; font-size: 16px; font-weight: 600;">Photos <span style="font-weight: 400; color: #475569;">(optional)</span></h2>
+      <span style="font-size: 14px; color: #475569;">{{photoCount}} of 4</span>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+      <sc-for list="{{photos}}" as="t" hint-placeholder-count="3">
+      <div style="width: {{s.thumb}}px; display: flex; flex-direction: column; align-items: center; gap: 0;">
+        <div style="position: relative; width: {{s.thumb}}px; height: {{s.thumb}}px; border-radius: 10px; background: {{t.bg}}; color: #334155; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+          <svg role="img" aria-label="{{t.alt}}" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M21 16l-5-5-9 9"></path></svg>
+          <sc-if value="{{t.blurred}}" hint-placeholder-val="{{ false }}">
+          <span style="position: absolute; left: 4px; bottom: 4px; padding: 1px 6px; border-radius: 999px; background: rgba(15, 23, 42, 0.78); color: #ffffff; font-size: 11px; font-weight: 600;">Blurred</span>
+          </sc-if>
+          <button type="button" aria-label="Remove {{t.alt}}" style="position: absolute; top: 3px; right: 3px; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 999px; background: rgba(15, 23, 42, 0.72); color: #ffffff; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+            <svg aria-hidden="true" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+          </button>
+        </div>
+        <button type="button" onClick="{{t.blur}}" aria-label="{{t.blurAria}}" style="min-height: 44px; padding: 0 2px; border: 0; background: transparent; color: #3659e3; font-family: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer;">{{t.blurLabel}}</button>
+      </div>
+      </sc-for>
+      <button type="button" aria-label="Add photo" style="width: {{s.thumb}}px; height: {{s.thumb}}px; border-radius: 10px; border: 1.5px dashed #94a3b8; background: #ffffff; color: #334155; font-family: inherit; font-size: 12px; font-weight: 600; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer;">
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"></path><circle cx="12" cy="13" r="3.5"></circle></svg>
+        Add
+      </button>
+    </div>
+    <p style="margin: 0; font-size: 14px; color: #475569;">Good deeds are meant to be shared proudly. If someone would rather not be shown, blur their face or remove the photo.</p>
+  </section>
+
+  <p style="margin: 0; display: flex; gap: 8px; align-items: flex-start; font-size: 14px; color: #475569;">
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px;"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+    Verified deeds appear in the public feed. You or Ahmed can hide it anytime.
+  </p>
+  <button type="button" onClick="{{send}}" style="width: 100%; min-height: 52px; border-radius: 8px; border: 0; background: #3659e3; color: #ffffff; font-family: inherit; font-size: 17px; font-weight: 600; cursor: pointer;">Send report</button>
+  </sc-if>
+
+  <!-- ===== Blur editor ===== -->
+  <sc-if value="{{f.editor}}" hint-placeholder-val="{{ false }}">
+  <h1 style="margin: 0; font-size: {{s.h1}}px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em;">Blur a face <span style="font-weight: 500; color: #475569;">(optional)</span></h1>
+  <p style="margin: 0; color: #334155;">Drag the circle over the face of anyone who’d rather not be shown. Everyone else stays exactly as they are.</p>
+  <div role="img" aria-label="{{editorAlt}}" style="position: relative; height: 340px; border-radius: 14px; background: #dbeafe; overflow: hidden;">
+    <svg aria-hidden="true" viewBox="0 0 358 340" width="100%" height="100%" preserveAspectRatio="xMidYMid slice">
+      <rect width="358" height="340" fill="#dbeafe"></rect>
+      <rect y="250" width="358" height="90" fill="#bfdbfe"></rect>
+      <circle cx="120" cy="120" r="34" fill="#94a3b8"></circle>
+      <path d="M62 270c0-44 26-80 58-80s58 36 58 80z" fill="#94a3b8"></path>
+      <circle cx="244" cy="132" r="32" fill="#a8a29e"></circle>
+      <path d="M190 280c0-42 24-76 54-76s54 34 54 76z" fill="#a8a29e"></path>
+    </svg>
+    <span style="position: absolute; left: 84px; top: 230px; padding: 2px 8px; border-radius: 6px; background: rgba(255, 255, 255, 0.85); font-size: 12px; font-weight: 600; color: #1e293b;">Ahmed</span>
+    <span style="position: absolute; left: 212px; top: 230px; padding: 2px 8px; border-radius: 6px; background: rgba(255, 255, 255, 0.85); font-size: 12px; font-weight: 600; color: #1e293b;">Elderly man</span>
+    <sc-if value="{{blurOn}}" hint-placeholder-val="{{ true }}">
+    <span aria-hidden="true" style="position: absolute; left: 196px; top: 84px; width: 96px; height: 96px; border-radius: 999px; border: 3px solid #ffffff; box-shadow: 0 0 0 2px #3659e3, 0 6px 16px rgba(15, 23, 42, 0.25); background: repeating-linear-gradient(45deg, #cbd5e1 0 6px, #e2e8f0 6px 12px); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #334155;">Blurred</span>
+    </sc-if>
+  </div>
+  <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+    <button type="button" onClick="{{toggleBlur}}" style="display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border-radius: 8px; border: 1px solid #cbd5e1; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;">{{blurBtn}}</button>
+  </div>
+  <p style="margin: 0; padding: 10px 12px; border-radius: 10px; background: #f1f5f9; font-size: 14px; color: #334155;">Only the blurred version is posted. You can change this until you send the report.</p>
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
+    <button type="button" onClick="{{cancelEditor}}" style="min-height: 52px; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">Cancel</button>
+    <button type="button" onClick="{{doneEditor}}" style="min-height: 52px; border-radius: 8px; border: 0; background: #3659e3; color: #ffffff; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">Done</button>
+  </div>
+  </sc-if>
+
+  <!-- ===== Report sent (uploader) ===== -->
+  <sc-if value="{{f.deedSent}}" hint-placeholder-val="{{ false }}">
+  <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 32px 16px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px;">
+    <span aria-hidden="true" style="width: 56px; height: 56px; border-radius: 999px; background: #ecfdf5; color: #047857; display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span>
+    <h1 style="margin: 0; font-size: 22px; font-weight: 700;">Deed recorded</h1>
+    <p style="margin: 0; color: #334155;">Thank you for recognising Ahmed. It’s now in the public feed with your photos.</p>
+    <button type="button" onClick="{{toMyDeed}}" style="min-height: 48px; padding: 0 20px; border-radius: 8px; border: 0; background: #3659e3; color: #ffffff; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">See it in My deeds</button>
+  </div>
+  </sc-if>
+
+  <!-- ===== Uploader: My deeds, deed with review outcome ===== -->
+  <sc-if value="{{f.myDeed}}" hint-placeholder-val="{{ false }}">
+  <sc-if value="{{f.outRemoved}}" hint-placeholder-val="{{ false }}">
+  <div role="status" style="display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 12px; border: 1px solid #fcd34d; background: #fffbeb; color: #78350f;">
+    <div style="display: flex; gap: 10px; align-items: flex-start;">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px;"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5h.01"></path></svg>
+      <span><strong style="display: block; color: #451a03;">A photo was removed after review</strong>Our team removed 1 photo because someone shown in it hadn’t agreed to appear. Your deed is still verified, and Ahmed’s count and points haven’t changed.</span>
+    </div>
+    <a href="#guidelines" style="margin-left: 30px; display: inline-flex; align-items: center; min-height: 44px; font-size: 15px; font-weight: 600; color: #92400e;">Read the photo guidelines</a>
+  </div>
+  </sc-if>
+  <sc-if value="{{f.outKept}}" hint-placeholder-val="{{ false }}">
+  <div role="status" style="display: flex; gap: 10px; align-items: flex-start; padding: 14px; border-radius: 12px; border: 1px solid #a7f3d0; background: #ecfdf5; color: #065f46;">
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px;"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+    <span><strong style="display: block; color: #064e3b;">Review complete: your photos stay</strong>Someone reported a photo on this deed. Our team reviewed it and it stays up. No action needed.</span>
+  </div>
+  </sc-if>
+  <article style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;">
+    <div style="display: flex; gap: 12px; align-items: center; padding: 14px 16px 6px;">
+      <span aria-hidden="true" style="flex-shrink: 0; width: 44px; height: 44px; border-radius: 999px; background: #dfe6fc; color: #2442b8; font-size: 15px; font-weight: 700; display: flex; align-items: center; justify-content: center;">AK</span>
+      <div style="flex-grow: 1; min-width: 0;">
+        <p style="margin: 0; font-weight: 700;">Ahmed Khan</p>
+        <p style="margin: 0; font-size: 13px; color: #475569;">You recorded this · Helping an elderly person · Koramangala</p>
+      </div>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 8px; padding: 6px 16px 12px;">
+      <span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 999px; border: 1px solid #a7f3d0; background: #ecfdf5; color: #047857; font-size: 12px; font-weight: 600;">
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+        Verified by a witness
+      </span>
+      <span style="display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 999px; background: #f1f5f9; color: #334155; font-size: 12px; font-weight: 600;">Shown in feed</span>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat({{myPhotoCount}}, minmax(0, 1fr)); gap: 4px; padding: 0 16px;">
+      <sc-for list="{{myPhotos}}" as="t" hint-placeholder-count="3">
+      <div style="height: 110px; border-radius: 10px; background: {{t.bg}}; color: #334155; display: flex; align-items: center; justify-content: center;">
+        <svg role="img" aria-label="{{t.alt}}" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M21 16l-5-5-9 9"></path></svg>
+      </div>
+      </sc-for>
+    </div>
+    <p style="margin: 0; padding: 12px 16px 16px; font-size: 15px; color: #1e293b;">Helped an elderly man cross the busy junction at Silk Board and carried his bags to the bus stop.</p>
+  </article>
+  </sc-if>
+
+  <!-- ===== Viewer: feed card or public page ===== -->
+  <sc-if value="{{f.viewerCard}}" hint-placeholder-val="{{ false }}">
+  <sc-if value="{{f.publicIntro}}" hint-placeholder-val="{{ false }}">
+  <p style="margin: 0; padding: 10px 12px; border-radius: 10px; background: #eef2fe; font-size: 14px; color: #1e3a8a;">Someone shared this good deed with you.</p>
+  </sc-if>
+  <article style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);">
+    <div style="display: flex; gap: 12px; align-items: center; padding: 14px 8px 6px 16px;">
+      <span aria-hidden="true" style="flex-shrink: 0; width: 44px; height: 44px; border-radius: 999px; background: #dfe6fc; color: #2442b8; font-size: 15px; font-weight: 700; display: flex; align-items: center; justify-content: center;">AK</span>
+      <div style="flex-grow: 1; min-width: 0;">
+        <p style="margin: 0; font-size: 16px; font-weight: 700; line-height: 1.3;">Ahmed Khan</p>
+        <p style="margin: 0; font-size: 13px; color: #475569;">recognised by Priya Sharma</p>
+      </div>
+      <button type="button" aria-label="More options for this deed" onClick="{{openMenu}}" style="flex-shrink: 0; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: #334155; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 12h.01M12 12h.01M18 12h.01"></path></svg>
+      </button>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 0 16px 10px 72px; font-size: 13px; color: #475569;">
+      <span style="font-weight: 600; color: #2442b8;">Helping an elderly person</span>
+      <span aria-hidden="true">·</span>
+      <span>Koramangala</span>
+      <span aria-hidden="true">·</span>
+      <span>2 h ago</span>
+    </div>
+    <div style="position: relative; height: {{s.photoH}}px; background: #dbeafe; color: #334155; display: flex; align-items: center; justify-content: center;">
+      <svg role="img" aria-label="Photo 1 of 3: Ahmed helping an elderly man cross the road" viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M21 16l-5-5-9 9"></path></svg>
+      <span style="position: absolute; top: 10px; right: 10px; padding: 2px 10px; border-radius: 999px; background: rgba(15, 23, 42, 0.72); color: #ffffff; font-size: 12px; font-weight: 600;">1 / 3</span>
+    </div>
+    <p style="margin: 0; padding: 12px 16px 14px; font-size: 15px; color: #1e293b;">Helped an elderly man cross the busy junction at Silk Board and carried his bags to the bus stop.</p>
+    <sc-if value="{{f.publicIntro}}" hint-placeholder-val="{{ false }}">
+    <div style="display: flex; flex-direction: column; gap: 10px; padding: 0 16px 16px;">
+      <a href="#signup" style="display: flex; align-items: center; justify-content: center; min-height: 48px; border-radius: 8px; background: #3659e3; color: #ffffff; font-weight: 600; text-decoration: none;">Join to like, comment and follow</a>
+    </div>
+    </sc-if>
+  </article>
+  </sc-if>
+
+  <!-- ===== Admin: queue ===== -->
+  <sc-if value="{{f.adminQueue}}" hint-placeholder-val="{{ false }}">
+  <h1 style="margin: 0; font-size: {{s.h1}}px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em;">Photo reports</h1>
+  <div role="tablist" aria-label="Report status" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 12px; background: #e9edf3; max-width: 360px;">
+    <button type="button" role="tab" aria-selected="true" style="min-height: 44px; border: 0; border-radius: 9px; background: #ffffff; color: #0f172a; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12); font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer;">Open · {{openCount}}</button>
+    <button type="button" role="tab" aria-selected="false" style="min-height: 44px; border: 0; border-radius: 9px; background: transparent; color: #475569; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer;">Resolved · {{resolvedCount}}</button>
+  </div>
+  <p style="margin: 0; font-size: 14px; color: #475569;">Children and privacy reports are listed first, then the oldest. Photos stay visible until you decide.</p>
+  <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px;">
+    <sc-for list="{{queue}}" as="q" hint-placeholder-count="4">
+    <li style="display: grid; grid-template-columns: {{s.rowCols}}; gap: 12px 16px; align-items: center; padding: 14px; border-radius: 14px; border: 1px solid #e2e8f0; background: #ffffff;">
+      <div style="display: flex; gap: 12px; align-items: center; min-width: 0;">
+        <span aria-hidden="true" style="flex-shrink: 0; width: 56px; height: 56px; border-radius: 10px; background: {{q.thumb}};"></span>
+        <div style="min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+          <span style="align-self: flex-start; padding: 1px 8px; border-radius: 999px; background: {{q.chipBg}}; color: {{q.chipFg}}; font-size: 12px; font-weight: 700;">{{q.priority}}</span>
+          <span style="font-weight: 600;">{{q.reason}}</span>
+        </div>
+      </div>
+      <div style="font-size: 14px; color: #475569; min-width: 0;">
+        <span style="display: block; color: #0f172a; font-weight: 500;">{{q.deed}}</span>
+        {{q.meta}}
+      </div>
+      <button type="button" onClick="{{q.open}}" style="justify-self: {{s.rowBtnJustify}}; min-height: 44px; padding: 0 18px; border-radius: 8px; border: 1px solid #cbd5e1; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;">Review</button>
+    </li>
+    </sc-for>
+  </ul>
+  </sc-if>
+
+  <!-- ===== Admin: review one report ===== -->
+  <sc-if value="{{f.adminReview}}" hint-placeholder-val="{{ false }}">
+  <sc-if value="{{f.adminDoneBanner}}" hint-placeholder-val="{{ false }}">
+  <div role="status" style="display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; padding: 14px 16px; border-radius: 12px; border: 1px solid #cbd5e1; background: #f1f5f9; color: #1e293b;">
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+    <span style="flex: 1 1 320px;"><strong>{{doneTitle}}</strong> {{doneBody}}</span>
+    <sc-if value="{{f.canRestore}}" hint-placeholder-val="{{ false }}">
+    <button type="button" onClick="{{restore}}" style="min-height: 44px; padding: 0 16px; border-radius: 8px; border: 1px solid #cbd5e1; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;">Restore photo</button>
+    </sc-if>
+  </div>
+  </sc-if>
+  <h1 style="margin: 0; font-size: {{s.h1}}px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em;">Review photo report</h1>
+  <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;">
+    <div style="flex: 1 1 420px; min-width: 0; display: flex; flex-direction: column; gap: 10px;">
+      <div style="position: relative; height: 380px; border-radius: 14px; background: #fde68a; color: #334155; display: flex; align-items: center; justify-content: center;">
+        <svg role="img" aria-label="Reported photo: photo 2 of 3 on Ahmed Khan's deed" viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M21 16l-5-5-9 9"></path></svg>
+        <span style="position: absolute; top: 12px; left: 12px; padding: 3px 10px; border-radius: 999px; background: {{photoStatus.bg}}; color: {{photoStatus.fg}}; font-size: 13px; font-weight: 700;">{{photoStatus.label}}</span>
+      </div>
+      <p style="margin: 0; font-size: 14px; color: #475569;">Photo 2 of 3 · Uploaded 18 Nov 2026, 10:42</p>
+    </div>
+    <div style="flex: 1 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 14px;">
+      <section style="padding: 14px; border-radius: 12px; border: 1px solid #e2e8f0; background: #ffffff; display: flex; flex-direction: column; gap: 6px;">
+        <h2 style="margin: 0; font-size: 15px; font-weight: 700; color: #334155;">Deed</h2>
+        <p style="margin: 0;"><strong>Ahmed Khan</strong>, recognised by <strong>Priya Sharma</strong> (uploaded the photos)</p>
+        <p style="margin: 0; font-size: 14px; color: #475569;">Helping an elderly person · Koramangala · Verified · Shown in feed</p>
+      </section>
+      <section style="padding: 14px; border-radius: 12px; border: 1px solid #e2e8f0; background: #ffffff; display: flex; flex-direction: column; gap: 6px;">
+        <h2 style="margin: 0; font-size: 15px; font-weight: 700; color: #334155;">Upload record</h2>
+        <p style="margin: 0; font-size: 15px;">Uploaded by Priya Sharma on 18 Nov 2026, 10:42.</p>
+        <p style="margin: 0; font-size: 14px; color: #475569;">No faces were blurred on this photo.</p>
+      </section>
+      <section style="padding: 14px; border-radius: 12px; border: 1px solid #e2e8f0; background: #ffffff; display: flex; flex-direction: column; gap: 10px;">
+        <h2 style="margin: 0; font-size: 15px; font-weight: 700; color: #334155;">Reports (2)</h2>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <span style="align-self: flex-start; padding: 1px 8px; border-radius: 999px; background: #ffedd5; color: #9a3412; font-size: 12px; font-weight: 700;">Privacy</span>
+          <p style="margin: 0; font-weight: 600;">I’m in this photo and didn’t agree</p>
+          <p style="margin: 0; font-size: 14px; color: #334155;">“This is my father. He didn’t want his photo online.”</p>
+          <p style="margin: 0; font-size: 13px; color: #475569;">Visitor on a shared link · 3 h ago</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px; padding-top: 10px; border-top: 1px solid #e2e8f0;">
+          <span style="align-self: flex-start; padding: 1px 8px; border-radius: 999px; background: #ffedd5; color: #9a3412; font-size: 12px; font-weight: 700;">Privacy</span>
+          <p style="margin: 0; font-weight: 600;">I’m in this photo and didn’t agree</p>
+          <p style="margin: 0; font-size: 13px; color: #475569;">Member @rahulv · 1 h ago</p>
+        </div>
+      </section>
+      <sc-if value="{{f.decide}}" hint-placeholder-val="{{ true }}">
+      <section style="padding: 14px; border-radius: 12px; border: 1px solid #cbd5e1; background: #ffffff; display: flex; flex-direction: column; gap: 10px;">
+        <label for="note" style="font-weight: 700;">Note for the record <span style="font-weight: 400; color: #475569;">(required)</span></label>
+        <textarea id="note" rows="3" value="{{note}}" onChange="{{onNote}}" placeholder="Why you decided this" style="box-sizing: border-box; width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-family: inherit; font-size: 15px; line-height: 1.5; resize: vertical;"></textarea>
+        <p style="margin: 0; font-size: 14px; color: #475569;">Priya is told the outcome. The deed, its verification and points never change.</p>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
+          <button type="button" onClick="{{keep}}" style="min-height: 48px; border-radius: 8px; border: 1px solid #cbd5e1; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">Keep photo</button>
+          <button type="button" onClick="{{askRemove}}" style="min-height: 48px; border-radius: 8px; border: 0; background: #b91c1c; color: #ffffff; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">Remove photo</button>
+        </div>
+      </section>
+      </sc-if>
+    </div>
+  </div>
+  </sc-if>
+
+</main>
+
+<!-- ===== Bottom sheets: post menu, report form, report sent ===== -->
+<sc-if value="{{f.sheet}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; background: rgba(15, 23, 42, 0.5);"></div>
+<div role="dialog" aria-modal="true" aria-labelledby="sheet-h" style="position: absolute; left: {{s.sheetLeft}}; top: {{s.sheetTop}}px; transform: {{s.sheetTx}}; width: {{s.sheetW}}; box-sizing: border-box; background: #ffffff; border-radius: {{s.sheetRadius}}; padding: 12px 16px 20px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 -8px 32px rgba(15, 23, 42, 0.25);">
+  <span aria-hidden="true" style="align-self: center; width: 40px; height: 4px; border-radius: 999px; background: #cbd5e1;"></span>
+
+  <sc-if value="{{f.sheetMenu}}" hint-placeholder-val="{{ false }}">
+  <h2 id="sheet-h" style="margin: 4px 0 0; font-size: 18px; font-weight: 700;">Ahmed Khan’s deed</h2>
+  <div style="display: flex; flex-direction: column; gap: 4px;">
+    <button type="button" onClick="{{openReport}}" style="display: flex; align-items: center; gap: 14px; min-height: 52px; padding: 0 8px; border: 0; border-radius: 10px; background: transparent; color: #0f172a; font-family: inherit; font-size: 16px; font-weight: 600; text-align: left; cursor: pointer;">
+      <span aria-hidden="true" style="width: 40px; height: 40px; border-radius: 999px; background: #fef2f2; color: #b91c1c; display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4h11l-1.5 4L16 12H5"></path></svg></span>
+      Report photo
+    </button>
+    <button type="button" onClick="{{closeSheet}}" style="display: flex; align-items: center; gap: 14px; min-height: 52px; padding: 0 8px; border: 0; border-radius: 10px; background: transparent; color: #0f172a; font-family: inherit; font-size: 16px; font-weight: 600; text-align: left; cursor: pointer;">
+      <span aria-hidden="true" style="width: 40px; height: 40px; border-radius: 999px; background: #eef2fe; color: #2442b8; display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"></path></svg></span>
+      Copy link
+    </button>
+  </div>
+  <button type="button" onClick="{{closeSheet}}" style="min-height: 48px; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">Cancel</button>
+  </sc-if>
+
+  <sc-if value="{{f.sheetReport}}" hint-placeholder-val="{{ false }}">
+  <h2 id="sheet-h" style="margin: 4px 0 0; font-size: 18px; font-weight: 700;">Report this photo</h2>
+  <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 2px;">
+    <legend style="padding: 0 0 6px; font-size: 15px; color: #334155;">Why are you reporting it?</legend>
+    <sc-for list="{{reasons}}" as="r" hint-placeholder-count="5">
+    <label style="display: flex; gap: 12px; align-items: center; min-height: 48px; padding: 0 8px; border-radius: 10px; background: {{r.bg}}; cursor: pointer;">
+      <input type="radio" name="reason" checked="{{r.on}}" onChange="{{r.pick}}" style="flex-shrink: 0; width: 20px; height: 20px; margin: 0; accent-color: #3659e3; cursor: pointer;">
+      <span style="font-size: 15px; font-weight: 500; color: #0f172a;">{{r.label}}</span>
+    </label>
+    </sc-for>
+  </fieldset>
+  <label for="details" style="font-size: 15px; font-weight: 600;">Add details <span style="font-weight: 400; color: #475569;">(optional)</span></label>
+  <textarea id="details" rows="2" placeholder="Anything that helps our team decide" style="box-sizing: border-box; width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-family: inherit; font-size: 15px; line-height: 1.5; resize: none;"></textarea>
+  <p style="margin: 0; padding: 10px 12px; border-radius: 10px; background: #f8fafc; font-size: 14px; color: #475569;">Our team reviews every report. The photo stays up until they decide. The person who posted it won’t see who reported it.</p>
+  <button type="button" onClick="{{sendReport}}" disabled="{{noReason}}" style="min-height: 48px; border-radius: 8px; border: 0; background: {{sendBg}}; color: #ffffff; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">Send report</button>
+  <button type="button" onClick="{{closeSheet}}" style="min-height: 48px; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">Cancel</button>
+  </sc-if>
+
+  <sc-if value="{{f.sheetSent}}" hint-placeholder-val="{{ false }}">
+  <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding: 8px 4px 4px;">
+    <span aria-hidden="true" style="width: 52px; height: 52px; border-radius: 999px; background: #ecfdf5; color: #047857; display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span>
+    <h2 id="sheet-h" style="margin: 0; font-size: 19px; font-weight: 700;">Thanks for telling us</h2>
+    <p style="margin: 0; color: #334155;">Our team will review this photo. Reports about children and privacy are looked at first.</p>
+  </div>
+  <button type="button" onClick="{{closeSheet}}" style="min-height: 48px; border-radius: 8px; border: 0; background: #3659e3; color: #ffffff; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">Done</button>
+  </sc-if>
+</div>
+</sc-if>
+
+<!-- ===== Admin confirm dialog ===== -->
+<sc-if value="{{f.dialog}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; background: rgba(15, 23, 42, 0.5);"></div>
+<div role="dialog" aria-modal="true" aria-labelledby="dlg-h" style="position: absolute; left: 50%; top: {{s.dialogTop}}px; transform: translateX(-50%); width: {{s.dialogW}}px; box-sizing: border-box; background: #ffffff; border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 20px 48px rgba(15, 23, 42, 0.3);">
+  <h2 id="dlg-h" style="margin: 0; font-size: 20px; font-weight: 700;">Remove this photo?</h2>
+  <p style="margin: 0; color: #334155;">It disappears from the feed, the deed page and shared links. Priya is told it was removed after review. The deed, its verification and points don’t change. You can restore it later.</p>
+  <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;">
+    <button type="button" onClick="{{confirmRemove}}" style="width: 100%; min-height: 48px; border-radius: 8px; border: 0; background: #b91c1c; color: #ffffff; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">Remove photo</button>
+    <button type="button" onClick="{{cancelRemove}}" style="width: 100%; min-height: 48px; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff; color: #1e293b; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">Cancel</button>
+  </div>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"device":{"editor":"enum","options":["mobile","desktop"],"default":"mobile"},"screen":{"editor":"enum","options":["live","form-photos","blur-editor","form-ready","report-menu","report-sheet","report-sent","public-report","outcome-removed","outcome-kept","admin-queue","admin-review","admin-remove-confirm","admin-done"],"default":"live"},"$preview":{"width":390,"height":1400}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      persona: 'uploader', up: 'form', consent: false, consentErr: false,
+      blurred: { 0: false, 1: false, 2: false }, editIdx: 1, blurOn: false,
+      vw: 'feed', reason: null, ad: 'queue', decision: null, note: ''
+    };
+  }
+  live() {
+    return (this.props.screen ?? 'live') === 'live';
+  }
+  go(patch) {
+    if (this.live()) this.setState(patch);
+  }
+  seg(on) {
+    return { on: on, bg: on ? '#ffffff' : 'transparent', fg: on ? '#0f172a' : '#9a3412', sh: on ? '0 1px 3px rgba(15, 23, 42, 0.12)' : 'none' };
+  }
+  renderVals() {
+    const desktop = (this.props.device ?? 'mobile') === 'desktop';
+    const live = this.live();
+    const st = this.state;
+    let screen = this.props.screen ?? 'live';
+    if (live) {
+      if (st.persona === 'uploader') {
+        if (st.up === 'editor') screen = 'blur-editor';
+        else if (st.up === 'sent') screen = 'deed-sent';
+        else if (st.up === 'mydeed') screen = st.decision === 'removed' ? 'outcome-removed' : (st.decision === 'kept' ? 'outcome-kept' : 'my-deed');
+        else screen = 'form-photos';
+      } else if (st.persona === 'viewer') {
+        screen = { feed: 'viewer-feed', menu: 'report-menu', sheet: 'report-sheet', sent: 'report-sent' }[st.vw];
+      } else {
+        screen = { queue: 'admin-queue', review: 'admin-review', confirm: 'admin-remove-confirm', done: 'admin-done' }[st.ad];
+      }
+    }
+
+    const isForm = ['form-photos', 'form-consent-error', 'form-ready'].indexOf(screen) >= 0;
+    const isViewer = ['viewer-feed', 'report-menu', 'report-sheet', 'report-sent', 'public-report'].indexOf(screen) >= 0;
+    const isPublic = screen === 'public-report';
+    const isMyDeed = ['my-deed', 'outcome-removed', 'outcome-kept'].indexOf(screen) >= 0;
+    const isAdmin = screen.indexOf('admin-') === 0;
+    const isReview = ['admin-review', 'admin-remove-confirm', 'admin-done'].indexOf(screen) >= 0;
+
+    const blurred = live ? st.blurred : (screen === 'form-ready' ? { 0: false, 1: true, 2: false } : { 0: false, 1: false, 2: false });
+    const colors = ['#dbeafe', '#fde68a', '#d1fae5'];
+    const photos = colors.map((c, i) => ({
+      bg: c, alt: 'Photo ' + (i + 1) + ' of 3', blurred: !!blurred[i],
+      blurLabel: blurred[i] ? 'Edit blur' : 'Blur face', blurAria: (blurred[i] ? 'Edit the blur on photo ' : 'Blur a face in photo ') + (i + 1),
+      blur: () => this.go({ up: 'editor', editIdx: i, blurOn: !!this.state.blurred[i] })
+    }));
+    const consent = live ? st.consent : screen === 'form-ready';
+    const consentErr = screen === 'form-consent-error';
+
+    const reasonList = [
+      { id: 'me', label: 'I’m in this photo and didn’t agree' },
+      { id: 'child', label: 'A child is shown without a parent’s consent' },
+      { id: 'private', label: 'It shows private details (like a phone number or address)' },
+      { id: 'harm', label: 'It’s inappropriate or harmful' },
+      { id: 'other', label: 'Something else' }
+    ];
+    const pickedReason = live ? st.reason : ((screen === 'report-sheet' || screen === 'public-report') ? 'me' : null);
+    const reasons = reasonList.map((r) => ({
+      label: r.label, on: pickedReason === r.id, bg: pickedReason === r.id ? '#eef2fe' : 'transparent',
+      pick: () => this.go({ reason: r.id })
+    }));
+
+    const decision = live ? st.decision : (screen === 'admin-done' ? 'removed' : null);
+    const queueAll = [
+      { id: 'kavya', thumb: '#d1fae5', priority: 'Child', chipBg: '#fee2e2', chipFg: '#991b1b', reason: 'A child is shown without a parent’s consent', deed: 'Kavya Nair · Road & traffic help · HSR Layout', meta: '1 report · 40 min ago' },
+      { id: 'ahmed', thumb: '#fde68a', priority: 'Privacy', chipBg: '#ffedd5', chipFg: '#9a3412', reason: 'I’m in this photo and didn’t agree', deed: 'Ahmed Khan · Helping an elderly person · Koramangala', meta: '2 reports · oldest 3 h ago' },
+      { id: 'sneha', thumb: '#dbeafe', priority: 'Privacy', chipBg: '#ffedd5', chipFg: '#9a3412', reason: 'It shows private details', deed: 'Sneha Rao · Environment & cleanliness · Indiranagar', meta: '1 report · 5 h ago' },
+      { id: 'imran', thumb: '#fce7f3', priority: 'Other', chipBg: '#f1f5f9', chipFg: '#334155', reason: 'It’s inappropriate or harmful', deed: 'Imran Sheikh · Animals · Jayanagar', meta: '1 report · yesterday' }
+    ];
+    const queue = queueAll.filter((q) => !(decision && q.id === 'ahmed')).map((q) => Object.assign({}, q, { open: () => { if (q.id === 'ahmed') this.go({ ad: 'review' }); } }));
+
+    let photoStatus = { label: 'Visible · report open', bg: 'rgba(15, 23, 42, 0.78)', fg: '#ffffff' };
+    if (decision === 'removed') photoStatus = { label: 'Removed', bg: '#b91c1c', fg: '#ffffff' };
+    if (decision === 'kept') photoStatus = { label: 'Kept after review', bg: '#047857', fg: '#ffffff' };
+
+    const outRemoved = screen === 'outcome-removed';
+    const myPhotos = (outRemoved ? [colors[0], colors[2]] : colors).map((c, i) => ({ bg: c, alt: 'Photo ' + (i + 1) }));
+
+    const personas = [
+      Object.assign({ label: 'Priya · reporter', pick: () => this.go({ persona: 'uploader' }) }, this.seg(st.persona === 'uploader')),
+      Object.assign({ label: 'Rahul · viewer', pick: () => this.go({ persona: 'viewer' }) }, this.seg(st.persona === 'viewer')),
+      Object.assign({ label: 'Admin', pick: () => this.go({ persona: 'admin' }) }, this.seg(st.persona === 'admin'))
+    ];
+
+    const backMap = { 'blur-editor': 'Back to the form', 'outcome-removed': 'My deeds', 'outcome-kept': 'My deeds', 'my-deed': 'My deeds', 'admin-review': 'Photo reports', 'admin-remove-confirm': 'Photo reports', 'admin-done': 'Photo reports', 'form-photos': 'Back', 'form-consent-error': 'Back', 'form-ready': 'Back' };
+    const navOn = { bg: '#eef2fe', fg: '#3659e3', fw: 600, cur: 'page' };
+    const navOff = { bg: 'transparent', fg: '#475569', fw: 500, cur: 'false' };
+
+    const sheetScreens = ['report-menu', 'report-sheet', 'report-sent', 'public-report'];
+    const hMobile = { 'blur-editor': 900, 'deed-sent': 900, 'admin-queue': 1100 };
+    let h = desktop ? 1300 : 1400;
+    if (desktop) {
+      if (sheetScreens.indexOf(screen) >= 0) h = 1100;
+      else if (screen === 'admin-queue') h = 1000;
+      else if (isReview) h = 1150;
+    } else {
+      if (sheetScreens.indexOf(screen) >= 0 || isMyDeed) h = 1100;
+      else if (hMobile[screen]) h = hMobile[screen];
+    }
+    if (live) h = 1400;
+
+    const reportOpen = screen === 'report-sheet' || screen === 'public-report';
+    const noReason = !pickedReason;
+
+    return {
+      personas: personas,
+      photos: photos,
+      photoCount: 3,
+      consent: consent,
+      blurOn: live ? st.blurOn : screen === 'blur-editor',
+      blurBtn: (live ? st.blurOn : true) ? 'Remove this blur' : 'Add a blur',
+      editorAlt: 'Photo 2 of 3: Ahmed and an elderly man' + ((live ? st.blurOn : true) ? ', with the elderly man’s face blurred' : ''),
+      reasons: reasons,
+      noReason: noReason,
+      sendBg: noReason ? '#94a3b8' : '#3659e3',
+      queue: queue,
+      openCount: decision ? 3 : 4,
+      resolvedCount: decision ? 13 : 12,
+      photoStatus: photoStatus,
+      doneTitle: decision === 'kept' ? 'Photo kept.' : 'Photo removed.',
+      doneBody: 'Priya has been told the outcome. Your note and decision are in the audit log.',
+      myPhotos: myPhotos,
+      myPhotoCount: myPhotos.length,
+      note: live ? st.note : (isReview ? 'Family member of the elderly man confirms he did not agree. Removing.' : ''),
+      backLabel: backMap[screen] || 'Back',
+      nav: { home: isViewer && !isPublic ? navOn : navOff, profile: isMyDeed ? navOn : navOff },
+      f: {
+        protoBar: live,
+        memberHeader: !isPublic && !isAdmin,
+        publicHeader: isPublic,
+        adminHeader: isAdmin,
+        backLink: !!backMap[screen],
+        form: isForm,
+        consentError: consentErr || (live && st.consentErr),
+        editor: screen === 'blur-editor',
+        deedSent: screen === 'deed-sent',
+        myDeed: isMyDeed,
+        outRemoved: outRemoved,
+        outKept: screen === 'outcome-kept',
+        viewerCard: isViewer,
+        publicIntro: isPublic,
+        adminQueue: screen === 'admin-queue',
+        adminReview: isReview,
+        adminDoneBanner: screen === 'admin-done' || (live && isReview && !!decision),
+        canRestore: decision === 'removed',
+        decide: !decision && screen !== 'admin-done',
+        sheet: sheetScreens.indexOf(screen) >= 0,
+        sheetMenu: screen === 'report-menu',
+        sheetReport: reportOpen,
+        sheetSent: screen === 'report-sent',
+        dialog: screen === 'admin-remove-confirm'
+      },
+      s: {
+        w: desktop ? 1440 : 390,
+        h: h,
+        headPad: desktop ? 24 : 16,
+        navOrder: desktop ? 2 : 3,
+        navW: desktop ? 'auto' : '100%',
+        navMl: desktop ? 'auto' : '0',
+        navCol: desktop ? 'auto' : '1fr',
+        btnOrder: desktop ? 3 : 2,
+        btnMl: desktop ? '0' : 'auto',
+        maxW: isAdmin ? (desktop ? 1152 : 390) : (desktop ? 640 : 390),
+        mainPad: desktop ? '32px 24px 56px' : '16px 16px 40px',
+        h1: desktop ? 30 : 26,
+        photoH: desktop ? 360 : 260,
+        thumb: desktop ? 96 : 76,
+        consentBd: consentErr || (live && st.consentErr) ? '2px solid #b91c1c' : '1px solid #e2e8f0',
+        rowCols: desktop ? 'minmax(0, 1.3fr) minmax(0, 1fr) auto' : 'minmax(0, 1fr)',
+        rowBtnJustify: desktop ? 'end' : 'start',
+        sheetLeft: desktop ? '50%' : '0',
+        sheetTx: desktop ? 'translateX(-50%)' : 'none',
+        sheetW: desktop ? '480px' : '100%',
+        sheetTop: desktop ? 160 : (reportOpen ? 330 : (screen === 'report-sent' ? 640 : 760)),
+        sheetRadius: desktop ? '16px' : '20px 20px 0 0',
+        dialogTop: desktop ? 320 : 320,
+        dialogW: desktop ? 440 : 350
+      },
+      toggleConsent: () => this.go({ consent: !this.state.consent, consentErr: false }),
+      send: () => this.go({ up: 'sent' }),
+      toggleBlur: () => this.go({ blurOn: !this.state.blurOn }),
+      cancelEditor: () => this.go({ up: 'form' }),
+      doneEditor: () => { if (this.live()) { const b = Object.assign({}, this.state.blurred); b[this.state.editIdx] = this.state.blurOn; this.setState({ blurred: b, up: 'form' }); } },
+      toMyDeed: () => this.go({ up: 'mydeed' }),
+      openMenu: () => this.go({ vw: 'menu' }),
+      openReport: () => this.go({ vw: 'sheet', reason: null }),
+      closeSheet: () => this.go({ vw: 'feed' }),
+      sendReport: () => { if (this.live() && this.state.reason) this.setState({ vw: 'sent' }); },
+      toQueue: () => this.go({ ad: 'queue' }),
+      onNote: (e) => { if (this.live()) this.setState({ note: e.target.value }); },
+      keep: () => { if (this.live() && this.state.note.trim()) this.setState({ decision: 'kept', ad: 'done' }); },
+      askRemove: () => { if (this.live() && this.state.note.trim()) this.setState({ ad: 'confirm' }); },
+      confirmRemove: () => this.go({ decision: 'removed', ad: 'done' }),
+      cancelRemove: () => this.go({ ad: 'review' }),
+      restore: () => this.go({ decision: 'kept', ad: 'done' }),
+      back: () => {
+        if (!this.live()) return;
+        const p = this.state.persona;
+        if (p === 'uploader') this.setState({ up: 'form' });
+        else if (p === 'admin') this.setState({ ad: 'queue' });
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

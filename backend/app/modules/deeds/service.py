@@ -1,0 +1,195 @@
+"""Public interface of the deeds module for other modules (docs/M2-DESIGN.md §4).
+
+Event payloads carry IDs only; consumers (Feed, Scoring, Fraud, ... from M3) fetch details here.
+The views never contain coordinates (only ``has_location``) and never reveal the doer of a
+pending deed. Self-logs are not exposed: they are private and never read by other modules.
+"""
+
+import uuid
+from collections.abc import Iterable
+from dataclasses import dataclass
+from datetime import datetime
+
+from sqlalchemy import Select, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.modules.deeds._areas import DEFAULT_AREA_NAME
+from app.modules.deeds._limits import load_limits
+from app.modules.deeds.events import DeedRejected, DeedVerified, DeedWithdrawn
+from app.modules.deeds.models import (
+    Area,
+    Deed,
+    DeedStatus,
+    SameActGroup,
+    SelfLog,
+    VerificationMethod,
+)
+
+__all__ = [
+    "DEFAULT_AREA_NAME",
+    "DeedRejected",  # events other modules subscribe to (M3 feed projection, §5)
+    "DeedStatus",
+    "DeedVerified",
+    "DeedView",
+    "DeedWithdrawn",
+    "SameActGroupView",
+    "VerificationMethod",
+    "area_name",
+    "category_labels",
+    "deeds_for_doer",
+    "get_deed",
+    "get_deeds",
+    "same_act_group_view",
+    "self_log_owner",
+]
+
+
+@dataclass(frozen=True)
+class DeedView:
+    id: uuid.UUID
+    status: DeedStatus
+    verification_method: VerificationMethod
+    reporter_id: uuid.UUID
+    # Always None while pending (PRD §6.5).
+    doer_id: uuid.UUID | None
+    category: str
+    description: str
+    beneficiaries_count: int | None
+    occurred_at: datetime
+    reported_at: datetime
+    verified_at: datetime | None
+    withdrawn_at: datetime | None
+    last_edited_at: datetime | None
+    same_act_group_id: uuid.UUID | None
+    counts_for_points: bool
+    prize_rank_eligible: bool
+    has_location: bool
+    limits_version: int
+    # Coarse public area (M3 D39); None shows as "Bangalore" (use ``area_name``). Never
+    # coordinates and never the dataset's ward code.
+    area_name: str | None = None
+
+
+@dataclass(frozen=True)
+class SameActGroupView:
+    """Counters and parameters of one act. The centre is never exposed, only whether it has
+    one (a group anchored by an invite deed without a location has none)."""
+
+    id: uuid.UUID
+    doer_id: uuid.UUID
+    anchor_at: datetime
+    radius_m: int
+    window_minutes: int
+    cap: int
+    verified_count: int
+    counted_count: int
+    distinct_reporters: int
+    has_centre: bool
+    limits_version: int
+    # Verified member deeds, oldest verification first.
+    verified_deed_ids: tuple[uuid.UUID, ...]
+
+
+def area_name(view: DeedView) -> str:
+    """The area to show for a deed: its area's display name, else "Bangalore"."""
+    return view.area_name or DEFAULT_AREA_NAME
+
+
+def _with_area() -> Select[Deed, str]:
+    return select(Deed, Area.name).outerjoin(Area, Area.id == Deed.area_id)
+
+
+def _view(deed: Deed, area: str | None = None) -> DeedView:
+    return DeedView(
+        id=deed.id,
+        status=deed.status,
+        verification_method=deed.verification_method,
+        reporter_id=deed.reporter_user_id,
+        doer_id=None if deed.status == DeedStatus.PENDING else deed.doer_user_id,
+        category=deed.category,
+        description=deed.description,
+        beneficiaries_count=deed.beneficiaries_count,
+        occurred_at=deed.occurred_at,
+        reported_at=deed.reported_at,
+        verified_at=deed.verified_at,
+        withdrawn_at=deed.withdrawn_at,
+        last_edited_at=deed.last_edited_at,
+        same_act_group_id=deed.same_act_group_id,
+        counts_for_points=deed.counts_for_points,
+        prize_rank_eligible=deed.prize_rank_eligible,
+        has_location=deed.location is not None,
+        limits_version=deed.limits_version,
+        area_name=area,
+    )
+
+
+async def category_labels(session: AsyncSession) -> dict[str, str]:
+    """Display label of each category slug in the active ``deeds`` config (M3 §3.4b #11)."""
+    _, limits = await load_limits(session)
+    return {c.slug: c.label for c in limits.categories}
+
+
+async def get_deed(session: AsyncSession, deed_id: uuid.UUID) -> DeedView | None:
+    row = (await session.execute(_with_area().where(Deed.id == deed_id))).first()
+    return None if row is None else _view(row[0], row[1])
+
+
+async def get_deeds(
+    session: AsyncSession, deed_ids: Iterable[uuid.UUID]
+) -> dict[uuid.UUID, DeedView]:
+    """Views of the deeds found, by id, in one query (joined with their area). Unknown ids are
+    left out; callers filter by status themselves."""
+    ids = set(deed_ids)
+    if not ids:
+        return {}
+    rows = await session.execute(_with_area().where(Deed.id.in_(ids)))
+    return {deed.id: _view(deed, area) for deed, area in rows}
+
+
+async def self_log_owner(session: AsyncSession, self_log_id: uuid.UUID) -> uuid.UUID | None:
+    """The owner of a self-log, or None if it doesn't exist. No content: self-logs are private."""
+    return await session.scalar(select(SelfLog.user_id).where(SelfLog.id == self_log_id))
+
+
+async def deeds_for_doer(
+    session: AsyncSession,
+    doer_id: uuid.UUID,
+    *,
+    statuses: tuple[DeedStatus, ...] = (DeedStatus.VERIFIED,),
+    limit: int = 50,
+    occurred_before: datetime | None = None,
+) -> list[DeedView]:
+    """Deeds about a doer, newest ``occurred_at`` first (verified only by default). Pending
+    deeds have no doer yet, so they never appear here."""
+    stmt = _with_area().where(Deed.doer_user_id == doer_id, Deed.status.in_(statuses))
+    if occurred_before is not None:
+        stmt = stmt.where(Deed.occurred_at < occurred_before)
+    rows = await session.execute(stmt.order_by(Deed.occurred_at.desc(), Deed.id).limit(limit))
+    return [_view(deed, area) for deed, area in rows]
+
+
+async def same_act_group_view(
+    session: AsyncSession, group_id: uuid.UUID
+) -> SameActGroupView | None:
+    group = await session.get(SameActGroup, group_id)
+    if group is None:
+        return None
+    deed_ids = await session.scalars(
+        select(Deed.id)
+        .where(Deed.same_act_group_id == group_id, Deed.status == DeedStatus.VERIFIED)
+        .order_by(Deed.verified_at, Deed.id)
+    )
+    return SameActGroupView(
+        id=group.id,
+        doer_id=group.doer_user_id,
+        anchor_at=group.anchor_at,
+        radius_m=group.radius_m,
+        window_minutes=group.window_minutes,
+        cap=group.cap,
+        verified_count=group.verified_count,
+        counted_count=group.counted_count,
+        distinct_reporters=group.distinct_reporters,
+        has_centre=group.centre is not None,
+        limits_version=group.limits_version,
+        verified_deed_ids=tuple(deed_ids),
+    )

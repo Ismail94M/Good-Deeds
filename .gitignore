@@ -23,3 +23,7 @@ test-results/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Claude Code local state
+.claude/state/
+.claude/settings.local.json

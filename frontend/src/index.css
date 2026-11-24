@@ -1,13 +1,16 @@
 @import 'tailwindcss';
 
+/* Palette from the Figma sign-in design: royal blue on a warm off-white. */
 @theme {
-  --color-brand-50: #f0fdf4;
-  --color-brand-100: #dcfce7;
-  --color-brand-600: #16a34a;
-  --color-brand-700: #15803d;
-  --color-brand-900: #14532d;
+  --color-brand-50: #eef2fe;
+  --color-brand-100: #dfe6fc;
+  --color-brand-600: #4b6ce8;
+  --color-brand-700: #3659e3;
+  --color-brand-900: #2442b8;
+  --color-canvas: #faf8f5;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
-  @apply bg-stone-50 text-stone-900 antialiased;
+  @apply bg-canvas text-slate-900 antialiased;
 }

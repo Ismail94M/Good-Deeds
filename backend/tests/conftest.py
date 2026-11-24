@@ -1,13 +1,16 @@
 import asyncio
 import os
 import sys
+import time
 from collections.abc import AsyncIterator, Callable, Iterator
 from pathlib import Path
 
-# Tests use their own database. Must be set before any app module is imported.
+# Tests use their own database and local settings. Must be set before app imports.
+os.environ["GD_ENV"] = "test"
+os.environ["GD_COOKIE_SECURE"] = "false"  # the test client talks plain http
 os.environ.setdefault(
     "GD_DATABASE_URL",
-    "postgresql+psycopg://gooddeeds:gooddeeds@localhost:5432/gooddeeds_test",
+    "postgresql+psycopg://gooddeeds:gooddeeds@127.0.0.1:5432/gooddeeds_test",
 )
 
 import psycopg
@@ -21,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.db import engine, get_session
+from app.core.ratelimit import InMemoryRateLimiter, get_rate_limiter
 from app.main import app
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
@@ -78,3 +82,16 @@ async def client(session: AsyncSession) -> AsyncIterator[AsyncClient]:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def rate_limiter() -> Iterator[InMemoryRateLimiter]:
+    """Each test gets fresh, in-memory rate limits (the Postgres limiter has its own test).
+
+    The clock is frozen at the current time so a test can't straddle a window boundary and
+    see its counters reset halfway through."""
+    frozen = time.time()
+    limiter = InMemoryRateLimiter(clock=lambda: frozen)
+    app.dependency_overrides[get_rate_limiter] = lambda: limiter
+    yield limiter
+    app.dependency_overrides.pop(get_rate_limiter, None)

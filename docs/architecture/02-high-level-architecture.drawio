@@ -1,0 +1,165 @@
+<mxfile host="drawio" agent="architecture-diagram">
+  <diagram id="containers" name="High-level architecture">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" page="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="containers-title" value="&lt;b&gt;02 High-level architecture (C4 container)&lt;/b&gt;&lt;br&gt;Synced to 2c7ba38 (branch m3-feed) + uncommitted 0017/0018, 2026-11-21" style="text;html=1;align=left;verticalAlign=top;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="20" y="20" width="700" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="containers-legend" value="&lt;b&gt;Legend&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;align=left;verticalAlign=top;spacingLeft=6;" vertex="1" parent="1">
+          <mxGeometry x="1300" y="20" width="280" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="containers-legend-implemented" value="implemented" style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=10;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="1310" y="50" width="125" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="containers-legend-partial" value="partial" style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=10;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="1445" y="50" width="125" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="containers-legend-planned" value="planned (Mx)" style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=10;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1310" y="92" width="125" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="containers-legend-proposed" value="proposed" style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=10;fillColor=#ffffff;strokeColor=#9673a6;dashed=1;dashPattern=1 4;" vertex="1" parent="1">
+          <mxGeometry x="1445" y="92" width="125" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="containers-boundary" value="Good Deeds (modular monolith, one repo)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;dashed=1;strokeColor=#6c8ebf;align=left;verticalAlign=bottom;spacingLeft=8;spacingBottom=4;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="265" width="870" height="1340" as="geometry" />
+        </mxCell>
+        <object id="gis" label="&lt;b&gt;Google Identity Services&lt;/b&gt;&lt;br&gt;gsi/client script" status="implemented" milestone="M1" source="frontend/src/features/auth/social/google.ts; docker-compose.yml#GD_GOOGLE_CLIENT_ID" details="Browser side of Google sign-in. Enabled when GD_GOOGLE_CLIENT_ID is set.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="350" y="110" width="160" height="70" as="geometry" />
+          </mxCell>
+        </object>
+        <object id="fbsdk" label="&lt;b&gt;Facebook JS SDK&lt;/b&gt;&lt;br&gt;connect.facebook.net" status="partial" milestone="M1" source="frontend/src/features/auth/social/facebook.ts; backend/.env.example" details="Built but unconfigured: GD_FACEBOOK_APP_ID empty, not forwarded by docker-compose.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+            <mxGeometry x="520" y="110" width="160" height="70" as="geometry" />
+          </mxCell>
+        </object>
+        <object id="fonts" label="&lt;b&gt;Google Fonts&lt;/b&gt;&lt;br&gt;[CDN] Inter" status="implemented" milestone="M1" source="frontend/index.html">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="20" y="290" width="210" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object id="member" label="&lt;b&gt;Member / visitor&lt;/b&gt;&lt;br&gt;[Person]&lt;br&gt;mobile or desktop browser" status="implemented" milestone="M1" source="docs/PRD.md#2; frontend/src/app/routes.tsx">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=36;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="20" y="390" width="210" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <object id="spa" label="&lt;b&gt;Web SPA&lt;/b&gt;&lt;br&gt;[React 19, TypeScript, Vite, Tailwind, TanStack Query]&lt;br&gt;/ (feed when signed in), /signup, /login, /forgot-password,&lt;br&gt;/onboarding, /profile, /me/qr, /me/deeds, /me/self-logs,&lt;br&gt;/me/saved, /me/connections, /deeds/:id, /report/*, /scan/:token,&lt;br&gt;/d/:id (public), /u/:handle, /admin/*, /terms, /privacy, guidelines" status="implemented" milestone="M1" source="frontend/src/app/routes.tsx; frontend/src/lib/api.ts; frontend/vite.config.ts" details="/scan/:token moves the QR token into memory and replaces the URL with /report/link (security R5-L2). Global header with 'Record a deed' (D25).">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="340" y="290" width="340" height="160" as="geometry" />
+          </mxCell>
+        </object>
+        <object id="screens" label="&lt;b&gt;M2 screens&lt;/b&gt; (F2, F3, F6)&lt;br&gt;My QR: QR + ID + 6-digit code, countdown; Record a deed: hub, camera scan, ID + code, deed form, result; My deeds: detail, edit, withdraw; self-logs; profile counts; forgot password&lt;br&gt;&lt;i&gt;Not in M2: invite screens (D26), photos (D23)&lt;/i&gt;" status="implemented" milestone="M2" source="frontend/src/features/qr/MyQrPage.tsx; frontend/src/features/report/ReportHubPage.tsx; frontend/src/features/deeds/MyDeedsPage.tsx; frontend/src/features/selflog/SelfLogsPage.tsx; frontend/src/features/profile/DeedCounts.tsx; frontend/src/features/auth/ForgotPasswordPage.tsx; frontend/src/features/deeds/deedsApi.ts" details="Built from the approved Design canvases (docs/design/f2, f3, f6). Limits and copy values come from GET /api/deeds/options and the scan response, never hard-coded (D20)."><mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="340" y="740" width="340" height="120" as="geometry" /></mxCell></object>
+        <mxCell id="containers-e17" value="deedsApi.ts,&lt;br&gt;identityApi.ts" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.97;entryDx=0;entryDy=0;" edge="1" parent="1" source="screens" target="api"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <object id="auth" label="&lt;b&gt;Auth mechanism&lt;/b&gt;&lt;br&gt;Access JWT (15 min) in memory, sent as Bearer&lt;br&gt;Refresh token: rotating httpOnly cookie gd_refresh,&lt;br&gt;path /api/auth, SameSite=Lax, stored hashed&lt;br&gt;30-day refresh, 90-day absolute session,&lt;br&gt;token_version revocation; X-Device-Id header" status="implemented" milestone="M1" source="frontend/src/lib/api.ts; backend/app/modules/identity/router.py#_set_refresh_cookie; backend/app/core/security.py; backend/app/core/config.py">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="340" y="520" width="340" height="190" as="geometry" />
+          </mxCell>
+        </object>
+        <object id="api" label="&lt;b&gt;API&lt;/b&gt;&lt;br&gt;[Python 3.12, FastAPI, SQLAlchemy 2 async]&lt;br&gt;modules: identity, deeds, media (M3), feed (M3)&lt;br&gt;&lt;br&gt;/api/health, /api/auth/*, /api/users/*&lt;br&gt;/api/scans, /api/deeds, /api/me/deeds,&lt;br&gt;/api/me/self-logs, invites (switched off, D17)&lt;br&gt;&lt;br&gt;&lt;i&gt;M3 media:&lt;/i&gt; /api/media/options, uploads (+ complete),&lt;br&gt;deeds/{id}/photos, self-logs/{id}/photos,&lt;br&gt;photos/{id} (DELETE), photos/{id}/reports&lt;br&gt;&lt;br&gt;&lt;i&gt;M3 feed:&lt;/i&gt; /api/feed (+ options, deeds/{id}, likes,&lt;br&gt;saves, shares, comments, hide/show, notices),&lt;br&gt;/api/public/deeds/{id} (no login, no-store, noindex),&lt;br&gt;/api/users/{handle}/follow, /social; /api/me/saved,&lt;br&gt;/api/me/followers, /api/me/following&lt;br&gt;&lt;br&gt;&lt;i&gt;M3 review (moderator or admin):&lt;/i&gt;&lt;br&gt;/api/admin/photo-reports, /api/admin/photos/{id}/restore,&lt;br&gt;/api/admin/comment-reports, /api/admin/comments/{id}/restore&lt;br&gt;&lt;br&gt;Postgres rate limits, limits from config rows,&lt;br&gt;outbox emit, audit log; token paths redacted" status="implemented" milestone="M3" source="backend/app/main.py; backend/app/modules/registry.py; backend/app/modules/identity/router.py; backend/app/modules/deeds/router.py; backend/app/modules/media/router.py; backend/app/modules/feed/router.py; backend/app/core/health.py; backend/app/core/ratelimit.py; backend/app/core/runtime_config.py; backend/app/core/log_redaction.py">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="840" y="270" width="300" height="560" as="geometry" />
+          </mxCell>
+        </object>
+        <object id="db" label="&lt;b&gt;PostgreSQL 16 + PostGIS 3.4&lt;/b&gt;&lt;br&gt;core: outbox_events, processed_events,&lt;br&gt;audit_log, rate_limits, config_versions&lt;br&gt;identity: users, consents, doer_codes,&lt;br&gt;oauth_accounts, phone_otps, refresh_tokens,&lt;br&gt;user_devices, phone_history&lt;br&gt;deeds: qr_scans, same_act_groups, deeds (+ area_id),&lt;br&gt;invites, verification_events, deed_revisions,&lt;br&gt;self_logs, areas (M3)&lt;br&gt;media (M3): photos, photo_report_cases,&lt;br&gt;photo_reports, photo_decisions&lt;br&gt;feed (M3): feed_posts, feed_likes, feed_comments,&lt;br&gt;feed_saves, feed_shares, follows, feed_notices_seen,&lt;br&gt;feed_top_snapshots, feed_top_entries,&lt;br&gt;comment_report_cases, comment_reports, comment_decisions&lt;br&gt;+ Procrastinate job schema (head 0018)" status="implemented" milestone="M3" source="backend/alembic/versions/2026_11_11_0000-0001_foundation.py; backend/alembic/versions/2026_11_11_1200-0002_identity.py; backend/alembic/versions/2026_11_11_1217-0003_identity_hardening.py; backend/alembic/versions/2026_11_13_0000-0004_runtime_config.py; backend/alembic/versions/2026_11_13_0100-0005_deeds.py; backend/alembic/versions/2026_11_15_0000-0006_identity_config.py; backend/alembic/versions/2026_11_16_0000-0007_deeds_v2.py; backend/alembic/versions/2026_11_17_0000-0008_deeds_v3.py; backend/alembic/versions/2026_11_17_0100-0009_deeds_v4.py; backend/alembic/versions/2026_11_17_0300-0011_identity_password_reset.py; backend/alembic/versions/2026_11_17_0400-0012_identity_reset_limits.py; backend/alembic/versions/2026_11_19_0000-0013_deeds_v5.py; backend/alembic/versions/2026_11_19_0100-0014_media.py; backend/alembic/versions/2026_11_19_0200-0015_feed.py; backend/alembic/versions/2026_11_21_0000-0016_feed_top_comments.py; backend/alembic/versions/2026_11_21_0100-0017_real_ward_areas.py; backend/alembic/versions/2026_11_21_0200-0018_deeds_v6.py" details="37 application tables. Append-only (forbid_modification trigger): audit_log, phone_history, config_versions, verification_events, deed_revisions, photo_decisions, comment_decisions. M3 migrations: 0013 areas + deeds.area_id + deeds v5 (photos_enabled moved out, area_fallback_m); 0014 media tables + media v1; 0015 feed tables + feed v1 + feed_posts backfill; 0016 feed_posts.top_comment_count (L1) and feed_comments.author_deleted_at (L3). Migration 0010 does not exist.">
+          <mxCell style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="840" y="860" width="285" height="340" as="geometry" />
+          </mxCell>
+        </object>
+        <object id="worker" label="&lt;b&gt;Worker&lt;/b&gt; [Procrastinate] (one worker, all queues)&lt;br&gt;core.dispatch_outbox (every 5 s), core.handle_event&lt;br&gt;identity.purge_expired_records (03:17)&lt;br&gt;deeds.expire_invites (15 min), deeds.purge_unconsumed_scans (03:37)&lt;br&gt;&lt;i&gt;M3 media queue:&lt;/i&gt; media.process_queued (every 5 s),&lt;br&gt;media.move_objects (1 min), media.purge_deleted (5 min),&lt;br&gt;media.sweep_late_puts (5 min), media.expire_uploads (30 min),&lt;br&gt;media.purge_detached (hourly), media.purge_removed (02:23),&lt;br&gt;media.sweep_staging (02:53)&lt;br&gt;&lt;i&gt;M3 feed:&lt;/i&gt; feed.refresh_top (every min, per period when due),&lt;br&gt;feed.erase_deleted_comments (03:47)&lt;br&gt;handlers: DeedVerified / DeedWithdrawn / DeedRejected → feed" status="implemented" milestone="M3" source="backend/app/core/jobs.py; backend/app/modules/identity/jobs.py; backend/app/modules/deeds/jobs.py; backend/app/modules/media/jobs.py; backend/app/modules/feed/jobs.py; backend/app/modules/feed/handlers.py; docker-compose.yml#worker" details="Media jobs run on the 'media' queue so photo processing can get its own worker later; in M3 the single worker listens to every queue.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="840" y="1230" width="345" height="310" as="geometry" />
+          </mxCell>
+        </object>
+        <object id="jwks" label="&lt;b&gt;Google OAuth certs&lt;/b&gt;&lt;br&gt;googleapis.com JWKS" status="implemented" milestone="M1" source="backend/app/modules/identity/_oauth.py; docker-compose.yml#GD_GOOGLE_CLIENT_ID" details="Server side of Google sign-in: ID token signature check.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+            <mxGeometry x="1280" y="272" width="300" height="56" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="containers-e1" value="verify ID token" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=1;exitY=0.1154;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="api" target="jwks">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object id="graph" label="&lt;b&gt;Facebook Graph API&lt;/b&gt;&lt;br&gt;v21.0" status="partial" milestone="M1" source="backend/app/modules/identity/_oauth.py; backend/.env.example" details="Built but unconfigured: app ID/secret empty.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+            <mxGeometry x="1280" y="342" width="300" height="56" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="containers-e2" value="verify token" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=1;exitY=0.3846;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="api" target="graph">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object id="sms" label="&lt;b&gt;SMS: console provider&lt;/b&gt;&lt;br&gt;OTP and reset codes in API log (dev only)" status="partial" milestone="M1" source="backend/app/core/sms.py; backend/app/core/config.py" details="Production config refuses GD_SMS_PROVIDER=console.">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+            <mxGeometry x="1280" y="412" width="300" height="56" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="containers-e3" value="send OTP,&lt;br&gt;reset code" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=1;exitY=0.6538;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="api" target="sms">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object id="realsms" label="&lt;b&gt;Real SMS provider&lt;/b&gt;&lt;br&gt;MSG91 or Twilio + DLT (pre-launch)" status="planned" milestone="pre-launch" source="docs/ROADMAP.md#Deferred from M1; backend/app/core/sms.py">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1">
+            <mxGeometry x="1280" y="482" width="300" height="56" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="containers-e4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=1;exitY=0.9231;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="api" target="realsms">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <object id="storage" label="&lt;b&gt;Object storage (S3-compatible API)&lt;/b&gt;&lt;br&gt;private bucket gooddeeds-media&lt;br&gt;dev: SeaweedFS in compose (implemented)&lt;br&gt;launch: Google Cloud Storage asia-south1,&lt;br&gt;XML API + HMAC keys (not configured yet)" status="partial" milestone="M3" source="backend/app/core/storage.py; backend/app/core/config.py; docker-compose.yml#storage; infra/seaweedfs/s3.json; docs/M3-DESIGN.md#43-local-storage-seaweedfs" details="Keys: staging/{id} (raw upload, deleted after processing), photos/{id}/... (blurred WebP variants), held/{id}/... (admin-removed, 90 days). Signed GET URLs: signing time floored to 30 min, valid 60 min (D34).">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+            <mxGeometry x="1280" y="560" width="300" height="110" as="geometry" />
+          </mxCell>
+        </object>
+        <object id="ai" label="&lt;b&gt;AI impact evaluator&lt;/b&gt;&lt;br&gt;ImpactEvaluator, shadow mode (M4)" status="planned" milestone="M4" source="docs/ROADMAP.md#M4; docs/PRD.md#14">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1">
+            <mxGeometry x="1280" y="1300" width="300" height="50" as="geometry" />
+          </mxCell>
+        </object>
+        <object id="notify" label="&lt;b&gt;Notifications&lt;/b&gt;&lt;br&gt;in-app + email delivery (M6)" status="planned" milestone="M6" source="docs/ROADMAP.md#M6; docs/PRD.md#6">
+          <mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1">
+            <mxGeometry x="1280" y="1370" width="300" height="50" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="containers-e5" value="HTTP :5173" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.8125;entryDx=0;entryDy=0;" edge="1" parent="1" source="member" target="spa">
+          <mxGeometry relative="1" x="-0.25" as="geometry" />
+        </mxCell>
+        <mxCell id="containers-e6" value="CSS / fonts" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=0;exitY=0.1875;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="spa" target="fonts">
+          <mxGeometry relative="1" x="0.25" as="geometry" />
+        </mxCell>
+        <mxCell id="containers-e7" value="ID token" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=0.2647;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="spa" target="gis">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="containers-e8" value="access token" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=0.7647;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="spa" target="fbsdk">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="containers-e9" value="/api/* JSON&lt;br&gt;+ Bearer JWT&lt;br&gt;(Vite proxy)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.3846;entryDx=0;entryDy=0;" edge="1" parent="1" source="spa" target="api">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="containers-e10" value="holds access token" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="spa" target="auth">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="containers-e11" value="POST /api/auth/refresh&lt;br&gt;(gd_refresh cookie)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=1;exitY=0.2;exitDx=0;exitDy=0;entryX=0;entryY=0.8846;entryDx=0;entryDy=0;" edge="1" parent="1" source="auth" target="api">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="containers-e12" value="SQL (psycopg 3),&lt;br&gt;outbox row in same txn" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=0.3333;exitY=1;exitDx=0;exitDy=0;entryX=0.3774;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="api" target="db">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="containers-e13" value="presign PUT/GET,&lt;br&gt;HEAD, range read" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=0.95;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="api" target="storage">
+          <mxGeometry relative="1" x="0.5" as="geometry" />
+        </mxCell>
+        <mxCell id="containers-e14" value="Procrastinate queue&lt;br&gt;+ outbox poll" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="worker" target="db">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="containers-e15" value="evaluate" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=1;exitY=0.2083;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="worker" target="ai">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="containers-e16" value="send" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=1;exitY=0.7917;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="worker" target="notify">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      <object id="screens3" label="&lt;b&gt;M3 screens&lt;/b&gt; (F7 feed, photos, admin)&lt;br&gt;Feed: Nearby / Following / Top (week, month, year); deed page with comments, hide/show; share sheet; public share page /d/:id; profiles with follows, followers, saved; photo picker, blur editor, photo outcome; photo and comment report sheets; admin queues and review pages&lt;br&gt;&lt;i&gt;Not in M3: video, invite screens&lt;/i&gt;" status="implemented" milestone="M3" source="frontend/src/features/feed/FeedPage.tsx; frontend/src/features/feed/DeedPage.tsx; frontend/src/features/feed/PublicDeedPage.tsx; frontend/src/features/media/PhotoPicker.tsx; frontend/src/features/media/BlurEditor.tsx; frontend/src/features/admin/AdminLayout.tsx; frontend/src/features/feed/feedApi.ts; frontend/src/features/media/mediaApi.ts" details="Built from the approved canvases docs/design/f7 and docs/design/m3-photos. Images are loaded straight from storage with signed URLs; the browser PUTs uploads straight to storage."><mxCell style="rounded=1;absoluteArcSize=1;arcSize=16;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="340" y="900" width="340" height="170" as="geometry" /></mxCell></object>
+        <mxCell id="containers-e18" value="feedApi.ts, mediaApi.ts,&lt;br&gt;adminApi.ts" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.85;entryDx=0;entryDy=0;" edge="1" parent="1" source="screens3" target="api"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="containers-e19" value="GET staging, PUT variants,&lt;br&gt;move to held/, delete" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;exitX=1;exitY=0.06;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="worker" target="storage"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="containers-e20" value="signed PUT (upload),&lt;br&gt;signed GET (img src)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="spa" target="storage"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="510" y="240" /><mxPoint x="1600" y="240" /><mxPoint x="1600" y="615" /></Array></mxGeometry></mxCell>
+        </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

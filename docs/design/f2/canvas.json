@@ -1,0 +1,44 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-11-16T12:00:00Z"},
+  "title": "Good Deeds — F2 My QR",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 390, "h": 1500, "title": "Interactive prototype (mobile) — press Play", "is_interactive": true},
+    "Mobile-Default.dc.html": {"x": 0, "y": 1900, "w": 390, "h": 1500, "title": "Mobile · Default"},
+    "Mobile-Ending.dc.html": {"x": 470, "y": 1900, "w": 390, "h": 1500, "title": "Mobile · Ending (last 5 s)"},
+    "Mobile-Copied.dc.html": {"x": 940, "y": 1900, "w": 390, "h": 1500, "title": "Mobile · ID copied"},
+    "Mobile-Reconnecting.dc.html": {"x": 1410, "y": 1900, "w": 390, "h": 1500, "title": "Mobile · Reconnecting"},
+    "Mobile-Large.dc.html": {"x": 1880, "y": 1900, "w": 390, "h": 844, "title": "Mobile · Large QR"},
+    "Mobile-ResetConfirm.dc.html": {"x": 2350, "y": 1900, "w": 390, "h": 1500, "title": "Mobile · Reset — confirm"},
+    "Mobile-ResetDone.dc.html": {"x": 2820, "y": 1900, "w": 390, "h": 1500, "title": "Mobile · Reset — done"},
+    "Mobile-Loading.dc.html": {"x": 3290, "y": 1900, "w": 390, "h": 844, "title": "Mobile · Loading"},
+    "Mobile-Error.dc.html": {"x": 3760, "y": 1900, "w": 390, "h": 844, "title": "Mobile · Error"},
+    "Mobile-Gated.dc.html": {"x": 4230, "y": 1900, "w": 390, "h": 844, "title": "Mobile · Setup not finished"},
+    "Desktop-Default.dc.html": {"x": 0, "y": 3800, "w": 1440, "h": 1020, "title": "Desktop · Default"},
+    "Desktop-Ending.dc.html": {"x": 1520, "y": 3800, "w": 1440, "h": 1020, "title": "Desktop · Ending (last 5 s)"},
+    "Desktop-Copied.dc.html": {"x": 3040, "y": 3800, "w": 1440, "h": 1020, "title": "Desktop · ID copied"},
+    "Desktop-Reconnecting.dc.html": {"x": 4560, "y": 3800, "w": 1440, "h": 1020, "title": "Desktop · Reconnecting"},
+    "Desktop-Large.dc.html": {"x": 6080, "y": 3800, "w": 1440, "h": 900, "title": "Desktop · Large QR"},
+    "Desktop-ResetConfirm.dc.html": {"x": 0, "y": 4940, "w": 1440, "h": 1020, "title": "Desktop · Reset — confirm"},
+    "Desktop-ResetDone.dc.html": {"x": 1520, "y": 4940, "w": 1440, "h": 1020, "title": "Desktop · Reset — done"},
+    "Desktop-Loading.dc.html": {"x": 3040, "y": 4940, "w": 1440, "h": 900, "title": "Desktop · Loading"},
+    "Desktop-Error.dc.html": {"x": 4560, "y": 4940, "w": 1440, "h": 900, "title": "Desktop · Error"},
+    "Desktop-Gated.dc.html": {"x": 6080, "y": 4940, "w": 1440, "h": 900, "title": "Desktop · Setup not finished"}
+  },
+  "order": [
+    "Main.dc.html",
+    "Mobile-Default.dc.html", "Mobile-Ending.dc.html", "Mobile-Copied.dc.html", "Mobile-Reconnecting.dc.html", "Mobile-Large.dc.html",
+    "Mobile-ResetConfirm.dc.html", "Mobile-ResetDone.dc.html", "Mobile-Loading.dc.html", "Mobile-Error.dc.html", "Mobile-Gated.dc.html",
+    "Desktop-Default.dc.html", "Desktop-Ending.dc.html", "Desktop-Copied.dc.html", "Desktop-Reconnecting.dc.html", "Desktop-Large.dc.html",
+    "Desktop-ResetConfirm.dc.html", "Desktop-ResetDone.dc.html", "Desktop-Loading.dc.html", "Desktop-Error.dc.html", "Desktop-Gated.dc.html"
+  ],
+  "notes": {
+    "t-proto": {"x": 0, "y": -300, "text": "F2 · My QR — interactive prototype", "kind": "title1", "maxW": 1600},
+    "t-mobile": {"x": 0, "y": 1600, "text": "Mobile · 390 px — every state", "kind": "title1", "maxW": 4620},
+    "t-desktop": {"x": 0, "y": 3500, "text": "Desktop · 1440 px — every state", "kind": "title1", "maxW": 7520},
+    "behaviour": {"x": 470, "y": 0, "w": 560, "fill": "blue", "size": "m", "text": "Behaviour notes (decisions from the product owner)\n\n1. The code changes every 30 s. The bar counts 30 → 0 and turns orange in the last 5 s. Always visible.\n2. Only the current code is shown. The previous code still works for one more window (30–60 s in total), silently.\n3. Only the ID has a Copy button. The 6-digit code is not copyable on purpose: the reporter must read it in person.\n4. Show large QR opens a full-screen view (QR, ID, code, countdown) for scanning from about 2 m. Close or Esc returns.\n5. If a refresh fails, the last QR and code stay visible, greyed, with \"Reconnecting…\". Error appears only on a failed first load, or once the last code has really expired (about 60 s).\n6. The reporting section is called \"Record a deed\". English only for v1.\n7. Not signed in → login page. Setup not finished → normally redirected to onboarding; the in-page \"Setup not finished\" state is the fallback if the API says onboarding_required.\n\nPress Play on the prototype: the countdown runs, the code changes, and Copy ID, Show large QR and Reset all work."}
+  },
+  "designSystems": []
+}

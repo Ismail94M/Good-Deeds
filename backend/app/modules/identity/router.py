@@ -1,0 +1,328 @@
+import logging
+from typing import Annotated
+
+from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, Request, Response, status
+from fastapi.responses import JSONResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.config import get_settings
+from app.core.db import get_session
+from app.core.errors import AppError, NotFound, TooManyRequests, Unauthorized
+from app.core.ratelimit import Limiter, RateLimiter, client_ip
+from app.core.sms import SmsProvider, get_sms_provider
+from app.modules.identity import service
+from app.modules.identity._limits import load_limits
+from app.modules.identity._oauth import OAuthError, OAuthVerifier, get_oauth_verifiers
+from app.modules.identity.models import User, UserStatus
+from app.modules.identity.schemas import (
+    AgeAndConsent,
+    AuthConfig,
+    LoginRequest,
+    Me,
+    OAuthLoginRequest,
+    PasswordForgotRequest,
+    PasswordForgotResponse,
+    PasswordResetRequest,
+    PasswordResetResponse,
+    PhoneStartRequest,
+    PhoneStartResponse,
+    PhoneVerifyRequest,
+    ProfileUpdate,
+    PublicProfile,
+    QrCodeResponse,
+    SignupRequest,
+    TokenResponse,
+)
+from app.modules.identity.service import CurrentUser, DeviceId
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
+Session = Annotated[AsyncSession, Depends(get_session)]
+
+REFRESH_COOKIE = "gd_refresh"
+REFRESH_COOKIE_PATH = "/api/auth"
+
+
+def _set_refresh_cookie(response: Response, raw: str) -> None:
+    settings = get_settings()
+    response.set_cookie(
+        REFRESH_COOKIE,
+        raw,
+        max_age=settings.refresh_token_days * 86400,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite="lax",
+        path=REFRESH_COOKIE_PATH,
+    )
+
+
+def _clear_refresh_cookie(response: Response) -> None:
+    settings = get_settings()
+    response.delete_cookie(
+        REFRESH_COOKIE,
+        path=REFRESH_COOKIE_PATH,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite="lax",
+    )
+
+
+async def _start_session(
+    session: AsyncSession, response: Response, user: User, device_id: str | None
+) -> TokenResponse:
+    access, expires, refresh = await service.issue_session(session, user, device_id)
+    await session.commit()
+    _set_refresh_cookie(response, refresh)
+    return TokenResponse(access_token=access, expires_at=expires)
+
+
+# --------------------------------------------------- auth
+
+
+@router.get("/auth/config", response_model=AuthConfig, tags=["auth"])
+async def auth_config() -> AuthConfig:
+    s = get_settings()
+    return AuthConfig(
+        google_client_id=s.google_client_id or None, facebook_app_id=s.facebook_app_id or None
+    )
+
+
+@router.post(
+    "/auth/signup", response_model=TokenResponse, status_code=status.HTTP_201_CREATED, tags=["auth"]
+)
+async def signup(
+    data: SignupRequest,
+    request: Request,
+    response: Response,
+    session: Session,
+    device_id: DeviceId,
+    limiter: Limiter,
+) -> TokenResponse:
+    limits = await load_limits(session)
+    await limiter.hit(f"signup:ip:{client_ip(request)}", limits.rate_signup_ip)
+    user = await service.register_with_password(session, data)
+    return await _start_session(session, response, user, device_id)
+
+
+@router.post("/auth/login", response_model=TokenResponse, tags=["auth"])
+async def login(
+    data: LoginRequest,
+    request: Request,
+    response: Response,
+    session: Session,
+    device_id: DeviceId,
+    limiter: Limiter,
+) -> TokenResponse:
+    limits = await load_limits(session)
+    await limiter.hit(f"login:ip:{client_ip(request)}", limits.rate_login_ip)
+    await limiter.hit(f"login:email:{data.email.lower()}", limits.rate_login_email)
+    user = await service.authenticate_password(session, data.email, data.password)
+    return await _start_session(session, response, user, device_id)
+
+
+@router.post("/auth/oauth/{provider}", response_model=TokenResponse, tags=["auth"])
+async def oauth_login(
+    provider: str,
+    data: OAuthLoginRequest,
+    request: Request,
+    response: Response,
+    session: Session,
+    device_id: DeviceId,
+    limiter: Limiter,
+    verifiers: Annotated[dict[str, OAuthVerifier], Depends(get_oauth_verifiers)],
+) -> TokenResponse:
+    limits = await load_limits(session)
+    await limiter.hit(f"oauth:ip:{client_ip(request)}", limits.rate_oauth_ip)
+    verifier = verifiers.get(provider)
+    if verifier is None:
+        raise AppError("Unknown sign-in provider.", code="unknown_provider")
+    try:
+        identity = await verifier.verify(data.token)
+    except OAuthError as exc:
+        raise Unauthorized(
+            "We couldn't sign you in with that account. Please try again.", code="oauth_failed"
+        ) from exc
+    user = await service.login_with_oauth(session, identity)
+    return await _start_session(session, response, user, device_id)
+
+
+@router.post("/auth/refresh", response_model=TokenResponse, tags=["auth"])
+async def refresh(
+    request: Request,
+    response: Response,
+    session: Session,
+    device_id: DeviceId,
+    limiter: Limiter,
+    gd_refresh: Annotated[str | None, Cookie()] = None,
+) -> TokenResponse | JSONResponse:
+    limits = await load_limits(session)
+    await limiter.hit(f"refresh:ip:{client_ip(request)}", limits.rate_refresh_ip)
+    try:
+        if not gd_refresh:
+            raise Unauthorized("Please log in.", code="not_authenticated")
+        _, access, expires, new_raw = await service.rotate_refresh_token(
+            session, gd_refresh, device_id
+        )
+    except Unauthorized as exc:
+        # Return the error ourselves: a raised exception would drop the cookie deletion,
+        # and the browser would keep replaying a dead token.
+        failed = JSONResponse(
+            status_code=exc.status_code, content={"detail": exc.detail, "code": exc.code}
+        )
+        _clear_refresh_cookie(failed)
+        return failed
+    await session.commit()
+    _set_refresh_cookie(response, new_raw)
+    return TokenResponse(access_token=access, expires_at=expires)
+
+
+@router.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT, tags=["auth"])
+async def logout(
+    response: Response, session: Session, gd_refresh: Annotated[str | None, Cookie()] = None
+) -> Response:
+    if gd_refresh:
+        await service.revoke_refresh_token(session, gd_refresh)
+        await session.commit()
+    response.status_code = status.HTTP_204_NO_CONTENT
+    _clear_refresh_cookie(response)
+    return response
+
+
+@router.post("/auth/password/forgot", response_model=PasswordForgotResponse, tags=["auth"])
+async def password_forgot(
+    data: PasswordForgotRequest,
+    request: Request,
+    background: BackgroundTasks,
+    session: Session,
+    limiter: Limiter,
+    sms: Annotated[SmsProvider, Depends(get_sms_provider)],
+) -> PasswordForgotResponse:
+    """Always ``{"sent": true, "resend_after_seconds": n}`` for a valid number: whether a code
+    went out (verified phone, password set, active account) is never revealed."""
+    limits = await load_limits(session)
+    await limiter.hit(f"pw_forgot:ip:{client_ip(request)}", limits.rate_password_forgot_ip)
+    phone = service.normalize_phone(data.phone)
+    # Keyed by the keyed hash: raw numbers never go into rate-limit keys.
+    phone_key = service.phone_hash(phone)
+    await limiter.hit(f"pw_forgot:phone:{phone_key}", limits.rate_password_forgot_phone)
+    await limiter.hit(f"pw_forgot:phone_day:{phone_key}", limits.rate_password_forgot_phone_daily)
+    outgoing = await service.request_password_reset(session, phone)
+    await session.commit()
+    if outgoing is not None:
+        # Sent after the response, so a slow SMS provider (or the budget check) doesn't
+        # reveal that an account exists.
+        background.add_task(_send_reset_sms, sms, limiter, limits.rate_sms_reset_global, outgoing)
+    return PasswordForgotResponse(resend_after_seconds=limits.otp_resend_seconds)
+
+
+async def _send_reset_sms(
+    sms: SmsProvider, limiter: RateLimiter, budget: str, outgoing: service.OutgoingSms
+) -> None:
+    """Charge the reset SMS budget (its own key, so resets and onboarding codes can't starve
+    each other) only for a code that is really going out. Past the budget the code is
+    quietly not sent: the caller has already answered "sent"."""
+    try:
+        await limiter.hit("sms:reset_global", budget)
+    except TooManyRequests:
+        # No phone number or code in the log.
+        logger.warning("Password reset SMS budget exhausted; a reset code was not sent.")
+        return
+    await sms.send(outgoing.phone_e164, outgoing.message)
+
+
+@router.post("/auth/password/reset", response_model=PasswordResetResponse, tags=["auth"])
+async def password_reset(
+    data: PasswordResetRequest, request: Request, session: Session, limiter: Limiter
+) -> PasswordResetResponse:
+    """Set a new password with the SMS code. Ends every session; does not sign the user in."""
+    limits = await load_limits(session)
+    await limiter.hit(f"pw_reset:ip:{client_ip(request)}", limits.rate_password_reset_ip)
+    phone = service.normalize_phone(data.phone)
+    phone_key = service.phone_hash(phone)
+    await limiter.hit(f"pw_reset:phone:{phone_key}", limits.rate_password_reset_phone)
+    await limiter.hit(f"pw_reset:phone_day:{phone_key}", limits.rate_password_reset_phone_daily)
+    await service.reset_password(session, phone, data.code, data.new_password)
+    await session.commit()
+    return PasswordResetResponse()
+
+
+# --------------------------------------------------- me
+
+
+@router.get("/users/me", response_model=Me, tags=["users"])
+async def get_me(user: CurrentUser, session: Session) -> Me:
+    result = await service.me(session, user)
+    await session.commit()
+    return result
+
+
+@router.patch("/users/me", response_model=Me, tags=["users"])
+async def update_me(data: ProfileUpdate, user: CurrentUser, session: Session) -> Me:
+    await service.update_profile(session, user, data)
+    result = await service.me(session, user)
+    await session.commit()
+    return result
+
+
+@router.post("/users/me/age-consent", response_model=Me, tags=["users"])
+async def age_consent(
+    data: AgeAndConsent, user: CurrentUser, session: Session, device_id: DeviceId
+) -> Me:
+    await service.complete_age_and_consent(session, user, data, device_id)
+    result = await service.me(session, user)
+    await session.commit()
+    return result
+
+
+@router.post("/users/me/phone/start", response_model=PhoneStartResponse, tags=["users"])
+async def phone_start(
+    data: PhoneStartRequest,
+    request: Request,
+    user: CurrentUser,
+    session: Session,
+    limiter: Limiter,
+    sms: Annotated[SmsProvider, Depends(get_sms_provider)],
+) -> PhoneStartResponse:
+    limits = await load_limits(session)
+    await limiter.hit(f"phone_start:ip:{client_ip(request)}", limits.rate_phone_start_ip)
+    await limiter.hit("sms:global", limits.rate_sms_global)
+    result = await service.start_phone_verification(session, user, data.phone, sms)
+    await session.commit()
+    return result
+
+
+@router.post("/users/me/phone/verify", response_model=Me, tags=["users"])
+async def phone_verify(
+    data: PhoneVerifyRequest, user: CurrentUser, session: Session, limiter: Limiter
+) -> Me:
+    limits = await load_limits(session)
+    await limiter.hit(f"phone_verify:user:{user.id}", limits.rate_phone_verify_user)
+    await service.confirm_phone(session, user, data.phone, data.code)
+    result = await service.me(session, user)
+    await session.commit()
+    return result
+
+
+@router.get("/users/me/qr", response_model=QrCodeResponse, tags=["users"])
+async def my_qr(user: CurrentUser, session: Session) -> QrCodeResponse:
+    result = await service.qr_code(session, user)
+    await session.commit()
+    return result
+
+
+@router.post("/users/me/qr/rotate", response_model=QrCodeResponse, tags=["users"])
+async def rotate_qr(user: CurrentUser, session: Session) -> QrCodeResponse:
+    await service.qr_code(session, user)  # same onboarding gate as viewing the code
+    await service.rotate_qr_key(session, user)
+    result = await service.qr_code(session, user)
+    await session.commit()
+    return result
+
+
+@router.get("/users/{handle}", response_model=PublicProfile, tags=["users"])
+async def get_profile(handle: str, session: Session) -> PublicProfile:
+    user = await service.get_user_by_handle(session, handle)
+    if user is None or user.status != UserStatus.ACTIVE:
+        raise NotFound("We couldn't find that person.", code="user_not_found")
+    return service.public_profile(user)

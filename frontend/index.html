@@ -4,8 +4,26 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- QR links carry a short-lived token in the path: never send it as a Referer (R5-L2). -->
+    <meta name="referrer" content="no-referrer" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    />
     <title>Good Deeds</title>
     <meta name="description" content="Make kindness visible. Make goodness contagious." />
+    <!--
+      Link previews (Q40): the same generic tags for every page, so no deed's name, photo, text,
+      area or category is ever in the HTML. Crawlers don't run JavaScript; the app loads a deed
+      only after the visibility check.
+    -->
+    <meta property="og:title" content="A good deed was shared with you" />
+    <meta property="og:description" content="See it on Good Deeds" />
+    <meta property="og:image" content="/og-logo.png" />
+    <meta property="og:site_name" content="Good Deeds" />
+    <meta property="og:type" content="website" />
   </head>
   <body>
     <div id="root"></div>

@@ -1,15 +1,30 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 import { createBrowserRouter, RouterProvider } from 'react-router'
-import { HomePage } from '../features/home/HomePage'
+import { AuthProvider } from '../features/auth/AuthProvider'
+import { ApiError } from '../lib/api'
+import { routes } from './routes'
 
-const router = createBrowserRouter([{ path: '/', element: <HomePage /> }])
+const router = createBrowserRouter(routes)
+
+function makeQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        // Don't retry client errors (401/403/404…); retry network blips once.
+        retry: (count, error) => !(error instanceof ApiError && error.status < 500) && count < 1,
+      },
+    },
+  })
+}
 
 export function App() {
-  const [queryClient] = useState(() => new QueryClient())
+  const [queryClient] = useState(makeQueryClient)
   return (
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
     </QueryClientProvider>
   )
 }

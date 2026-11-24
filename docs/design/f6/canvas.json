@@ -1,0 +1,53 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-11-16T16:00:00Z"},
+  "title": "Good Deeds — F6 My deeds",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 390, "h": 1400, "title": "Interactive prototype (mobile) — press Play", "is_interactive": true},
+
+    "M-Profile.dc.html": {"x": 0, "y": 1800, "w": 390, "h": 1100, "title": "Mobile · Your profile"},
+    "M-ProfilePublic.dc.html": {"x": 470, "y": 1800, "w": 390, "h": 1100, "title": "Mobile · Someone else's profile"},
+
+    "M-DeedsRecognised.dc.html": {"x": 0, "y": 3300, "w": 390, "h": 1100, "title": "Mobile · My deeds — Recognised for"},
+    "M-DeedsReported.dc.html": {"x": 470, "y": 3300, "w": 390, "h": 1100, "title": "Mobile · My deeds — I reported"},
+    "M-DeedsEmpty.dc.html": {"x": 940, "y": 3300, "w": 390, "h": 844, "title": "Mobile · My deeds — empty"},
+
+    "M-Detail.dc.html": {"x": 0, "y": 4800, "w": 390, "h": 1100, "title": "Mobile · Deed detail"},
+    "M-WithdrawConfirm.dc.html": {"x": 470, "y": 4800, "w": 390, "h": 1100, "title": "Mobile · Withdraw — confirm"},
+    "M-Withdrawn.dc.html": {"x": 940, "y": 4800, "w": 390, "h": 1100, "title": "Mobile · Withdrawn"},
+    "M-Edit.dc.html": {"x": 1410, "y": 4800, "w": 390, "h": 1400, "title": "Mobile · Edit report — photos editable (first 24 h)"},
+    "M-EditLocked.dc.html": {"x": 1880, "y": 4800, "w": 390, "h": 1400, "title": "Mobile · Edit report — photos locked (after 24 h)"},
+
+    "M-SelfLogs.dc.html": {"x": 0, "y": 6600, "w": 390, "h": 1100, "title": "Mobile · Self-logs"},
+    "M-SelfLogsEmpty.dc.html": {"x": 470, "y": 6600, "w": 390, "h": 844, "title": "Mobile · Self-logs — empty"},
+    "M-SelfLogForm.dc.html": {"x": 940, "y": 6600, "w": 390, "h": 1400, "title": "Mobile · Log a deed"},
+    "M-SelfLogDelete.dc.html": {"x": 1410, "y": 6600, "w": 390, "h": 1100, "title": "Mobile · Delete self-log — confirm"},
+
+    "D-Profile.dc.html": {"x": 0, "y": 8400, "w": 1440, "h": 1000, "title": "Desktop · Your profile"},
+    "D-DeedsReported.dc.html": {"x": 1520, "y": 8400, "w": 1440, "h": 1000, "title": "Desktop · My deeds — I reported"},
+    "D-Detail.dc.html": {"x": 3040, "y": 8400, "w": 1440, "h": 1000, "title": "Desktop · Deed detail"},
+    "D-Edit.dc.html": {"x": 0, "y": 9520, "w": 1440, "h": 1250, "title": "Desktop · Edit report"},
+    "D-SelfLogs.dc.html": {"x": 1520, "y": 9520, "w": 1440, "h": 1000, "title": "Desktop · Self-logs"},
+    "D-SelfLogForm.dc.html": {"x": 3040, "y": 9520, "w": 1440, "h": 1250, "title": "Desktop · Log a deed"}
+  },
+  "order": [
+    "Main.dc.html",
+    "M-Profile.dc.html", "M-ProfilePublic.dc.html",
+    "M-DeedsRecognised.dc.html", "M-DeedsReported.dc.html", "M-DeedsEmpty.dc.html",
+    "M-Detail.dc.html", "M-WithdrawConfirm.dc.html", "M-Withdrawn.dc.html", "M-Edit.dc.html", "M-EditLocked.dc.html",
+    "M-SelfLogs.dc.html", "M-SelfLogsEmpty.dc.html", "M-SelfLogForm.dc.html", "M-SelfLogDelete.dc.html",
+    "D-Profile.dc.html", "D-DeedsReported.dc.html", "D-Detail.dc.html", "D-Edit.dc.html", "D-SelfLogs.dc.html", "D-SelfLogForm.dc.html"
+  ],
+  "notes": {
+    "t-proto": {"x": 0, "y": -300, "text": "F6 · My deeds — interactive prototype", "kind": "title1", "maxW": 1600},
+    "t-profile": {"x": 0, "y": 1500, "text": "1 · Profile", "kind": "title1", "maxW": 860},
+    "t-deeds": {"x": 0, "y": 3000, "text": "2 · My deeds", "kind": "title1", "maxW": 1330},
+    "t-detail": {"x": 0, "y": 4500, "text": "3 · Deed detail, edit, withdraw", "kind": "title1", "maxW": 2270},
+    "t-self": {"x": 0, "y": 6300, "text": "4 · Self-logs", "kind": "title1", "maxW": 1800},
+    "t-desk": {"x": 0, "y": 8100, "text": "Desktop · 1440 px — key screens", "kind": "title1", "maxW": 4480},
+    "behaviour": {"x": 470, "y": 0, "w": 600, "fill": "blue", "size": "m", "text": "F6 decisions (product owner, 2026-11-16)\n\n1. My deeds has two tabs while invites are off: Recognised for and I reported. The Invites tab returns when invites are switched on.\n2. Self-logs get the same photo section as the deed form: up to 4, Take photo or Upload.\n3. The doer sees who reported them: \"Priya Sharma recognised you\".\n4. Editing a report: category, description and people helped can always be changed; photos can be changed for 24 hours after sending, then they lock. Who, when and where never change: they are the verification evidence. Edits are logged and the deed shows \"Edited\".\n\nAlso from the design doc: Withdraw needs confirmation and can't be undone; the deed stops counting for the doer. Self-logs are private, never earn points, and can be edited or deleted any time. Profile shows Self-log Deeds and Verified Deeds (counted reports); on your own profile both link through. Log out now lives on Profile.\n\nSample user: Priya Sharma (@priyas).\nPress Play: Profile → tap Verified Deeds → I reported → open Ahmed → Edit or Withdraw. Or tap Self-log Deeds → Log a deed."}
+  },
+  "designSystems": []
+}
