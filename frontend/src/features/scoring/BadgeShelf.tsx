@@ -123,16 +123,17 @@ function Medal({
       >
         <MedalFace info={info} locked={locked} fresh={fresh} delay={delay} />
         <span
-          className={`line-clamp-2 text-center text-[11.5px] leading-tight ${
+          className={`flex flex-col text-center text-[11.5px] leading-tight ${
             locked ? 'text-slate-500' : 'font-semibold text-slate-800'
           }`}
         >
           {locked && (
-            <span className="block text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
+            <span className="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
               Next
             </span>
           )}
-          {info.label}
+          {/* Only the name is clamped, so "Next" never uses up one of its two lines. */}
+          <span className="line-clamp-2">{info.label}</span>
         </span>
         {fresh && <span className="sr-only"> (new)</span>}
         <span id={`${id}-d`} className="sr-only">
@@ -246,6 +247,9 @@ function Details({ info, locked }: { info: BadgeInfo; locked: boolean }) {
   useLayoutEffect(() => {
     const el = card.current
     if (!el) return
+    // Measure from the unshifted spot, so running again (React dev runs effects twice) keeps the
+    // shift instead of measuring the already-shifted card and resetting it to 0.
+    el.style.marginLeft = '0px'
     const rect = el.getBoundingClientRect()
     const margin = 8
     let dx = 0

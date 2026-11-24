@@ -48,8 +48,9 @@ async def test_seeded_configs_load_with_the_po_values(session: AsyncSession) -> 
         ] * 8
     _, board = await load_leaderboard(session)
     assert board.shared_rank_style == "dense"
-    # Area only (PO 2026-11-23, migration 0022); City keeps its titles so it can be reopened.
-    assert [lvl.kind for lvl in board.levels if lvl.enabled] == ["ward"]
+    # Area only from migration 0022 (D71); City open again from 0025 (D76, PO 2026-11-24) with
+    # its titles; State and Country stay closed ("Coming soon").
+    assert [lvl.kind for lvl in board.levels if lvl.enabled] == ["ward", "city"]
     city = next(lvl for lvl in board.levels if lvl.kind == "city")
     assert [t.key for t in city.titles] == ["hero", "top3"]
 

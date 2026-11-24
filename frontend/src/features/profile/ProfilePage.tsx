@@ -18,6 +18,7 @@ import { useSocial } from '../feed/feedQueries'
 import { useMyScoring } from '../scoring/scoringQueries'
 import { OwnBadges } from '../scoring/OwnBadges'
 import { TierChip } from '../scoring/TierChip'
+import { RankingsButton } from '../scoring/Rankings'
 import { DeedCounts } from './DeedCounts'
 
 const BIO_MAX = 280
@@ -73,7 +74,10 @@ export function ProfilePage() {
           Your profile has been saved.
         </p>
       )}
-      <DeedCounts handle={user.handle} />
+      <div className="flex flex-col gap-2">
+        <DeedCounts handle={user.handle} />
+        <RankingsButton handle={user.handle} title="Your rankings" />
+      </div>
       <ConnectionsLine handle={user.handle} />
       <OwnPoints />
       <OwnBadges handle={user.handle} />

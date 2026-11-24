@@ -6,6 +6,7 @@
 
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError } from '../../lib/api'
+import { useAuth } from '../auth/authContext'
 import {
   DEFAULT_TOP_PERIOD,
   feedApi,
@@ -96,12 +97,19 @@ export function usePublicDeed(deedId: string) {
   })
 }
 
-/** Follower and following counts, and whether I follow them. */
+/**
+ * Follower and following counts, and whether I follow them. Login is optional on this read, so it
+ * waits until the session is restored: asked earlier (a profile opened straight from a link), the
+ * server answers as a visitor and the cached reply shows "Follow" to someone already following,
+ * or on their own profile.
+ */
 export function useSocial(handle: string) {
+  const { isLoading } = useAuth()
   return useQuery({
     queryKey: feedKeys.social(handle),
     queryFn: () => feedApi.social(handle),
     retry: retryUnlessClientError,
+    enabled: !isLoading,
   })
 }
 

@@ -210,6 +210,7 @@ describe('Privacy of the heroes history (D69)', () => {
     expect(await within(history as HTMLElement).findByText('Asha Rao')).toBeVisible()
     const main = screen.getByRole('main')
     expect(main).not.toHaveTextContent(/4321|8765|5432|6543/)
-    expect(within(main).queryByText(/\bpoints?\b/i)).not.toBeInTheDocument()
+    // No point figures; the footnote's ranking rule may name points as a tie-break (D76).
+    expect(within(main).queryByText(/\d\s*points?\b/i)).not.toBeInTheDocument()
   })
 })

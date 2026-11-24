@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
-import { makeMe, mockApi, renderApp, signedIn } from '../../test/utils'
+import { makeMe, mockApi, renderApp, signedIn, TOKEN } from '../../test/utils'
 import { makePost, page } from '../feed/testFixtures'
 
 const ASHA = {
@@ -117,6 +117,31 @@ describe('PublicProfilePage: follows (F13)', () => {
       ...(extra as Record<string, never>),
     })
   }
+
+  it('opened from a link, asks for follow state only once the session is restored', async () => {
+    // The server answers this optional-login read as a visitor when no token is sent. Asked
+    // before the refresh finished, that reply showed "Follow" to someone already following.
+    let releaseRefresh = () => {}
+    const refreshed = new Promise<void>((resolve) => (releaseRefresh = resolve))
+    const api = setup({
+      'POST /auth/refresh': async () => {
+        await refreshed
+        return { body: TOKEN }
+      },
+      'GET /users/asha/social': (req: { headers: Headers }) =>
+        req.headers.get('Authorization')
+          ? { body: { followers: 12, following: 45, is_following: true, is_me: false } }
+          : { body: { followers: 12, following: 45, is_following: null, is_me: false } },
+    })
+    renderApp('/u/asha')
+    expect(await screen.findByRole('heading', { name: 'Asha' })).toBeInTheDocument()
+    expect(api.calls('GET /users/asha/social')).toHaveLength(0)
+    releaseRefresh()
+    expect(await screen.findByRole('button', { name: 'Following Asha' })).toBeVisible()
+    expect(api.calls('GET /users/asha/social').every((r) => r.headers.has('Authorization'))).toBe(
+      true,
+    )
+  })
 
   it('shows four plain counts, the deeds heading and the deeds (Q36)', async () => {
     setup()

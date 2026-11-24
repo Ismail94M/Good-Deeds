@@ -15,6 +15,8 @@ import { useToggleFollow } from '../feed/postActions'
 import { useToast } from '../feed/useToast'
 import { useUserScoring } from '../scoring/scoringQueries'
 import { CrownIcon } from '../scoring/HeroTitles'
+import { useCityRank } from '../scoring/ranks'
+import { PodiumIcon, RankingsButton } from '../scoring/Rankings'
 import { TierChip } from '../scoring/TierChip'
 import { BadgeList, TitlesList } from '../scoring/TitlesList'
 
@@ -101,7 +103,7 @@ export function PublicProfilePage() {
           </LinkButton>
         )}
       </section>
-      <ProfileCounts handle={data.handle} />
+      <ProfileCounts handle={data.handle} name={data.display_name} />
       <p className="flex items-start gap-2.5 text-sm text-slate-600">
         <svg
           aria-hidden
@@ -164,13 +166,14 @@ function ProfileTier({ handle }: { handle: string }) {
   return <TierChip tier={scoring.data.tier} />
 }
 
-type Tone = 'emerald' | 'rose' | 'violet' | 'sky' | 'brand'
+type Tone = 'emerald' | 'amber' | 'rose' | 'violet' | 'sky' | 'brand'
 
 const TONE: Record<Tone, string> = {
   emerald: 'bg-emerald-50 text-emerald-600',
   rose: 'bg-rose-50 text-rose-600',
   violet: 'bg-violet-50 text-violet-600',
   sky: 'bg-sky-50 text-sky-600',
+  amber: 'bg-amber-50 text-amber-700',
   brand: 'bg-brand-50 text-brand-700',
 }
 
@@ -180,8 +183,14 @@ const TONE: Record<Tone, string> = {
  * the title cards below. Followers and Following stay plain numbers (Q36), and there is no
  * Self-log Deeds count and no points on a public profile (D69, PO Q55). Phone: the three
  * achievement stats on top, the two social ones below; from `sm`, all five in one row.
+ *
+ * Signed in (D76): a City Rank tile beside Verified Deeds, from the same snapshots as the City
+ * board, and "View all rankings" below; six tiles, three a row on a phone, one row from `sm`.
+ * Visitors never see ranks: the boards they come from need sign-in.
  */
-function ProfileCounts({ handle }: { handle: string }) {
+function ProfileCounts({ handle, name }: { handle: string; name: string }) {
+  const { user } = useAuth()
+  const signedIn = user !== null
   const counts = useQuery({
     queryKey: deedsKeys.counts(handle),
     queryFn: () => deedsApi.deedCounts(handle),
@@ -192,9 +201,10 @@ function ProfileCounts({ handle }: { handle: string }) {
   const [badgesOpen, setBadgesOpen] = useState(false)
   const badgesId = useId()
   const titlesHeading = useRef<HTMLHeadingElement>(null)
+  const cityRank = useCityRank(handle, signedIn)
   const show = (failed: boolean, n: number | undefined) => (failed ? '–' : (n ?? '…'))
-  const top = 'col-span-2 sm:col-span-1'
-  const bottom = 'col-span-3 sm:col-span-1'
+  const top = signedIn ? '' : 'col-span-2 sm:col-span-1'
+  const bottom = signedIn ? '' : 'col-span-3 sm:col-span-1'
   const titles = scoring.data?.titles ?? []
 
   return (
@@ -204,7 +214,11 @@ function ProfileCounts({ handle }: { handle: string }) {
           role="group"
           aria-label="Counts"
           aria-busy={counts.isPending || social.isPending || scoring.isPending || undefined}
-          className="grid grid-cols-6 gap-2 sm:grid-cols-5"
+          className={
+            signedIn
+              ? 'grid grid-cols-3 gap-2 sm:grid-cols-6'
+              : 'grid grid-cols-6 gap-2 sm:grid-cols-5'
+          }
         >
           <Stat
             icon={<ShieldIcon />}
@@ -213,6 +227,16 @@ function ProfileCounts({ handle }: { handle: string }) {
             label="Verified Deeds"
             className={top}
           />
+          {signedIn && (
+            <Stat
+              icon={<PodiumIcon />}
+              tone="amber"
+              n={cityRank.value}
+              label="City Rank"
+              hint={cityRank.unranked ? 'Not ranked yet this month' : undefined}
+              className={top}
+            />
+          )}
           <Stat
             icon={<MedalIcon />}
             tone="rose"
@@ -253,7 +277,7 @@ function ProfileCounts({ handle }: { handle: string }) {
             n={show(social.isError, social.data?.followers)}
             label="Followers"
             className={bottom}
-            row
+            row={!signedIn}
           />
           <Stat
             icon={<FollowingIcon />}
@@ -261,9 +285,10 @@ function ProfileCounts({ handle }: { handle: string }) {
             n={show(social.isError, social.data?.following)}
             label="Following"
             className={bottom}
-            row
+            row={!signedIn}
           />
         </div>
+        {signedIn && <RankingsButton handle={handle} title={`${name}’s rankings`} />}
         {badgesOpen && scoring.data && (
           <section
             id={badgesId}
@@ -300,6 +325,7 @@ function Stat({
   n,
   label,
   className,
+  hint,
   row = false,
   button,
 }: {
@@ -308,6 +334,8 @@ function Stat({
   n: ReactNode
   label: string
   className: string
+  /** Spoken after the label, e.g. "Not ranked yet this month" for a "–" rank. */
+  hint?: string
   /** Icon beside the number on a phone (the social stats), above it from `sm`. */
   row?: boolean
   button?: { onClick: () => void; expanded?: boolean; controls?: string }
@@ -330,6 +358,7 @@ function Stat({
           {n}
         </span>{' '}
         <span className="text-[12.5px] leading-tight font-medium text-slate-600">{label}</span>
+        {hint && <span className="sr-only">, {hint}</span>}
       </span>
     </>
   )

@@ -12,6 +12,7 @@ import {
   makeRow,
   PRIYA,
   RAVI,
+  SEED,
 } from './testFixtures'
 
 const ME = makeMe({ handle: PRIYA.handle, display_name: PRIYA.display_name })
@@ -62,15 +63,34 @@ describe('LeaderboardPage', () => {
     expect(screen.queryByRole('heading', { name: 'Kindness Heroes' })).not.toBeInTheDocument()
   })
 
-  it('pins my own row and marks it', async () => {
+  it('highlights my own row where it is, with no duplicate "Your place" row', async () => {
     setup()
     renderApp('/leaderboard')
-    const mine = await screen.findByRole('region', { name: 'Your place' })
-    expect(mine).toHaveTextContent('=2')
-    expect(mine).toHaveTextContent('Priya Sharma (you)')
     const rows = within(await ranking()).getAllByTestId('board-row')
-    expect(rows[2]).toHaveTextContent('(you)')
+    expect(rows[2]).toHaveTextContent('Priya Sharma (you)')
+    expect(rows[2]).toHaveAttribute('data-me', 'true')
     expect(rows[1]).not.toHaveTextContent('(you)')
+    expect(rows[1]).not.toHaveAttribute('data-me')
+    expect(screen.queryByRole('region', { name: 'Your place' })).not.toBeInTheDocument()
+    expect(screen.getAllByText(/\(you\)/)).toHaveLength(1)
+  })
+
+  it('pins my row with my real rank while I am further down than the rows shown', async () => {
+    const board = makeLeaderboard()
+    setup({
+      'GET /leaderboards': {
+        body: makeLeaderboard({
+          items: board.items.filter((row) => row.user.handle !== PRIYA.handle),
+          me: makeRow({ rank: 57, user: PRIYA, tier: SEED, deed_count: 1 }),
+          next_cursor: 'more',
+        }),
+      },
+    })
+    renderApp('/leaderboard')
+    const mine = await screen.findByRole('region', { name: 'Your place' })
+    expect(mine).toHaveTextContent('57')
+    expect(mine).toHaveTextContent('Priya Sharma (you)')
+    expect(within(await ranking()).queryByText(/\(you\)/)).not.toBeInTheDocument()
   })
 
   it('never shows points, even if a reply carried them by mistake (D69)', async () => {
@@ -84,7 +104,8 @@ describe('LeaderboardPage', () => {
     await ranking()
     const main = screen.getByRole('main')
     expect(main).not.toHaveTextContent(/91\d\d|9999|777/)
-    expect(within(main).queryByText(/\bpoints?\b/i)).not.toBeInTheDocument()
+    // No point figures; the footnote's ranking rule may name points as a tie-break (D76).
+    expect(within(main).queryByText(/\d\s*points?\b/i)).not.toBeInTheDocument()
     // My own points are never fetched for the board screen.
     expect(screen.queryByText('124')).not.toBeInTheDocument()
   })

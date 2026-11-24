@@ -1,7 +1,8 @@
-"""Area-only leaderboards (PO 2026-11-23, migration 0022): the seeded config opens the ward
-("Area") level only; City, State and Country are listed as disabled so the app shows them locked.
-A disabled level gets no boards or titles, its reads are 404, and "my boards" leaves it out.
-These tests use the seeded config as is (no ``city_board_on``)."""
+"""Open and locked leaderboard levels. Migration 0022 (D71) opened only the ward ("Area") level;
+migration 0025 (D76, PO 2026-11-24) opens City beside it, so the seeded config has Area and City
+open and State and Country listed as disabled, shown locked ("Coming soon"). A disabled level
+gets no boards or titles, its reads are 404, and "my boards" leaves it out; the tests for that
+close City again with one config version (``_area_only``)."""
 
 from datetime import UTC, datetime, timedelta
 
@@ -17,6 +18,17 @@ from tests.deeds.helpers import Member, members
 from tests.scoring.board_helpers import CITY, city, counted, ist, month, publish_board, ward
 
 
+async def _area_only(session: AsyncSession) -> None:
+    """Close City again (the D71 config), as one new config version."""
+    _, current = await load_leaderboard(session)
+    await publish_board(
+        session,
+        levels=tuple(
+            lvl.model_copy(update={"enabled": lvl.kind == "ward"}) for lvl in current.levels
+        ),
+    )
+
+
 async def _september(session: AsyncSession) -> tuple[Member, Member, int, int]:
     """a: 3 ward deeds from 2 reporters (enough for the Area Hero); b: 1 deed with no ward."""
     a, b, r1, r2 = await members(session, 4)
@@ -28,19 +40,46 @@ async def _september(session: AsyncSession) -> tuple[Member, Member, int, int]:
     return a, b, kora, bangalore
 
 
-async def test_only_the_area_level_is_open_and_the_rest_are_listed_locked(
+async def test_area_and_city_are_open_and_state_and_country_are_listed_locked(
     client: AsyncClient, session: AsyncSession
 ) -> None:
     (user,) = await members(session, 1)
     res = await client.get("/api/scoring/options", headers=user.headers)
     assert res.status_code == 200
     levels = {lvl["kind"]: lvl["enabled"] for lvl in res.json()["levels"]}
-    assert levels == {"ward": True, "city": False, "state": False, "country": False}
+    assert levels == {"ward": True, "city": True, "state": False, "country": False}
+
+
+async def test_the_open_city_ranks_everyone_in_its_wards_and_awards_its_titles(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """D76: the City board counts deeds in every ward plus deeds with no ward, with the board
+    rules, and month end awards City Kindness Hero (#1) and Top 3 (#2, #3) from the config."""
+    a, b, kora, bangalore = await _september(session)
+    await finalize_month(session, month(2026, 9), now=ist(2026, 10, 3))
+    await session.commit()
+
+    board = await client.get(f"/api/leaderboards?region={CITY}&month=2026-09", headers=b.headers)
+    assert board.status_code == 200
+    assert [(i["rank"], i["user"]["handle"]) for i in board.json()["items"]] == [
+        (1, a.handle),
+        (2, b.handle),
+    ]
+    titles = {
+        (t.level_kind, t.region_id, t.place, t.user_id)
+        for t in await session.scalars(select(HeroTitle))
+    }
+    assert titles == {
+        (TitleLevel.WARD, kora, 1, a.user_id),
+        (TitleLevel.CITY, bangalore, 1, a.user_id),
+        (TitleLevel.CITY, bangalore, 2, b.user_id),
+    }
 
 
 async def test_a_disabled_city_gets_no_board_and_no_titles(
     client: AsyncClient, session: AsyncSession
 ) -> None:
+    await _area_only(session)
     a, b, kora, bangalore = await _september(session)
     await finalize_month(session, month(2026, 9), now=ist(2026, 10, 3))
     await session.commit()
@@ -71,24 +110,20 @@ async def test_my_boards_leave_out_a_level_that_was_closed(
 ) -> None:
     """A city board computed while City was open (an old snapshot) is not offered once it is
     closed again; reopening it is one config version and brings it back."""
-    _, current = await load_leaderboard(session)
-    with_city = tuple(
-        lvl.model_copy(update={"enabled": lvl.kind in ("ward", "city")}) for lvl in current.levels
-    )
-    await publish_board(session, levels=with_city)
+    _, with_city = await load_leaderboard(session)
     a, r = await members(session, 2)
     now = datetime.now(UTC)
     kora = await ward(session, "AO2")
     await counted(session, a, r, region_id=kora, verified_at=now - timedelta(minutes=5))
     await _leaderboard.refresh_due(session, now=now + timedelta(hours=1))
-    await publish_board(session, levels=current.levels)
+    await _area_only(session)
     await session.commit()
 
     me = await client.get("/api/scoring/me", headers=a.headers)
     assert me.status_code == 200
     assert {b["region"]["kind"] for b in me.json()["boards"]} == {"ward"}
 
-    await publish_board(session, levels=with_city)
+    await publish_board(session, levels=with_city.levels)
     await session.commit()
     me = await client.get("/api/scoring/me", headers=a.headers)
     assert {b["region"]["kind"] for b in me.json()["boards"]} == {"ward", "city"}

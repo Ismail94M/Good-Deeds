@@ -211,6 +211,26 @@ class Leaderboard(BaseModel):
     next_cursor: str | None
 
 
+class UserRank(BaseModel):
+    """One level of a person's ranking this month (D76). ``enabled`` false means the level is not
+    open yet ("Coming soon"); ``rank`` null means they are on no board of that level this month.
+    Read from the same snapshots as the boards, so it always matches the leaderboard."""
+
+    level: RegionKindName
+    enabled: bool
+    region: BoardRegion | None
+    rank: int | None
+    shared: bool
+
+
+class UserRanks(BaseModel):
+    """#12 (D76). ``levels`` in order Area (ward), City, State, Country."""
+
+    month: str
+    final: bool
+    levels: list[UserRank]
+
+
 class RegionOption(BaseModel):
     code: str
     name: str

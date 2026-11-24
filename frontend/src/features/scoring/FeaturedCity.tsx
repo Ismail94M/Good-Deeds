@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { ApiError } from '../../lib/api'
 import { Avatar, focusRing, secondaryButton } from '../feed/feedUi'
 import type { FeaturedCityBoard, FeaturedRow } from './scoringApi'
+import { RANKING_RULE } from './ranks'
 import { useFeaturedCity } from './scoringQueries'
 import { deedsText, formatMonth, rankText } from './scoringText'
 
@@ -88,8 +89,7 @@ function Board({ board }: { board: FeaturedCityBoard }) {
         </>
       )}
       <p className="text-sm text-slate-600">
-        People registered in {board.city.name}, ranked like every board: verified deeds this month,
-        then points. “=2” means a shared place.
+        People registered in {board.city.name}. {RANKING_RULE} “=2” means a shared place.
       </p>
     </Frame>
   )
@@ -129,19 +129,19 @@ function Frame({
 const PLACE_STYLE = [
   {
     order: 'order-2',
-    block: 'h-24 bg-amber-400 text-white',
+    block: 'h-28 bg-amber-400 text-amber-950',
     ring: 'ring-amber-400',
     medal: 'Gold',
   },
   {
     order: 'order-1',
-    block: 'h-16 bg-slate-300 text-slate-800',
+    block: 'h-20 bg-slate-300 text-slate-800',
     ring: 'ring-slate-300',
     medal: 'Silver',
   },
   {
     order: 'order-3',
-    block: 'h-12 bg-orange-300 text-orange-950',
+    block: 'h-16 bg-orange-300 text-orange-950',
     ring: 'ring-orange-300',
     medal: 'Bronze',
   },

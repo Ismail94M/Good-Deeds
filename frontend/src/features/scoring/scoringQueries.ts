@@ -52,6 +52,19 @@ export function useUserScoring(handle: string, enabled = true) {
   })
 }
 
+/**
+ * `GET /scoring/users/{handle}/ranks` (#12, D76): their rank this month at each level, read from
+ * the same snapshots as the boards. Signed-in only: pass `enabled` false for visitors.
+ */
+export function useUserRanks(handle: string, enabled = true) {
+  return useQuery({
+    queryKey: scoringKeys.ranks(handle),
+    queryFn: () => scoringApi.ranks(handle),
+    retry: retryUnlessClientError,
+    enabled,
+  })
+}
+
 /** `GET /scoring/deeds/{id}` (#5): my own points line on a deed (404 for anyone else). */
 export function useDeedPoints(deedId: string, enabled = true) {
   return useQuery({

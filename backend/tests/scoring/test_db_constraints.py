@@ -847,11 +847,12 @@ def test_config_seed_is_safe_to_rerun(sync_conn: Connection) -> None:
     count = text(
         "SELECT count(*) FROM config_versions WHERE namespace IN ('scoring', 'leaderboard')"
     )
-    # The two 0020 seeds plus the leaderboard versions of 0022 (City off) and 0023 (featured).
-    assert sync_conn.execute(count).scalar_one() == 4
+    # The two 0020 seeds plus the leaderboard versions of 0022 (City off), 0023 (featured) and
+    # 0025 (City open again, D76).
+    assert sync_conn.execute(count).scalar_one() == 5
     with Operations.context(MigrationContext.configure(sync_conn)):
         m.seed_config()
-    assert sync_conn.execute(count).scalar_one() == 4
+    assert sync_conn.execute(count).scalar_one() == 5
 
 
 def test_downgrade_and_upgrade_round_trip(sync_conn: Connection) -> None:

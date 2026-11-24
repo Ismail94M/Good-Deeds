@@ -43,11 +43,15 @@ export function LevelTabs({
                   aria-label={`${LEVEL_LABEL[kind]}, locked`}
                   title={`${LEVEL_LABEL[kind]} leaderboards are coming soon`}
                   data-testid={`level-locked-${kind}`}
-                  className="inline-flex min-h-11 w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 text-[15px] font-semibold text-slate-400 select-none"
+                  className="inline-flex min-h-11 w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 text-[15px] font-semibold text-slate-400 select-none sm:flex-col sm:gap-0.5 sm:py-1"
                 >
-                  <LockIcon className="size-4 shrink-0" />
-                  {LEVEL_LABEL[kind]}
-                  <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-[11px] font-bold tracking-wide text-slate-600 uppercase">
+                  {/* Four in a row from `sm` leaves too little width for name and tag side by side
+                      ("Country" overflowed), so they stack there. */}
+                  <span className="inline-flex items-center gap-1.5">
+                    <LockIcon className="size-4 shrink-0" />
+                    {LEVEL_LABEL[kind]}
+                  </span>
+                  <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-[11px] leading-none font-bold tracking-wide text-slate-600 uppercase">
                     Locked
                   </span>
                 </span>

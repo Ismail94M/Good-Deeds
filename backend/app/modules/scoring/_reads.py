@@ -62,6 +62,8 @@ from app.modules.scoring.schemas import (
     TierOption,
     TierOut,
     TitleOut,
+    UserRank,
+    UserRanks,
     UserSummary,
 )
 
@@ -587,6 +589,68 @@ async def leaderboard(
             else None
         ),
     )
+
+
+async def user_ranks(
+    session: AsyncSession, handle: str, *, now: datetime | None = None
+) -> UserRanks:
+    """#12 (D76): a person's rank this month at each level, read from the boards' current
+    snapshots (final, else newest), so it always matches the leaderboard. A person can be on
+    several boards of one level (deeds in several wards); the best one is shown: best rank, then
+    more counted deeds, then region name. Disabled levels come back ``enabled: false``.
+
+    Only the board's region is named, never the person's registered area or city."""
+    user = await identity.get_user_by_handle(session, handle)
+    if user is None or user.status != "active":
+        raise NotFound("We couldn't find that person.", code="user_not_found")
+    now = now or datetime.now(UTC)
+    _, config = await load_leaderboard(session)
+    period = await _now_month(session, now)
+    finalized = await _leaderboard.is_finalized(session, period)
+    finalized = finalized or await _finalize.closed_without_deeds(session, period, now)
+    entries = [
+        (snapshot, entry)
+        for snapshot, entry in await _leaderboard.user_board_entries(session, user.id, [period])
+        # As on the board read: once finalized, a region with no final snapshot is empty.
+        if snapshot.final or not finalized
+    ]
+    regions = await deeds.regions_by_id(session, {s.region_id for s, _ in entries})
+    best: dict[str, tuple[LeaderboardEntry, deeds.RegionView]] = {}
+    for snapshot, entry in entries:
+        region = regions.get(snapshot.region_id)
+        if region is None:
+            continue
+        kind = region.kind.value
+        current = best.get(kind)
+        if current is None or (entry.rank, -entry.deed_count, region.name) < (
+            current[0].rank,
+            -current[0].deed_count,
+            current[1].name,
+        ):
+            best[kind] = (entry, region)
+    shared: dict[tuple[uuid.UUID, int], int] = {}
+    if best:
+        keys = [(e.snapshot_id, e.rank) for e, _ in best.values()]
+        counts = await session.execute(
+            select(LeaderboardEntry.snapshot_id, LeaderboardEntry.rank, func.count())
+            .where(tuple_(LeaderboardEntry.snapshot_id, LeaderboardEntry.rank).in_(keys))
+            .group_by(LeaderboardEntry.snapshot_id, LeaderboardEntry.rank)
+        )
+        shared = {(sid, rank): int(n) for sid, rank, n in counts}
+    levels: list[UserRank] = []
+    for level in config.levels:
+        found = best.get(level.kind) if level.enabled else None
+        levels.append(
+            UserRank(
+                level=level.kind,
+                enabled=level.enabled,
+                region=None if found is None else _region_out(found[1]),
+                rank=None if found is None else found[0].rank,
+                shared=found is not None
+                and shared.get((found[0].snapshot_id, found[0].rank), 1) > 1,
+            )
+        )
+    return UserRanks(month=_labels.month_param(period), final=finalized, levels=levels)
 
 
 async def region_options(

@@ -209,6 +209,22 @@ export type LeaderboardParams = {
 /** One ward-picker result (#7). */
 export type RegionOption = { code: string; name: string }
 
+/**
+ * One level of `GET /scoring/users/{handle}/ranks` (#12, D76). `enabled: false` = the level is
+ * not open yet ("Coming soon"); `rank: null` = on no board of that level this month. `region` is
+ * the board's region (for Area, the person's best Area board), never their registered area.
+ */
+export type UserRank = {
+  level: RegionKind
+  enabled: boolean
+  region: { code: string; name: string; kind: RegionKind } | null
+  rank: number | null
+  shared: boolean
+}
+
+/** `GET /scoring/users/{handle}/ranks` (#12): signed-in only; levels in Area, City, State, Country order. */
+export type UserRanks = { month: string; final: boolean; levels: UserRank[] }
+
 export type RegionSearchParams = { kind?: RegionKind; q?: string }
 
 /** `GET /leaderboards/heroes` (#8, §3.4 item 2): final months only, newest first. */
@@ -287,6 +303,7 @@ export const scoringApi = {
   ledger: ({ role, cursor }: LedgerParams = {}) =>
     apiGet<LedgerPage>(`/scoring/me/ledger${queryString({ role, cursor })}`),
   user: (handle: string) => apiGet<PublicScoring>(`/scoring/users/${seg(handle)}`),
+  ranks: (handle: string) => apiGet<UserRanks>(`/scoring/users/${seg(handle)}/ranks`),
   deed: (deedId: string) => apiGet<DeedPoints>(`/scoring/deeds/${seg(deedId)}`),
   leaderboard: ({ region, month, cursor }: LeaderboardParams = {}) =>
     apiGet<Leaderboard>(`/leaderboards${queryString({ region, month, cursor })}`),
@@ -310,6 +327,8 @@ export const scoringKeys = {
   me: ['scoring', 'me'] as const,
   ledger: (role: LedgerRole | null = null) => ['scoring', 'me', 'ledger', role ?? 'all'] as const,
   user: (handle: string) => ['scoring', 'user', handle.toLowerCase()] as const,
+  // Under `leaderboard`, so whatever refreshes the boards refreshes the ranks read from them.
+  ranks: (handle: string) => ['leaderboard', 'ranks', handle.toLowerCase()] as const,
   deed: (deedId: string) => ['scoring', 'deed', deedId] as const,
   leaderboard: (region: string | null = null, month: string | null = null) =>
     ['leaderboard', region, month] as const,

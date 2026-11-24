@@ -38,7 +38,11 @@ export function HeroTitles({ titles }: { titles: HeroTitle[] }) {
     <div className="flex flex-col gap-2.5">
       <ul className="grid gap-2.5 sm:grid-cols-2">
         {cards.map((title, i) => (
-          <li key={key(title)} className={i === 0 ? 'sm:col-span-2' : ''}>
+          // The first card spans the row; so does a last card that would sit alone at half width.
+          <li
+            key={key(title)}
+            className={i === 0 || (i === cards.length - 1 && i % 2 === 1) ? 'sm:col-span-2' : ''}
+          >
             <TitleCard title={title} />
           </li>
         ))}

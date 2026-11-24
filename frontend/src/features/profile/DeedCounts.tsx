@@ -2,13 +2,15 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { deedsApi, deedsKeys } from '../deeds/deedsApi'
+import { useCityRank } from '../scoring/ranks'
 
 const focusRing =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700'
 
 /**
- * My own "{n} Self-log Deeds | {n} Verified Deeds" on `/profile` (D4, D15), linking to
- * self-logs and My deeds. Since M4 (D69, PO Q55) the self-log count is private: it comes from
+ * My own "{n} Self-log Deeds | {n} Verified Deeds | #{n} City Rank" on `/profile` (D4, D15, D76),
+ * linking to self-logs, My deeds and my City board (the City level's landing when I'm not on
+ * it this month). Since M4 (D69, PO Q55) the self-log count is private: it comes from
  * `total` on my own `GET /me/self-logs` (sharing the self-logs list's cache), and
  * `GET /users/{handle}/deed-counts` returns only `verified`. If the API doesn't send `total`,
  * the Self-logs tile shows no number.
@@ -30,13 +32,15 @@ export function DeedCounts({ handle }: { handle: string }) {
   const selfLogTotal = selfLogs.data?.pages[0]?.total
   // Loaded but without `total`: hide the number rather than guess it from one page.
   const hideSelfLogCount = selfLogs.isSuccess && typeof selfLogTotal !== 'number'
+  const cityRank = useCityRank(handle, true)
+  const cityRegion = cityRank.city?.region
 
   return (
     <div
       role="group"
       aria-label="Deed counts"
       aria-busy={counts.isPending || selfLogs.isPending || undefined}
-      className="grid grid-cols-2 overflow-hidden rounded-2xl border border-slate-200 bg-white"
+      className="grid grid-cols-3 overflow-hidden rounded-2xl border border-slate-200 bg-white"
     >
       <Count
         n={hideSelfLogCount ? null : value(selfLogs.isError, selfLogTotal)}
@@ -49,6 +53,17 @@ export function DeedCounts({ handle }: { handle: string }) {
         to="/me/deeds"
         divider
       />
+      <Count
+        n={cityRank.value}
+        label="City Rank"
+        hint={cityRank.unranked ? 'Not ranked yet' : undefined}
+        to={
+          cityRegion
+            ? `/leaderboard/${encodeURIComponent(cityRegion.code)}`
+            : '/leaderboard?level=city'
+        }
+        divider
+      />
     </div>
   )
 }
@@ -57,11 +72,14 @@ function Count({
   n,
   label,
   to,
+  hint,
   divider = false,
 }: {
   n: ReactNode
   label: string
   to: string
+  /** Spoken after the label, e.g. "Not ranked yet" for a "–" rank. */
+  hint?: string
   divider?: boolean
 }) {
   return (
@@ -76,7 +94,8 @@ function Count({
           <span className="text-[26px] leading-tight font-bold">{n}</span>{' '}
         </>
       )}
-      <span className="text-sm font-medium text-brand-700">{label}</span>
+      <span className="text-center text-sm leading-tight font-medium text-brand-700">{label}</span>
+      {hint && <span className="sr-only">, {hint}</span>}
     </Link>
   )
 }

@@ -34,6 +34,7 @@ from app.modules.scoring.schemas import (
     PublicScoring,
     RegionOption,
     ScoringOptions,
+    UserRanks,
 )
 
 router = APIRouter(tags=["scoring"])
@@ -101,6 +102,16 @@ async def public_scoring(
     """Public (§3.4 #4): tier, badges and titles; never points or ranks."""
     await _limit(session, limiter, request, viewer_id)
     return await _reads.public_scoring(session, handle)
+
+
+@router.get("/scoring/users/{handle}/ranks", response_model=UserRanks)
+async def user_ranks(
+    handle: str, request: Request, user: CurrentUser, session: Session, limiter: Limiter
+) -> UserRanks:
+    """#12 (D76): a person's rank this month at each level. Signed-in only, like the boards it
+    is read from; nobody can hide from the boards, so there is no opt-out."""
+    await _limit(session, limiter, request, user.id)
+    return await _reads.user_ranks(session, handle)
 
 
 @router.get("/scoring/deeds/{deed_id}", response_model=DeedPoints)

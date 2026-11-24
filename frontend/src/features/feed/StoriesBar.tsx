@@ -43,7 +43,9 @@ export function StoriesBar() {
           <Key tone={ROLE_TONE.verified.ring} label="Verified" />
         </p>
       </div>
-      <ul className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pt-0.5 pb-1 [scrollbar-width:none]">
+      {/* scroll-px-4: snap points respect the gutter, or the first ring snaps flush to the
+          screen edge on a phone. */}
+      <ul className="-mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pt-0.5 pb-1 [scrollbar-width:none]">
         {!hasMine && (
           <li className="snap-start">
             <Link

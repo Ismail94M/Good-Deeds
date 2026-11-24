@@ -8,6 +8,7 @@ import { Avatar, FeedMain, focusRing, LockIcon, secondaryButton } from '../feed/
 import { FeaturedCity } from './FeaturedCity'
 import { DEFAULT_LEVEL, LEVEL_LABEL, LEVEL_NOUN, levelHref, openLevels, parseLevel } from './levels'
 import { LevelTabs } from './LevelTabs'
+import { RANKING_RULE } from './ranks'
 import { RegionPicker } from './RegionPicker'
 import type { BoardTitle, Leaderboard, LeaderboardRow, RegionKind } from './scoringApi'
 import { useHeroes, useLeaderboard, useMyScoring, useScoringOptions } from './scoringQueries'
@@ -115,8 +116,8 @@ function BoardView({
           />
           {board.isError && <ErrorAlert>{errorMessage(board.error)}</ErrorAlert>}
           <p className="text-sm text-slate-600">
-            Ranks come from deeds that witnesses verified this month. Likes, comments and followers
-            never count. “=2” means a shared place.
+            {RANKING_RULE} Only deeds a witness verified count; likes, comments and followers never
+            do. “=2” means a shared place.
           </p>
         </>
       ) : null}
@@ -376,16 +377,28 @@ function BoardRows({
       </p>
     )
   }
+  // Your row is highlighted where it is; it is pinned above the list only while it is not
+  // among the rows shown (further down the board), with your real rank.
+  const listed = rows.some((r) => r.user.handle?.toLowerCase() === myHandle)
   return (
     <div className="flex flex-col gap-3">
-      {board.me && (
-        <section aria-label="Your place" className="rounded-2xl border border-brand-100 bg-white">
+      {board.me && !listed && (
+        <section
+          aria-labelledby="your-place-h"
+          className="flex flex-col gap-1 overflow-hidden rounded-2xl border border-brand-600/35 bg-white pt-2"
+        >
+          <h3
+            id="your-place-h"
+            className="px-3.5 text-xs font-bold tracking-wide text-brand-700 uppercase"
+          >
+            Your place
+          </h3>
           {row(board.me)}
         </section>
       )}
       <ol
         aria-label="Ranking"
-        className="flex flex-col divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white"
+        className="flex flex-col divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200 bg-white"
       >
         {rows.map((r, i) => (
           <li key={r.user.handle ?? `unavailable-${r.rank}-${i}`}>{row(r)}</li>
@@ -409,7 +422,8 @@ function Row({ row, me, title }: { row: LeaderboardRow; me: boolean; title: stri
   return (
     <div
       data-testid="board-row"
-      className={`flex items-center gap-3 px-3.5 py-3 ${me ? 'bg-brand-50' : ''}`}
+      data-me={me || undefined}
+      className={`flex items-center gap-3 px-3.5 py-3 ${me ? 'bg-brand-50 ring-2 ring-brand-600/35 ring-inset' : ''}`}
     >
       <span
         aria-label={row.shared ? `Rank ${row.rank}, shared` : `Rank ${row.rank}`}
