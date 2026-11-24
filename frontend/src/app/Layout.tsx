@@ -6,7 +6,7 @@ const focusRing =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700'
 
 function navClass({ isActive }: { isActive: boolean }) {
-  return `flex min-h-11 items-center justify-center rounded-lg px-3 text-sm font-medium ${focusRing} ${
+  return `flex min-h-11 items-center justify-center rounded-lg px-2 text-sm font-medium sm:px-3 ${focusRing} ${
     isActive ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100'
   }`
 }
@@ -37,7 +37,7 @@ function PlusIcon() {
 }
 
 /**
- * Header (M2-DESIGN D25). Signed in: logo, nav Home · My QR · Profile, and a blue "Record a deed"
+ * Header (M2-DESIGN D25). Signed in: logo, nav Home · Leaderboard · My QR · Profile (M4 §6.2), and a blue "Record a deed"
  * button on every page; on phones the logo and button share the first row and the nav runs full
  * width below. Log out lives on the Profile page. Signed out: the sign-in / sign-up link.
  */
@@ -74,10 +74,16 @@ export function Layout() {
             className={user ? 'order-3 w-full sm:order-2 sm:ml-auto sm:w-auto' : 'order-2'}
           >
             {user ? (
-              <ul className="grid grid-cols-3 gap-1 sm:flex">
+              <ul className="grid grid-cols-4 gap-1 sm:flex">
                 <li>
                   <NavLink to="/" end className={navClass}>
                     Home
+                  </NavLink>
+                </li>
+                <li>
+                  {/* M4 §6.2: the city board; ward boards are reached from there. */}
+                  <NavLink to="/leaderboard" className={navClass}>
+                    Leaderboard
                   </NavLink>
                 </li>
                 <li>

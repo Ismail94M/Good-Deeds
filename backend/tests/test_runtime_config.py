@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.audit import AuditLog
 from app.core.db import advisory_xact_lock
 from app.core.errors import AppError, Gone
-from app.core.runtime_config import ConfigVersion, RuntimeConfig, load, publish
+from app.core.runtime_config import ConfigVersion, RuntimeConfig, load, load_version, publish
 from app.modules.identity._qr import QrConfig
 
 
@@ -118,6 +118,21 @@ async def test_load_returns_highest_version(session: AsyncSession) -> None:
     version, qr = await load(session, QrConfig)
     assert version == v2
     assert qr == QrConfig(window_seconds=20, grace_windows=0)
+
+
+async def test_load_version_returns_that_version(session: AsyncSession) -> None:
+    before, original = await load(session, QrConfig)
+    v1 = await publish(
+        session, QrConfig(window_seconds=45, grace_windows=2), actor_id=None, reason="a"
+    )
+    await publish(session, QrConfig(window_seconds=20, grace_windows=0), actor_id=None, reason="b")
+
+    assert await load_version(session, QrConfig, before) == original
+    assert await load_version(session, QrConfig, v1) == QrConfig(window_seconds=45, grace_windows=2)
+    with pytest.raises(LookupError):
+        await load_version(session, QrConfig, v1 + 100)
+    with pytest.raises(LookupError):
+        await load_version(session, MissingConfig, 1)
 
 
 async def test_publish_writes_audit_row(session: AsyncSession) -> None:

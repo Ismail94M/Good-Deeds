@@ -6,6 +6,7 @@
 
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError } from '../../lib/api'
+import { useAuth } from '../auth/authContext'
 import {
   DEFAULT_TOP_PERIOD,
   feedApi,
@@ -47,6 +48,27 @@ export function useFeed(tab: FeedTab, period: TopPeriod = DEFAULT_TOP_PERIOD) {
   })
 }
 
+/** The stories bar (D73): who in my network has stories. Counts only, so it is cheap. */
+export function useStoryRings() {
+  return useQuery({
+    queryKey: feedKeys.stories,
+    queryFn: feedApi.storyRings,
+    staleTime: 60_000,
+    retry: retryUnlessClientError,
+  })
+}
+
+/** One person's stories with signed photo URLs; loaded only when their ring is opened. */
+export function useStoryPerson(handle: string | null) {
+  return useQuery({
+    queryKey: feedKeys.storyPerson(handle ?? ''),
+    queryFn: () => feedApi.storyPerson(handle ?? ''),
+    enabled: handle !== null,
+    staleTime: 5 * 60_000,
+    retry: retryUnlessClientError,
+  })
+}
+
 /** `PostDetail` for `/deeds/:id`. */
 export function useFeedDeed(deedId: string) {
   return useQuery({
@@ -75,12 +97,19 @@ export function usePublicDeed(deedId: string) {
   })
 }
 
-/** Follower and following counts, and whether I follow them. */
+/**
+ * Follower and following counts, and whether I follow them. Login is optional on this read, so it
+ * waits until the session is restored: asked earlier (a profile opened straight from a link), the
+ * server answers as a visitor and the cached reply shows "Follow" to someone already following,
+ * or on their own profile.
+ */
 export function useSocial(handle: string) {
+  const { isLoading } = useAuth()
   return useQuery({
     queryKey: feedKeys.social(handle),
     queryFn: () => feedApi.social(handle),
     retry: retryUnlessClientError,
+    enabled: !isLoading,
   })
 }
 

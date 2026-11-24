@@ -6,7 +6,38 @@ import { makeMe, mockApi, NOT_ONBOARDED, renderApp, signedIn } from '../../test/
 /** The site header (a page's own <header> inside <main> is also a banner in jsdom). */
 const siteHeader = () => screen.getAllByRole('banner')[0]
 
-const COUNTS = { 'GET /users/asha/deed-counts': { body: { self_logged: 25, verified: 12 } } }
+// M4 D69: deed-counts is public and has `verified` only; my self-log count is `total` on my
+// own `GET /me/self-logs`.
+const COUNTS = {
+  'GET /users/asha/deed-counts': { body: { verified: 12 } },
+  'GET /me/self-logs': { body: { items: [], next_cursor: null, total: 25 } },
+}
+
+const MY_SCORING = {
+  tier: { slug: 'sprout', label: 'Sprout' },
+  badges_total: 2,
+  titles_total: 1,
+  badges: [
+    { slug: 'first_recognised', label: 'First recognition' },
+    { slug: 'kind_5', label: '5 deeds' },
+  ],
+  titles: [
+    {
+      label: 'Kindness Hero · Koramangala · November 2026',
+      period_month: '2026-11',
+      region_name: 'Koramangala',
+      place: 1,
+      level: 'ward',
+    },
+  ],
+  total_points: 124,
+  // Deliberately not adding up to total_points: the page shows the server's total (§3.4 item 5).
+  doer_points: 100,
+  reporter_points: 14,
+  provisional_points: 12,
+  boards: [],
+  reporter_today: { used: 1, cap: 10 },
+}
 
 describe('ProfilePage', () => {
   it('shows the name, "@handle" without a city, and the linked counts', async () => {
@@ -55,10 +86,52 @@ describe('ProfilePage', () => {
     mockApi({
       ...signedIn(makeMe()),
       'GET /users/asha/deed-counts': { status: 500, body: { detail: 'boom' } },
+      'GET /me/self-logs': { status: 500, body: { detail: 'boom' } },
     })
     renderApp('/profile')
     const counts = await screen.findByRole('group', { name: 'Deed counts' })
     expect(await within(counts).findByRole('link', { name: '– Self-log Deeds' })).toBeVisible()
+    expect(await within(counts).findByRole('link', { name: '– Verified Deeds' })).toBeVisible()
+  })
+
+  it('hides the self-log number when the API sends no total (M4 D69)', async () => {
+    mockApi({
+      ...signedIn(makeMe()),
+      'GET /users/asha/deed-counts': { body: { verified: 12 } },
+      'GET /me/self-logs': { body: { items: [], next_cursor: null } },
+    })
+    renderApp('/profile')
+    const counts = await screen.findByRole('group', { name: 'Deed counts' })
+    expect(await within(counts).findByRole('link', { name: 'Self-logs' })).toHaveAttribute(
+      'href',
+      '/me/self-logs',
+    )
+    expect(within(counts).getByRole('link', { name: '12 Verified Deeds' })).toBeVisible()
+  })
+
+  it('shows my tier, points, badges and titles, only to me, with a link to My points', async () => {
+    mockApi({ ...signedIn(makeMe()), ...COUNTS, 'GET /scoring/me': { body: MY_SCORING } })
+    renderApp('/profile')
+    const points = await screen.findByRole('region', { name: 'Your points' })
+    expect(points).toHaveTextContent('Your points: 124 (12 still provisional)')
+    expect(points).toHaveTextContent('2 badges · 1 Hero title · Only you can see your points.')
+    expect(within(points).getByRole('link', { name: 'My points' })).toHaveAttribute(
+      'href',
+      '/me/points',
+    )
+    expect(screen.getByText('Sprout')).toHaveTextContent('Tier: Sprout')
+  })
+
+  it('leaves out the points line when scoring can’t load', async () => {
+    mockApi({
+      ...signedIn(makeMe()),
+      ...COUNTS,
+      'GET /scoring/me': { status: 500, body: { detail: 'boom' } },
+    })
+    renderApp('/profile')
+    const counts = await screen.findByRole('group', { name: 'Deed counts' })
+    await within(counts).findByRole('link', { name: '25 Self-log Deeds' })
+    expect(screen.queryByRole('region', { name: 'Your points' })).not.toBeInTheDocument()
   })
 
   it('shows the account details with the phone number to its owner', async () => {

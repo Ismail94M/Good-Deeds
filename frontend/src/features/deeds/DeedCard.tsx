@@ -2,6 +2,7 @@ import { Link } from 'react-router'
 import { useUnreadOutcome } from '../media/outcomeSeen'
 import { formatCardDate } from '../report/format'
 import type { Category, DeedOut } from './deedsApi'
+import { useCanWithdraw } from './withdrawWindow'
 import { categoryLabel, extraWitnessNote, isExtraWitness, whoLine } from './deedText'
 import {
   EditIcon,
@@ -30,7 +31,9 @@ export function DeedCard({
   sameActCap: number
   onWithdraw: (deed: DeedOut) => void
 }) {
-  const showActions = viewer === 'reporter' && (deed.can_edit || deed.can_withdraw)
+  // M4 D64: the Withdraw button goes once the 24 h window passes, even with the page open.
+  const canWithdraw = useCanWithdraw(deed)
+  const showActions = viewer === 'reporter' && (deed.can_edit || canWithdraw)
   const unread = useUnreadOutcome(deed, viewer === 'reporter')
   return (
     <article className="flex flex-col gap-1.5 rounded-2xl border border-slate-200 bg-white px-4 py-3.5">
@@ -78,7 +81,7 @@ export function DeedCard({
           ) : (
             <span />
           )}
-          {deed.can_withdraw && (
+          {canWithdraw && (
             <button
               type="button"
               onClick={() => onWithdraw(deed)}

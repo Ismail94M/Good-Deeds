@@ -1,14 +1,17 @@
 """Typed values of the ``deeds`` config namespace (docs/M2-DESIGN.md §2.1).
 
 Every key is required and has no default: the ``config_versions`` row (seeded as ``deeds`` v1 by
-migration 0004, then v2 by 0007, v3 by 0008, v4 by 0009, v5 by 0013 and v6 by 0018) is the only
-source of these values. Change them by publishing a new version.
+migration 0004, then v2 by 0007, v3 by 0008, v4 by 0009, v5 by 0013, v6 by 0018 and v7 by 0019) is
+the only source of these values. Change them by publishing a new version.
 
 v5 (docs/M3-DESIGN.md §2.1, D41): ``photos_enabled`` moved to the ``media`` namespace, and
 ``area_fallback_m`` was added.
 
 v6 (migration 0018): the report-limit warning thresholds ``reporter_monthly_warn_at`` and
 ``reporter_doer_monthly_warn_at``, formerly frontend constants.
+
+v7 (migration 0019, docs/M4-DESIGN.md §2.6): ``withdraw_window_hours`` and
+``fallback_region_code``.
 """
 
 from pydantic import BaseModel, ConfigDict
@@ -65,6 +68,12 @@ class DeedLimits(RuntimeConfig):
     # Area names (M3 D39): a point outside every area polygon takes the nearest area within
     # this many metres, else shows "Bangalore"
     area_fallback_m: int
+    # Withdrawal window (M4 D64): a reporter may withdraw a verified deed only this many hours
+    # after ``verified_at``; points settle then. Pending invites can be cancelled at any time.
+    withdraw_window_hours: int
+    # Leaderboards (M4 D66): a deed with no ward (``area_id`` null) counts from this region
+    # (``regions.code``), the city
+    fallback_region_code: str
     # Deed content
     description_min: int
     description_max: int

@@ -60,6 +60,41 @@ export type PostOut = {
   share_url: string
 }
 
+// ----------------------------------------------------------------- stories (D73)
+
+/**
+ * `reported`: a deed the person witnessed and reported (blue ring). `verified`: the person's own
+ * deed, verified by a witness (green ring). One deed is a story in both people's rings.
+ */
+export type StoryRole = 'reported' | 'verified'
+
+/** One person in the stories bar: counts only, no photos (they load when the ring opens). */
+export type StoryRing = {
+  user: UserRef
+  is_me: boolean
+  reported_count: number
+  verified_count: number
+  /** Stories I haven't watched; 0 means a grey ring. */
+  unseen_count: number
+  latest_at: string
+}
+
+export type StoryRings = {
+  items: StoryRing[]
+  seconds_per_story: number
+  window_hours: number
+}
+
+export type StoryOut = { role: StoryRole; seen: boolean; post: PostOut }
+
+/** One person's stories, oldest first. */
+export type StoryPerson = {
+  user: UserRef
+  is_me: boolean
+  seconds_per_story: number
+  items: StoryOut[]
+}
+
 /** The caller's hide controls; separate hides per person (Q24). */
 export type Visibility = {
   listed: boolean
@@ -247,6 +282,12 @@ export const feedApi = {
   myFollowing: (cursor?: string | null) =>
     apiGet<Page<ConnectionOut>>(`/me/following${queryString({ cursor })}`),
 
+  // stories (D73): rings first (no media), one person's stories when their ring opens
+  storyRings: () => apiGet<StoryRings>('/feed/stories'),
+  storyPerson: (handle: string) => apiGet<StoryPerson>(`/feed/stories/${seg(handle)}`),
+  storySeen: (deedId: string, role: StoryRole) =>
+    apiPut<void>('/feed/stories/seen', { deed_id: deedId, role }),
+
   // saved (#12)
   saved: (cursor?: string | null) => apiGet<Page<PostOut>>(`/me/saved${queryString({ cursor })}`),
 
@@ -270,6 +311,8 @@ export const feedKeys = {
   publicDeed: (deedId: string) => ['feed', 'public', deedId] as const,
   userDeeds: (handle: string) => ['feed', 'user-deeds', handle.toLowerCase()] as const,
   saved: ['feed', 'saved'] as const,
+  stories: ['feed', 'stories'] as const,
+  storyPerson: (handle: string) => ['feed', 'stories', handle.toLowerCase()] as const,
   followers: ['feed', 'followers'] as const,
   following: ['feed', 'following'] as const,
   notices: ['feed', 'notices'] as const,

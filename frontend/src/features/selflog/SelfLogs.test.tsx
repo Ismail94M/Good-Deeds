@@ -37,7 +37,7 @@ function setup(logs: SelfLogOut[], handlers: Parameters<typeof mockApi>[0] = {})
     ...signedIn(makeMe()),
     'GET /deeds/options': { body: makeOptions() },
     'GET /me/self-logs': { body: { items: logs, next_cursor: null } },
-    'GET /users/asha/deed-counts': { body: { self_logged: logs.length, verified: 0 } },
+    'GET /users/asha/deed-counts': { body: { verified: 0 } },
     ...handlers,
   })
 }

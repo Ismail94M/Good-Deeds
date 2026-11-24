@@ -19,6 +19,7 @@ MODULES: list[str] = [
     "deeds",  # M2: deeds, scans, same-act groups, invites, self-logs
     "media",  # M3: photo uploads, pipeline, photo reports and decisions
     "feed",  # M3: feed projection, likes, comments, saves, shares, follows, Top
+    "scoring",  # M4: points ledger, leaderboards, Kindness Hero titles, badges, tier
 ]
 
 _OPTIONAL_PARTS = ("models", "handlers", "jobs")

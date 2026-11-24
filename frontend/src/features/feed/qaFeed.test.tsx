@@ -1009,7 +1009,16 @@ describe('Loading and error states of the new screens', () => {
           joined_at: '2026-11-01T10:00:00Z',
         },
       },
-      'GET /users/asha/deed-counts': { body: { self_logged: 0, verified: 0 } },
+      'GET /users/asha/deed-counts': { body: { verified: 0 } },
+      'GET /scoring/users/asha': {
+        body: {
+          tier: { slug: 'seed', label: 'Seed' },
+          badges_total: 0,
+          titles_total: 0,
+          badges: [],
+          titles: [],
+        },
+      },
       'GET /users/asha/social': {
         body: { followers: 0, following: 0, is_following: false, is_me: false },
       },
@@ -1020,6 +1029,6 @@ describe('Loading and error states of the new screens', () => {
     // Counts stay plain text (Q36), even at zero.
     const counts = screen.getByRole('group', { name: 'Counts' })
     expect(within(counts).queryByRole('link')).not.toBeInTheDocument()
-    await waitFor(() => expect(within(counts).getAllByText('0')).toHaveLength(4))
+    await waitFor(() => expect(within(counts).getAllByText('0')).toHaveLength(5))
   })
 })

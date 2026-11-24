@@ -6,7 +6,7 @@ import { makeMe, mockApi, NOT_ONBOARDED, renderApp, signedIn } from '../test/uti
 const siteHeader = () => screen.getAllByRole('banner')[0]
 
 describe('Layout header (D25)', () => {
-  it('shows Home · My QR · Profile and a Record a deed button when signed in', async () => {
+  it('shows Home · Leaderboard · My QR · Profile and a Record a deed button when signed in', async () => {
     mockApi(signedIn(makeMe()))
     renderApp('/profile')
     const header = siteHeader()
@@ -15,7 +15,12 @@ describe('Layout header (D25)', () => {
 
     const nav = within(header).getByRole('navigation', { name: 'Main' })
     const links = within(nav).getAllByRole('link')
-    expect(links.map((link) => link.textContent)).toEqual(['Home', 'My QR', 'Profile'])
+    expect(links.map((link) => link.textContent)).toEqual([
+      'Home',
+      'Leaderboard',
+      'My QR',
+      'Profile',
+    ])
     expect(within(nav).getByRole('link', { name: 'Profile' })).toHaveAttribute(
       'aria-current',
       'page',

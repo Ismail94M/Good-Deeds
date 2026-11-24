@@ -512,3 +512,122 @@ describe('edit', () => {
     expect(screen.queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument()
   })
 })
+
+describe('withdrawal window (M4 F15, D64)', () => {
+  // 08:35 UTC = 14:05 IST on 3 Dec.
+  const UNTIL = '2099-12-03T08:35:00Z'
+  const closed = (overrides: Partial<DeedOut> = {}) =>
+    reported({
+      verified_at: '2026-11-01T10:00:00Z',
+      withdrawable_until: '2026-11-02T10:00:00Z',
+      can_withdraw: false,
+      ...overrides,
+    })
+  const OPTIONS = { body: { withdraw_window_hours: 24 } }
+
+  it('shows "You can withdraw until …" with the button inside the window', async () => {
+    setup({ 'GET /deeds/r1': { body: reported({ withdrawable_until: UNTIL }) } })
+    renderApp('/me/deeds/r1')
+    expect(await screen.findByText('You can withdraw until 3 Dec, 14:05.')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Withdraw' })).toBeVisible()
+  })
+
+  it('hides Withdraw after the window and says why; Edit stays', async () => {
+    setup({ 'GET /deeds/r1': { body: closed() }, 'GET /scoring/options': OPTIONS })
+    renderApp('/me/deeds/r1')
+    expect(
+      await screen.findByText('Verified deeds can be withdrawn only in the first 24 hours.'),
+    ).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Withdraw' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/You can withdraw until/)).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Edit' })).toBeVisible()
+  })
+
+  it('hides Withdraw when the window ends while the page is open', async () => {
+    const soon = new Date(Date.now() + 1200).toISOString()
+    setup({
+      'GET /deeds/r1': { body: reported({ withdrawable_until: soon }) },
+      'GET /scoring/options': OPTIONS,
+    })
+    renderApp('/me/deeds/r1')
+    expect(await screen.findByRole('button', { name: 'Withdraw' })).toBeVisible()
+    await waitFor(
+      () => expect(screen.queryByRole('button', { name: 'Withdraw' })).not.toBeInTheDocument(),
+      { timeout: 4000 },
+    )
+    expect(
+      await screen.findByText('Verified deeds can be withdrawn only in the first 24 hours.'),
+    ).toBeVisible()
+  })
+
+  it('hides Withdraw on the card once the window has passed', async () => {
+    track(
+      setup({
+        ...deedsByRole(
+          [],
+          [closed({ can_withdraw: true, withdrawable_until: '2026-11-02T10:00:00Z' })],
+        ),
+      }),
+    )
+    renderApp('/me/deeds?tab=reported')
+    expect(
+      await screen.findByRole('link', { name: 'Edit: You recognised Ahmed Khan' }),
+    ).toBeVisible()
+    expect(screen.queryByRole('button', { name: /^Withdraw/ })).not.toBeInTheDocument()
+  })
+
+  it('a pending invite deed can still be withdrawn (no window)', async () => {
+    setup({
+      'GET /deeds/p1': {
+        body: reported({
+          id: 'p1',
+          status: 'pending',
+          verification_method: 'invite_accept',
+          doer: null,
+          same_act: null,
+          verified_at: null,
+          withdrawable_until: null,
+        }),
+      },
+    })
+    renderApp('/me/deeds/p1')
+    expect(await screen.findByRole('button', { name: 'Withdraw' })).toBeVisible()
+    expect(screen.queryByText(/You can withdraw until/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/first 24 hours/)).not.toBeInTheDocument()
+  })
+
+  it('handles 409 withdraw_window_closed with the server’s message and reloads', async () => {
+    const MESSAGE = 'You can no longer withdraw this deed. It was verified more than 24 hours ago.'
+    const api = setup({
+      'GET /deeds/r1': [{ body: reported({ withdrawable_until: UNTIL }) }, { body: closed() }],
+      'GET /scoring/options': OPTIONS,
+      'POST /deeds/r1/withdraw': {
+        status: 409,
+        body: { detail: MESSAGE, code: 'withdraw_window_closed' },
+      },
+    })
+    const user = userEvent.setup()
+    renderApp('/me/deeds/r1')
+    await user.click(await screen.findByRole('button', { name: 'Withdraw' }))
+    await user.click(screen.getByRole('button', { name: 'Withdraw report' }))
+    const dialog = await screen.findByRole('dialog', { name: 'You can’t withdraw this report' })
+    expect(dialog).toHaveAccessibleDescription(MESSAGE)
+    expect(
+      within(dialog).queryByRole('button', { name: 'Withdraw report' }),
+    ).not.toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'OK' }))
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Withdraw' })).not.toBeInTheDocument(),
+    )
+    expect(
+      await screen.findByText('Verified deeds can be withdrawn only in the first 24 hours.'),
+    ).toBeVisible()
+    expect(api.calls('GET /deeds/r1')).toHaveLength(2)
+  })
+
+  it('notes on the edit form that late changes don’t change points', async () => {
+    setup({ 'GET /deeds/r1': { body: reported() }, 'GET /scoring/options': OPTIONS })
+    renderApp('/me/deeds/r1/edit')
+    expect(await screen.findByText('Changes after 24 hours don’t change points.')).toBeVisible()
+  })
+})

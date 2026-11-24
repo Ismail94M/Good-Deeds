@@ -20,7 +20,7 @@ from app.modules.deeds import _cursor
 from app.modules.deeds._areas import area_names
 from app.modules.deeds._common import ist_day, ist_month, utcnow
 from app.modules.deeds._invites import invite_out
-from app.modules.deeds._limits import DeedLimits
+from app.modules.deeds._limits import DeedLimits, load_limits
 from app.modules.deeds._reporter_limit import reported_this_month
 from app.modules.deeds._views import deed_out
 from app.modules.deeds.models import Deed, DeedStatus, Invite, InviteStatus, SameActGroup
@@ -63,6 +63,8 @@ async def _deed_outs(
     if own_ids:
         found = await session.scalars(select(Invite).where(Invite.deed_id.in_(own_ids)))
         invites = {i.deed_id: i for i in found}
+    _, limits = await load_limits(session)
+    now = utcnow()
     out: list[DeedOut] = []
     for deed in deeds:
         invite = invites.get(deed.id)
@@ -75,6 +77,8 @@ async def _deed_outs(
                 invite=invite_out(invite) if invite is not None else None,
                 summaries=summaries,
                 areas=areas,
+                window_hours=limits.withdraw_window_hours,
+                now=now,
             )
         )
     return out

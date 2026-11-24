@@ -19,6 +19,7 @@ import {
 } from './deedUi'
 import { descriptionError, fromBeneficiariesCount, toBeneficiariesCount } from './formValues'
 import { PeopleStepper } from './PeopleStepper'
+import { useScoringOptions } from '../scoring/scoringQueries'
 import { visibleDoerName } from './deedText'
 
 const NOT_EDITABLE = 'This report can’t be edited any more.'
@@ -81,6 +82,10 @@ function EditForm({
   const [description, setDescription] = useState(deed.description)
   const [people, setPeople] = useState(fromBeneficiariesCount(deed.beneficiaries_count))
   const [showErrors, setShowErrors] = useState(false)
+  // M4 D56: edits re-score only inside the withdrawal window (verified deeds).
+  const verified = deed.status === 'verified'
+  const scoringOptions = useScoringOptions(verified)
+  const windowHours = scoringOptions.data?.withdraw_window_hours
 
   const save = useMutation({
     mutationFn: (changes: DeedUpdate) => deedsApi.updateDeed(deed.id, changes),
@@ -163,6 +168,13 @@ function EditForm({
         <p className="text-sm text-[#586579]">
           Changes are saved with a history, and the deed shows “Edited”.
         </p>
+        {verified && (
+          <p className="-mt-4 text-sm text-[#586579]">
+            {windowHours
+              ? `Changes after ${windowHours} hours don’t change points.`
+              : 'Changes made after the withdrawal window don’t change points.'}
+          </p>
+        )}
         {formError && <ErrorAlert>{formError}</ErrorAlert>}
         <div className="flex flex-col gap-2.5">
           <button

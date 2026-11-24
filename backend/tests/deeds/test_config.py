@@ -2,6 +2,7 @@
 
 import pytest
 from pydantic import ValidationError
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.runtime_config import ConfigVersion
@@ -9,7 +10,7 @@ from app.modules.deeds._limits import DeedLimits, load_limits
 
 
 async def test_seeded_deeds_row_validates_against_deed_limits(session: AsyncSession) -> None:
-    row = await session.get(ConfigVersion, ("deeds", 6))
+    row = await session.get(ConfigVersion, ("deeds", 7))
     assert row is not None
     limits = DeedLimits.model_validate(row.values)
     # Every seeded key is modelled, and nothing else.
@@ -25,6 +26,7 @@ async def test_seeded_deeds_row_validates_against_deed_limits(session: AsyncSess
     assert limits.reporter_doer_monthly_limit == 15
     assert limits.area_fallback_m == 1500
     assert (limits.reporter_monthly_warn_at, limits.reporter_doer_monthly_warn_at) == (10, 3)
+    assert (limits.withdraw_window_hours, limits.fallback_region_code) == (24, "IN-KA-BLR")
     assert limits.invites_enabled is False
     assert limits.has_category("animals")
     assert not limits.has_category("crypto")
@@ -115,17 +117,43 @@ async def test_deeds_v6_adds_the_warning_thresholds(session: AsyncSession) -> No
         "reporter_doer_monthly_warn_at": 3,
     }
     assert v6.created_by is None and "warning" in v6.reason
-    assert await session.get(ConfigVersion, ("deeds", 7)) is None
-    version, limits = await load_limits(session)
-    assert version == 6
+    _, limits = await load_limits(session)
     assert (limits.reporter_monthly_warn_at, limits.reporter_doer_monthly_warn_at) == (10, 3)
+    # v6 lacks the v7 keys: the current model can't read it.
+    with pytest.raises(ValidationError):
+        DeedLimits.model_validate(v6.values)
+
+
+async def test_deeds_v7_adds_the_withdraw_window_and_fallback_region(
+    session: AsyncSession,
+) -> None:
+    """Migration 0019 (M4 D64, D66) publishes v7 = v6 + ``withdraw_window_hours = 24`` and
+    ``fallback_region_code = "IN-KA-BLR"`` (a seeded region); v7 is the active version on a fresh
+    database."""
+    v6 = await session.get(ConfigVersion, ("deeds", 6))
+    v7 = await session.get(ConfigVersion, ("deeds", 7))
+    assert v6 is not None and v7 is not None
+    assert v7.values == {
+        **v6.values,
+        "withdraw_window_hours": 24,
+        "fallback_region_code": "IN-KA-BLR",
+    }
+    assert v7.created_by is None and "D64" in v7.reason and "D66" in v7.reason
+    assert await session.get(ConfigVersion, ("deeds", 8)) is None
+    version, limits = await load_limits(session)
+    assert version == 7
+    assert (limits.withdraw_window_hours, limits.fallback_region_code) == (24, "IN-KA-BLR")
+    city = await session.scalar(
+        text("SELECT kind FROM regions WHERE code = :c"), {"c": limits.fallback_region_code}
+    )
+    assert city == "city"
     # A snapshot that still carries photos_enabled is rejected (extra keys are forbidden).
     with pytest.raises(ValidationError):
-        DeedLimits.model_validate({**v6.values, "photos_enabled": True})
+        DeedLimits.model_validate({**v7.values, "photos_enabled": True})
 
 
 async def test_deed_limits_has_no_defaults(session: AsyncSession) -> None:
-    row = await session.get(ConfigVersion, ("deeds", 6))
+    row = await session.get(ConfigVersion, ("deeds", 7))
     assert row is not None
     for key in (
         "same_act_cap",
@@ -136,6 +164,8 @@ async def test_deed_limits_has_no_defaults(session: AsyncSession) -> None:
         "rate_manual_target_daily",
         "reporter_monthly_warn_at",
         "reporter_doer_monthly_warn_at",
+        "withdraw_window_hours",
+        "fallback_region_code",
     ):
         values = dict(row.values)
         values.pop(key)

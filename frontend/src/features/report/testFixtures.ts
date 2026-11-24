@@ -72,6 +72,11 @@ export function makeDeed(overrides: Partial<DeedOut> = {}): DeedOut {
     area_name: 'Koramangala',
     can_edit: true,
     can_withdraw: true,
+    // M4 D64: a verified deed can be withdrawn for 24 h; null for any other status.
+    withdrawable_until:
+      (overrides.status ?? 'verified') === 'verified'
+        ? new Date(Date.now() + 24 * 3600_000).toISOString()
+        : null,
     invite: null,
     ...overrides,
   }

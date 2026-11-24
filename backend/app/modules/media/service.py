@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.storage import ObjectStorage, get_storage, stable_signing_time
 from app.modules.media import _keys
 from app.modules.media._limits import MediaLimits, load_limits
+from app.modules.media.events import DeedPhotoReady
 from app.modules.media.models import (
     ObjectMove,
     Photo,
@@ -30,6 +31,7 @@ from app.modules.media.models import (
 from app.modules.media.schemas import PhotoOut
 
 __all__ = [
+    "DeedPhotoReady",  # the event scoring subscribes to (M4 §5, D47)
     "PhotoOut",
     "SignedVariants",
     "admin_photo_urls",
