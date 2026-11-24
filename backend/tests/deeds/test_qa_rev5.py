@@ -369,8 +369,9 @@ async def test_withdrawing_real_reports_frees_no_pair_slot(session: AsyncSession
     deeds = [
         await scan_and_report(session, witness, ahmed, at=OCT_1 + i * DAY) for i in range(PAIR)
     ]
-    for d in deeds:
-        out = await withdraw(session, witness, d.id, at=OCT_1 + PAIR * DAY)
+    for i, d in enumerate(deeds):
+        # Each inside its 24 h withdrawal window (M4 D64).
+        out = await withdraw(session, witness, d.id, at=OCT_1 + i * DAY + timedelta(hours=1))
         assert out.status == "withdrawn"
     for manual in (False, True):
         await _expect(scan(session, witness, ahmed, at=OCT_20, manual=manual), "pair_monthly_limit")
@@ -572,14 +573,14 @@ async def test_public_counts_and_profile_show_no_non_verified_deed(
 ) -> None:
     doer = await make_member(session)
     witnesses, deeds = await _act(session, doer, 5)
-    await withdraw(session, witnesses[0], deeds[0].id)
+    await withdraw(session, witnesses[0], deeds[0].id, at=OCT_20 + timedelta(hours=1))
     for deed, status in zip(
         deeds[1:4], (DeedStatus.REJECTED, DeedStatus.REMOVED, DeedStatus.UNVERIFIED), strict=True
     ):
         await session.execute(update(Deed).where(Deed.id == deed.id).values(status=status))
     await session.commit()
     counts = await client.get(f"/api/users/{doer.handle}/deed-counts")
-    assert counts.json() == {"self_logged": 0, "verified": 1}
+    assert counts.json() == {"verified": 1}
     profile = await client.get(f"/api/users/{doer.handle}")
     assert profile.status_code == 200
     assert not {k for k in profile.json() if "deed" in k or "count" in k}
@@ -606,7 +607,7 @@ async def test_service_views_for_other_modules_exclude_withdrawn_deeds(
     the doer can't see (withdrawn here)."""
     doer = await make_member(session)
     witnesses, deeds = await _act(session, doer, 3)
-    await withdraw(session, witnesses[0], deeds[0].id)
+    await withdraw(session, witnesses[0], deeds[0].id, at=OCT_20 + timedelta(hours=1))
     views = await deeds_service.deeds_for_doer(session, doer.user_id)
     assert {v.id for v in views} == {deeds[1].id, deeds[2].id}
     view = await deeds_service.get_deed(session, deeds[1].id)
@@ -667,6 +668,8 @@ LATER_KEYS = {
     "area_fallback_m",  # 0013
     "reporter_monthly_warn_at",  # 0018
     "reporter_doer_monthly_warn_at",  # 0018
+    "withdraw_window_hours",  # 0019
+    "fallback_region_code",  # 0019
 }
 # Keys that 0008 adds but a later migration removed again (0013 moved ``photos_enabled`` to the
 # ``media`` namespace). Re-running 0008 on top of head brings them back, so they are compared

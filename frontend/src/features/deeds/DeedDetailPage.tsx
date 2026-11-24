@@ -8,7 +8,7 @@ import { feedApi, feedKeys } from '../feed/feedApi'
 import { DeedPhotos } from '../media/OwnerPhotos'
 import { formatOccurredAt, formatShortDate } from '../report/format'
 import { useDeedOptions } from './deedQueries'
-import { DEFAULT_SAME_ACT_CAP, deedsApi, deedsKeys } from './deedsApi'
+import { DEFAULT_SAME_ACT_CAP, deedsApi, deedsKeys, type DeedOut } from './deedsApi'
 import {
   categoryLabel,
   checkedBy,
@@ -30,7 +30,10 @@ import {
   secondaryButtonClass,
   StatusBadge,
 } from './deedUi'
+import { DeedPointsLine } from '../scoring/DeedPointsLine'
+import { useScoringOptions } from '../scoring/scoringQueries'
 import { WithdrawDeedDialog } from './WithdrawDeedDialog'
+import { formatWithdrawUntil, useCanWithdraw, windowClosedNote } from './withdrawWindow'
 
 /** Passed in navigation state, e.g. from the edit page after a 409 `deed_not_editable`. */
 export type DeedDetailState = { notice?: string } | null
@@ -39,7 +42,7 @@ export type DeedDetailState = { notice?: string } | null
  * `/me/deeds/:id` (F6 canvas): the private owner view of one deed. The reporter gets Edit and
  * Withdraw while allowed, and the withdrawn notice. M3: photos with review outcomes, remove and
  * add (`DeedPhotos`, M3-DESIGN §6.3), and a "Shown in feed" / "Hidden from feed" chip for verified
- * deeds (read from the feed's deed detail).
+ * deeds (read from the feed's deed detail). M4: the viewer's own points line (§6.3).
  */
 export function DeedDetailPage() {
   const { id = '' } = useParams()
@@ -47,7 +50,6 @@ export function DeedDetailPage() {
   const notice = (location.state as DeedDetailState)?.notice ?? null
   const { user } = useAuth()
   const options = useDeedOptions()
-  const [withdrawing, setWithdrawing] = useState(false)
   const query = useQuery({
     queryKey: deedsKeys.deed(id),
     queryFn: () => deedsApi.deed(id),
@@ -150,6 +152,11 @@ export function DeedDetailPage() {
           </>
         )}
       </dl>
+      {/* Own points line (§6.3, #5): the API answers only the doer or reporter, never pending. */}
+      <DeedPointsLine
+        deedId={deed.id}
+        enabled={deed.status !== 'pending' && deed.status !== 'unverified'}
+      />
       {viewer === 'reporter' && deed.status === 'withdrawn' && deed.withdrawn_at && (
         <div
           role="status"
@@ -173,7 +180,35 @@ export function DeedDetailPage() {
           </span>
         </div>
       )}
-      {viewer === 'reporter' && (deed.can_edit || deed.can_withdraw) && (
+      {viewer === 'reporter' && <ReporterActions deed={deed} />}
+    </F6Main>
+  )
+}
+
+/**
+ * The reporter's Edit and Withdraw (F6), with the M4 withdrawal window (D64, §6.3): inside it
+ * "You can withdraw until 3 Dec, 14:05" and the button; after it the button is gone and a note
+ * says why. A pending invite deed can be withdrawn at any time.
+ */
+function ReporterActions({ deed }: { deed: DeedOut }) {
+  const [withdrawing, setWithdrawing] = useState(false)
+  const canWithdraw = useCanWithdraw(deed)
+  const verified = deed.status === 'verified'
+  const windowClosed = verified && deed.withdrawable_until !== null && !canWithdraw
+  const scoringOptions = useScoringOptions(windowClosed)
+  return (
+    <>
+      {verified && canWithdraw && deed.withdrawable_until && (
+        <p className="text-[15px] text-slate-700">
+          You can withdraw until {formatWithdrawUntil(deed.withdrawable_until)}.
+        </p>
+      )}
+      {windowClosed && (
+        <p className="text-[15px] text-slate-600">
+          {windowClosedNote(scoringOptions.data?.withdraw_window_hours)}
+        </p>
+      )}
+      {(deed.can_edit || canWithdraw) && (
         <div className="grid grid-cols-2 gap-2">
           {deed.can_edit ? (
             <Link
@@ -186,7 +221,7 @@ export function DeedDetailPage() {
           ) : (
             <span />
           )}
-          {deed.can_withdraw && (
+          {canWithdraw && (
             <button
               type="button"
               onClick={() => setWithdrawing(true)}
@@ -198,6 +233,6 @@ export function DeedDetailPage() {
         </div>
       )}
       {withdrawing && <WithdrawDeedDialog deed={deed} onClose={() => setWithdrawing(false)} />}
-    </F6Main>
+    </>
   )
 }

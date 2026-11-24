@@ -3,9 +3,9 @@
  * reconnecting or expired, focus handling, and the uncopyable code.
  */
 
-import { createEvent, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, createEvent, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { makeMe, makeQr, mockApi, renderApp, signedIn } from '../../test/utils'
 
 const ME = makeMe({ display_name: 'Ahmed Khan' })
@@ -13,6 +13,8 @@ const soon = (ms: number) => new Date(Date.now() + ms).toISOString()
 
 describe('My QR: reconnecting', () => {
   it('leaves the reconnecting state when a later refresh succeeds', async () => {
+    // The refresh schedule runs on a controlled clock, so a slow machine can't miss a step.
+    vi.useFakeTimers({ shouldAdvanceTime: true })
     const api = mockApi({
       ...signedIn(ME),
       'GET /users/me/qr': [
@@ -23,9 +25,13 @@ describe('My QR: reconnecting', () => {
     })
     renderApp('/me/qr')
     await screen.findByText('482 913')
-    expect(await screen.findByText('Reconnecting…', {}, { timeout: 3000 })).toBeVisible()
-    // Retries on the normal schedule, then shows the fresh code, not greyed, with the bar.
-    expect(await screen.findByText('615 207', {}, { timeout: 3000 })).toBeVisible()
+    // The refresh due after 1 s fails...
+    await act(() => vi.advanceTimersByTimeAsync(1_000))
+    expect(await screen.findByText('Reconnecting…')).toBeVisible()
+    expect(api.calls('GET /users/me/qr')).toHaveLength(2)
+    // ...and the retry on the normal schedule shows the fresh code, not greyed, with the bar.
+    await act(() => vi.advanceTimersByTimeAsync(1_000))
+    expect(await screen.findByText('615 207')).toBeVisible()
     expect(screen.queryByText('Reconnecting…')).not.toBeInTheDocument()
     expect(screen.getByTestId('qr-frame')).not.toHaveClass('grayscale')
     expect(screen.getByRole('progressbar', { name: 'Time until the code changes' })).toBeVisible()

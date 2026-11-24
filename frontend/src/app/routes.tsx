@@ -30,6 +30,8 @@ import { ScanDeedPage } from '../features/report/ScanDeedPage'
 import { ScanLandingPage, ScanLinkPage } from '../features/report/ScanLandingPage'
 import { SelfLogFormPage } from '../features/selflog/SelfLogFormPage'
 import { SelfLogsPage } from '../features/selflog/SelfLogsPage'
+import { LeaderboardPage } from '../features/scoring/LeaderboardPage'
+import { MyPointsPage } from '../features/scoring/MyPointsPage'
 import { NotFoundPage } from './NotFoundPage'
 import { RedirectIfAuthed, RequireAuth, RequireOnboarded, RequireRole } from './guards'
 import { Layout } from './Layout'
@@ -61,6 +63,10 @@ export const routes: RouteObject[] = [
           { path: '/deeds/:id', element: <DeedPage /> },
           { path: '/me/saved', element: <SavedPage /> },
           { path: '/me/connections', element: <ConnectionsPage /> },
+          // M4 scoring screens (M4-DESIGN §6.2): owner-only points, members' leaderboards.
+          { path: '/me/points', element: <MyPointsPage /> },
+          { path: '/leaderboard', element: <LeaderboardPage /> },
+          { path: '/leaderboard/:regionCode', element: <LeaderboardPage /> },
         ],
       },
       {

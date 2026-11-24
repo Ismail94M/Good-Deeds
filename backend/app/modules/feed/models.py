@@ -431,6 +431,32 @@ class FeedNoticeSeen(Base):
     seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class StoryRole(StrEnum):
+    """Whose ring a story is in (D73): the witness who reported the deed (blue) or the doer
+    whose deed was verified (green). One deed is a story in both rings; it is never copied."""
+
+    REPORTED = "reported"
+    VERIFIED = "verified"
+
+
+class StoryView(Base):
+    """Stories a user has watched (D73), so watched rings turn grey on every device. Keyed by
+    the deed and the ring it was watched in. Pruned by ``feed.prune_story_views`` after
+    ``story_seen_retention_hours``."""
+
+    __tablename__ = "story_views"
+    __table_args__ = (PrimaryKeyConstraint("viewer_id", "deed_id", "role", name="pk_story_views"),)
+
+    viewer_id: Mapped[uuid.UUID] = mapped_column(_users_fk())
+    deed_id: Mapped[uuid.UUID] = mapped_column(_posts_fk())
+    role: Mapped[StoryRole] = mapped_column(_enum(StoryRole, "story_role", length=10))
+    seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# The nightly prune.
+Index("ix_story_views_seen_at", StoryView.seen_at)
+
+
 class FeedTopSnapshot(Base):
     """A periodic Top ranking for one period (Q26). The job keeps the newest two per period, so
     a reader holding the previous snapshot's cursor can finish."""

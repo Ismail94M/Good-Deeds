@@ -304,6 +304,6 @@ async def withdraw_deed(
 ) -> DeedOut:
     _, limits = await load_limits(session)
     await _edits.limit_edit(limiter, limits, user.id, client_ip(request))
-    out = await _edits.withdraw_deed(session, user.id, deed_id)
+    out = await _edits.withdraw_deed(session, user.id, deed_id, limits=limits)
     await session.commit()
     return out

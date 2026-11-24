@@ -15,6 +15,10 @@ import { identityApi, type Me } from '../auth/identityApi'
 import { collectErrors, validateDisplayName, validateHandle } from '../auth/validation'
 import { initials } from '../report/format'
 import { useSocial } from '../feed/feedQueries'
+import { useMyScoring } from '../scoring/scoringQueries'
+import { OwnBadges } from '../scoring/OwnBadges'
+import { TierChip } from '../scoring/TierChip'
+import { RankingsButton } from '../scoring/Rankings'
 import { DeedCounts } from './DeedCounts'
 
 const BIO_MAX = 280
@@ -26,7 +30,8 @@ const focusRing =
 /**
  * `/profile` (F6 canvas, M2-DESIGN §5.3 F6c): avatar, name and "@handle" (Q22: no city), the
  * deed counts linking to self-logs and My deeds, Log a deed and My QR, "Your activity", and
- * the Account section with the M1 details, Edit profile and Log out (D25).
+ * the Account section with the M1 details, Edit profile and Log out (D25). M4 (§6.3, D69) adds
+ * the tier and "Your points", visible only here, to their owner.
  */
 export function ProfilePage() {
   const { user } = useAuth()
@@ -62,14 +67,20 @@ export function ProfilePage() {
           {user.display_name}
         </h1>
         <p className="text-slate-600">@{user.handle}</p>
+        <OwnTier />
       </section>
       {saved && (
         <p role="status" className="text-center text-brand-700">
           Your profile has been saved.
         </p>
       )}
-      <DeedCounts handle={user.handle} own />
+      <div className="flex flex-col gap-2">
+        <DeedCounts handle={user.handle} />
+        <RankingsButton handle={user.handle} title="Your rankings" />
+      </div>
       <ConnectionsLine handle={user.handle} />
+      <OwnPoints />
+      <OwnBadges handle={user.handle} />
       <div className="grid grid-cols-2 gap-2">
         <Link
           to="/me/self-logs/new"
@@ -104,6 +115,53 @@ export function ProfilePage() {
         }}
       />
     </main>
+  )
+}
+
+/** My tier chip under my name; hidden while loading or on error. */
+function OwnTier() {
+  const scoring = useMyScoring()
+  if (!scoring.data) return null
+  return <TierChip tier={scoring.data.tier} />
+}
+
+/**
+ * "Your points: 124 (12 still provisional)", badges and Hero titles, and a link to My points
+ * (M4-DESIGN §6.3). Owner only: points never appear on a public screen (D69). Hidden while
+ * loading or on error, so the rest of the profile never waits for scoring.
+ */
+function OwnPoints() {
+  const scoring = useMyScoring()
+  if (!scoring.data) return null
+  // The server sums doer and reporter points (§3.4 item 5); the client never adds them up.
+  const { total_points: total, provisional_points, badges_total, titles_total } = scoring.data
+  return (
+    <section
+      aria-label="Your points"
+      className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-2xl border border-slate-200 bg-white px-4 py-3.5"
+    >
+      <div>
+        <p className="font-semibold text-slate-900">
+          Your points: {total}
+          {provisional_points > 0 && (
+            <span className="font-normal text-slate-600">
+              {' '}
+              ({provisional_points} still provisional)
+            </span>
+          )}
+        </p>
+        <p className="text-sm text-slate-600">
+          {badges_total} {badges_total === 1 ? 'badge' : 'badges'} · {titles_total} Hero{' '}
+          {titles_total === 1 ? 'title' : 'titles'} · Only you can see your points.
+        </p>
+      </div>
+      <Link
+        to="/me/points"
+        className={`inline-flex min-h-11 items-center rounded font-semibold text-brand-700 underline-offset-2 hover:text-brand-900 hover:underline ${focusRing}`}
+      >
+        My points
+      </Link>
+    </section>
   )
 }
 

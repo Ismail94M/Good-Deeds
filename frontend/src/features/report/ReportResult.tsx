@@ -68,6 +68,12 @@ export function ReportResult({
             ? `${thanks}It now counts on ${who.display_name}’s profile.`
             : `Others already reported this act. Your report backs theirs up, but it doesn’t count a second time on ${firstName(who.display_name)}’s profile.`}
         </p>
+        {/* M4 §6.3: no number here; the points line on the deed page has the details. */}
+        {counts && (
+          <p className="max-w-[420px] font-medium text-emerald-800">
+            {firstName(who.display_name)} earns points for this deed.
+          </p>
+        )}
         {photos && <PhotoResultLine photos={photos} />}
         <dl className="mt-2 grid w-full grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2.5 rounded-2xl border border-slate-200 bg-white px-4.5 py-4 text-left text-[15px]">
           <dt className="text-slate-600">Who</dt>

@@ -60,13 +60,13 @@ A user can never verify their own deed.
 
 **Self-logged deeds:** users can log their own good deeds (e.g. planting, beach cleaning) with a category, description, date/time and optional location. Self-logs are private: only the owner sees the details. They never appear in the feed and never count toward points, impact score, leaderboard, prizes or the North Star. A self-log can't be converted into a verified deed; a witness who saw the deed reports it separately through the normal QR or ID + code flow. The owner can edit and delete self-logs.
 
-**Profile counts:** every profile shows two public counts, like followers/following: *Self-log Deeds* and *Verified Deeds*. Verified Deeds counts the user's **counted** verified reports, the same figure the leaderboard uses: 20 witnesses of one act count as 5 (the same-act cap), while 100 reports in separate places or times count as 100. Self-logs are never included in it.
+**Profile counts:** every profile shows a public *Verified Deeds* count. It counts the user's **counted** verified reports, using the same same-act rule as the leaderboard: 20 witnesses of one act count as 5 (the same-act cap), while 100 reports in separate places or times count as 100. Self-logs, unverified, rejected and withdrawn deeds are never included. The *Self-log Deeds* count is no longer public (PO decision Q55, 2026-11-22): the owner sees it in My deeds only. The public profile shows Verified Deeds, Badges (total), Kindness Hero titles (total), Followers, Following and the public tier; points are visible only to their owner (section 9).
 
 **Monthly reporting limits (PO decision 2026-11-16, replaces the earlier flat limit):** per IST calendar month (resetting on the 1st), a reporter can submit at most **15 reports per reporter–doer pair**, plus at most **150 reports in total** across all doers. Both limits apply to QR and invite reports. Withdrawn reports still use up a slot; failed submissions don't. The app shows no warning until the reporter is close: a warning on the deed form from **3 reports left** for that doer, and a warning on the reporting hub from **10 reports left** in total. At either limit, further reports are refused until the month resets. The two limits (15 and 150) are config values.
 
 **Invites are switched off for now** (2026-11-16). Only QR / ID + code reporting is live. The invite rules below apply when invites are switched back on; when they return, an invite-verified deed earns points but needs human review or another independent verification before it counts for prizes.
 
-**Edit and withdraw:** a reporter can edit a deed's category, description and number of people helped (every edit is kept in an append-only history), and can withdraw a deed. Time, location, doer and verification method can't be edited. When a counted report in a same-act group is withdrawn, the oldest uncounted report in the group (from a reporter not already counted) is promoted to count. A withdrawal doesn't free the reporter–doer pair's daily slot.
+**Edit and withdraw:** a reporter can edit a deed's category, description and number of people helped (every edit is kept in an append-only history), and can withdraw a verified deed only within 24 hours of its verification (a config value; PO decision 2026-11-22, replacing Q52); a pending invite can be cancelled at any time. After the 24 hours, edits still update the text but never change points. Time, location, doer and verification method can't be edited. When a counted report in a same-act group is withdrawn, the oldest uncounted report in the group (from a reporter not already counted) is promoted to count. A withdrawal doesn't free the reporter–doer pair's daily slot.
 
 **Account deletion:** deleting an account anonymises the user's deeds instead of deleting them.
 
@@ -156,7 +156,7 @@ A user can never verify their own deed.
 7. **Notifications:** "You were recognized", "Your deed was verified", likes and comments, challenge and prize updates.
 8. **Monthly kindness challenges**, which can be sponsored.
 9. **Impact scoring:** rule-based scoring at launch and AI impact evaluation in shadow mode (section 12), with admin overrides and recorded reasons.
-10. **Points ledger, badges, local leaderboard and monthly Kindness Hero.**
+10. **Points ledger, badges, leaderboards and monthly Kindness Hero titles** for each level of a location hierarchy (ward and city at launch; state and country configurable), see section 9.
 11. **Monthly cash prizes** for top leaderboard positions, for prize-eligible users only, with human winner review and payout tracking.
 12. **Content moderation:** report a post, AI pre-screening for staged, harmful or unrelated content, human review before removal, user blocking.
 13. **Ads and sponsorship:** sponsored monthly challenges and prizes, and clearly labelled ads between feed posts (no more than one in every 8 posts). No ads inside a deed post.
@@ -187,6 +187,7 @@ A user can never verify their own deed.
 - **User:** id, display name, city/area, verified phone, device fingerprint, account created_at, roles (member, moderator, admin), prize_eligible flag, status
 - **DoerCode:** user_id, rotating QR token, created/revoked timestamps
 - **Deed:** id, doer_user_id (empty until accepted), reporter_user_id, category, description, media (photos shown as taken; optional face blur by the uploader), location (coordinates, shown publicly as coarse area), occurred_at, reported_at, beneficiaries_count (anonymous), status (pending / verified / unverified / rejected / removed), verification_method (qr_scan / invite_accept), same_act_group_id, counts_for_points (true for the first 5 in a group, false after, unless promoted after a withdrawal), prize_rank_eligible, withdrawn_at
+- **Region:** id, kind (country / state / city / ward), parent, name, code. Each ward area maps to a ward region; new cities, states and countries are data (PO decision Q54, 2026-11-22)
 - **SameActGroup:** id, doer_user_id, centre location, time window, report_count
 - **VerificationEvent:** deed_id, method (qr_scan / invite_accept / moderator), actor_id, location/time evidence, result, timestamp
 - **Invite:** id, deed_id, reporter_user_id, single-use token, sent_via, expires_at, accepted_by, accepted_phone, accepted_at
@@ -257,15 +258,42 @@ The "people helped" count used for scoring is capped per category, and counts ab
 
 ### Contribution points
 
-- **Doer:** base points by deed category, plus the small fixed photo-and-description bonus.
-- **Reporter:** small points per verified deed reported, and very small points for reports beyond the same-act cap. Reporter points have a daily cap.
-- **Reporter points never count toward prize rank.** They appear only on the reporter's profile and in badges.
+- **Doer:** base points by deed category, plus the small fixed photo-and-description bonus. At launch every category gives 10 points and a photo adds 2 (PO decision Q45, 2026-11-22); a report the text rules flag as spam or empty gets the minimum of 4. Each counted report in a same-act group is scored on its own (Q46); "scored once" above applies to the later AI score.
+- **Photo bonus and removals (Q29):** the bonus is earned once a photo added within the 24-hour add window has been processed, and it is never taken away when a photo is later removed by the doer, the uploader or an admin.
+- **Reporter:** 2 points per verified deed reported, and 1 point for reports beyond the same-act cap. Reporter points are earned for at most 10 reports per IST day (Q48); doers are unaffected.
+- **Repeat pairs (Q47):** per IST calendar month, a reporter–doer pair's reports 1–3 earn 100%, 4–7 earn 75%, 8–15 earn 50%, for both doer and reporter points.
+- **Reporter points never count toward prize rank or any leaderboard.** They appear only on the reporter's own points page and in badges.
+- **When points are final (2026-11-22):** points count in the IST month of verification (server time). They are provisional for 24 hours (the withdrawal window); after that, edits never change them. All values are config.
 
 ### Leaderboard
 
 **Rank score** = number of counted verified deeds in the period (after the daily and same-act caps) + doer points. The weight of each part is set in LeaderboardConfig. Only deeds marked prize-rank eligible count toward prize positions.
 
-Deed count, points, badges, likes and prize history are shown separately on the profile.
+**Levels (PO decision Q54, 2026-11-22):**
+- Leaderboards and Kindness Hero titles exist for each level of a location hierarchy: ward/area, city, state and country. At launch only Bangalore's wards and the city are switched on.
+- Each counted deed counts where it happened (its ward from the verified location), once per level. A deed outside the mapped wards counts from the city level up. No home address or home ward is collected.
+- Boards are monthly (IST calendar month), and past months stay viewable.
+
+**Tie-break (Q50):**
+1. More distinct reporters in the period.
+2. More distinct IST days with counted deeds in the period.
+3. Later, AI impact scores once the AI is live.
+4. Otherwise a shared rank.
+
+**Kindness Hero titles:**
+- Titles are taken automatically from the final ranking of each board. Everyone on a shared titled place gets the title, and one person can hold several titles in one month.
+- City level: #1 is "Bangalore City Kindness Hero", and #2 and #3 are "Top 3 in Bangalore". There is no minimum. **Not live at launch (PO 2026-11-23):** only Area (ward) leaderboards are open; City, State and Country appear in the app as locked, upcoming levels, and no City titles are awarded until City is switched on in config (M4-DESIGN D71). Under the Area search, a **Featured City Top Performers** section shows the top 5 members registered in Bengaluru this month (podium, then list) with rank, name, points and verified-deed count, ranked by the same rules; showing points here is an exception to the points-are-private rule, for this section only. Featured cities are config, so other cities or a national list can be added later (M4-DESIGN D72).
+- Ward level: #1 is "Kindness Hero · {ward} · {month}". It needs at least 3 counted deeds in that ward that month from at least 2 different reporters; if nobody qualifies, there is no ward Hero that month (the board is still shown).
+- Places and minimums are config. Admins can revoke a title for confirmed fraud (M5). Cash prizes are separate (M8).
+
+**Finalization:** a month's boards are provisional until month end + the 24-hour withdrawal window + a safety margin have passed and all earlier events are processed; then boards and titles are frozen.
+
+**Badges** (Q53): First recognition, 5 / 25 / 100 deeds; First witness, 10 / 50 deeds recognised. A badge is awarded once the deed that earns it is past its 24 hours, and is permanent unless revoked for fraud.
+
+**What is public (Q55):**
+- Profiles and leaderboards show rank, name, a tier (Seed, Sprout, Tree, Forest), verified-deed counts, badges and titles.
+- Points are visible only to their owner.
+- Hiding a deed from the feed never affects points, leaderboards or titles (Q51), and there is no leaderboard opt-out.
 
 ## 10. Evaluation workflow
 
@@ -330,6 +358,8 @@ Deed count, points, badges, likes and prize history are shown separately on the 
 7. Deed submission and verification are one module (Deeds & Verification), because verification, grouping and acceptance must change a deed in one transaction. It can be split later along its events.
 8. Rate limits apply per account and per IP address on every limited action, plus a per-ID limit on typed ID + code entry.
 
+M4 scoring decisions (Q45–Q57, 2026-11-22): see section 9 and `docs/M4-DESIGN.md` §11. The AI evaluator sees only the category, the redacted description, the people-helped count and the evidence level (no photos, locations, timestamps or identities), and stays off until legal review. An AI tie-break runs in shadow only and never changes ranks.
+
 **Prize eligibility (proposed defaults)**
 
 A user can win a cash prize only if all of these are true:
@@ -357,6 +387,14 @@ A user can win a cash prize only if all of these are true:
 | Accepted invites per reporter–doer pair on a shared device | 15 per month                      |
 | QR token / manual code accepted for                       | 30 s window + 1 earlier window     |
 | Max share of a doer's prize-rank points from one reporter | 30%                                |
+| Doer points per deed / photo bonus / minimum              | 10 / +2 / 4 (Q45)                  |
+| Reporter points / beyond the same-act cap                 | 2 / 1                              |
+| Reports per IST day that earn reporter points             | 10 (Q48)                           |
+| Repeat-pair points (per IST month, both roles)            | 1–3: 100%, 4–7: 75%, 8–15: 50% (Q47) |
+| Withdrawing a verified deed allowed for                   | 24 hours after verification        |
+| Month finalization                                        | month end + 24 h + 1 h margin      |
+| Ward Kindness Hero minimum                                | 3 counted deeds, 2 distinct reporters |
+| City titled places                                        | #1 Hero, #2–#3 "Top 3"             |
 | Evidence caps on impact score                             | 40 / 70 / 100                      |
 | Minimum account age for prizes                            | 30 days                            |
 | Minimum deeds and distinct reporters for prizes           | 5 deeds, 3 reporters               |

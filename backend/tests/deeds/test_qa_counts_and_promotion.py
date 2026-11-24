@@ -208,7 +208,7 @@ async def test_promotion_after_withdrawal_keeps_the_count_consistent(
         )
         assert response.status_code == 201
     counts = (await client.get(f"/api/users/{doer.handle}/deed-counts")).json()
-    assert counts == {"self_logged": 3, "verified": 1}
+    assert counts == {"verified": 1}
 
 
 # --------------------------------------------------- D13: withdraw-then-promote loops
@@ -268,7 +268,8 @@ async def test_withdraw_then_promote_loop_never_exceeds_the_cap(session: AsyncSe
         if counted is None:
             break
         reporter = next(m for m in crew if m.user_id == counted.reporter_user_id)
-        await withdraw(session, reporter, counted.id)
+        # Inside the latest reports' 24 h withdrawal window (M4 D64).
+        await withdraw(session, reporter, counted.id, at=after_midnight + timedelta(hours=1))
         await assert_group_invariants(session, group_id)
     group = await assert_group_invariants(session, group_id)
     assert group.counted_count == 0 and group.verified_count == 0

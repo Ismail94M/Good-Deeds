@@ -188,3 +188,131 @@ def test_feed_rules_pass_without_media_or_feed_packages(tmp_path: Path) -> None:
     _write(app_dir, "modules/deeds/service.py", "import app.core.db\n")
     assert _media_feed_violations(app_dir) == []
     assert _scoring_feed_violations(app_dir) == []
+
+
+# --- M4: scoring reads neither visibility nor photo state, and AI never reaches points ---
+# (docs/M4-DESIGN.md D47, D62, §3.4 #8)
+
+MEDIA = "app.modules.media"
+# The only name scoring may import from media: the event class it subscribes to.
+SCORING_MEDIA_ALLOWED = ("app.modules.media.service", ("DeedPhotoReady",))
+# Scoring files that decide points, ranks or titles: they never import the AI evaluator.
+NO_AI_FILES = ("_ledger.py", "_rules.py", "_leaderboard.py", "_finalize.py", "_badges.py")
+# Exactly the events scoring handles (§5); never a photo removal or any feed event.
+SCORING_EVENTS = frozenset(
+    {
+        "deeds.deed_verified",
+        "deeds.counts_for_points_changed",
+        "deeds.prize_rank_changed",
+        "deeds.deed_edited",
+        "deeds.deed_withdrawn",
+        "deeds.deed_rejected",
+        "media.deed_photo_ready",
+    }
+)
+
+
+def _media_imports(path: Path, app_dir: Path) -> list[str]:
+    """Every media import of a file, except ``from app.modules.media.service import
+    DeedPhotoReady`` (alone)."""
+    problems: list[str] = []
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.level == 0:
+            module = node.module or ""
+            names = tuple(alias.name for alias in node.names)
+            if (module, names) == SCORING_MEDIA_ALLOWED:
+                continue
+            if module == MEDIA or module.startswith(MEDIA + "."):
+                problems.append(f"{module} ({', '.join(names)})")
+            elif module == "app.modules" and "media" in names:
+                problems.append("app.modules.media")
+        elif isinstance(node, ast.Import):
+            problems.extend(
+                a.name for a in node.names if a.name == MEDIA or a.name.startswith(MEDIA + ".")
+            )
+        elif isinstance(node, ast.ImportFrom) and node.level > 0:
+            # Relative imports resolve inside scoring; any reaching media is listed.
+            problems.extend(n for n in _imports(path, app_dir) if n.startswith(MEDIA))
+    return problems
+
+
+def _scoring_media_violations(app_dir: Path) -> list[str]:
+    scoring = app_dir / "modules" / "scoring"
+    if not scoring.is_dir():
+        return []
+    return [
+        f"{path.relative_to(app_dir).as_posix()} imports {name}"
+        for path in sorted(scoring.rglob("*.py"))
+        for name in _media_imports(path, app_dir)
+    ]
+
+
+def _scoring_ai_violations(app_dir: Path) -> list[str]:
+    scoring = app_dir / "modules" / "scoring"
+    return [
+        f"{(scoring / name).relative_to(app_dir).as_posix()} imports {imported}"
+        for name in NO_AI_FILES
+        if (scoring / name).exists()
+        for imported in _imports(scoring / name, app_dir)
+        if any(part.startswith("_ai") for part in imported.split("."))
+    ]
+
+
+def test_scoring_imports_only_deed_photo_ready_from_media() -> None:
+    problems = _scoring_media_violations(APP)
+    assert problems == [], (
+        "scoring may import only DeedPhotoReady from media.service (D47, §3.4 #8):\n"
+        + "\n".join(problems)
+    )
+
+
+def test_points_and_ranks_never_import_the_ai_evaluator() -> None:
+    problems = _scoring_ai_violations(APP)
+    assert problems == [], "Shadow AI must never reach points or ranks (D62):\n" + "\n".join(
+        problems
+    )
+
+
+def test_scoring_subscribes_to_exactly_its_events() -> None:
+    from app.core import events
+    from app.modules.registry import MODULES, load_modules
+
+    assert "scoring" in MODULES
+    load_modules()
+    handled = {
+        event_type
+        for event_type in events._event_types
+        for name in events.handlers_for(event_type)
+        if name.startswith("app.modules.scoring.")
+    }
+    assert handled == SCORING_EVENTS
+    assert not any(t.startswith("feed.") for t in handled)
+    assert not any("remov" in t or "moderation" in t for t in handled)
+
+
+def test_scoring_rules_catch_violations(tmp_path: Path) -> None:
+    app_dir = tmp_path / "app"
+    ok = "from app.modules.media.service import DeedPhotoReady\n"
+    _write(app_dir, "modules/scoring/handlers.py", ok)
+    _write(
+        app_dir,
+        "modules/scoring/_evidence.py",
+        "from app.modules.media.service import DeedPhotoReady, public_photos\n",
+    )
+    _write(app_dir, "modules/scoring/_x.py", "import app.modules.media.models\n")
+    _write(app_dir, "modules/scoring/_y.py", "from app.modules import media\n")
+    _write(app_dir, "modules/scoring/_ledger.py", "from app.modules.scoring import _ai\n")
+    _write(app_dir, "modules/scoring/_finalize.py", "from ._ai_tiebreak import run\n")
+    _write(app_dir, "modules/scoring/_ai.py", "from app.modules.scoring import _rules\n")
+
+    assert _scoring_media_violations(app_dir) == [
+        "modules/scoring/_evidence.py imports app.modules.media.service "
+        "(DeedPhotoReady, public_photos)",
+        "modules/scoring/_x.py imports app.modules.media.models",
+        "modules/scoring/_y.py imports app.modules.media",
+    ]
+    assert {v.split(" imports ")[0] for v in _scoring_ai_violations(app_dir)} == {
+        "modules/scoring/_ledger.py",
+        "modules/scoring/_finalize.py",
+    }

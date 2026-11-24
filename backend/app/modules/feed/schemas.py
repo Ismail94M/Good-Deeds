@@ -285,3 +285,45 @@ class CommentDecisionIn(BaseModel):
 
 class CommentRestoreIn(BaseModel):
     note: str = Field(max_length=10000)
+
+
+# --------------------------------------------------- stories (D73)
+
+
+class StoryRing(BaseModel):
+    """One person in the stories bar. Counts only: photos load when the ring is opened."""
+
+    user: UserRef
+    is_me: bool
+    # Deeds this person witnessed and reported (blue ring).
+    reported_count: int
+    # This person's own deeds verified by a witness (green ring).
+    verified_count: int
+    # Stories the caller hasn't watched; 0 means a grey ring.
+    unseen_count: int
+    latest_at: datetime
+
+
+class StoryRings(BaseModel):
+    items: list[StoryRing]
+    seconds_per_story: int
+    window_hours: int
+
+
+class StoryOut(BaseModel):
+    role: Literal["reported", "verified"]
+    seen: bool
+    post: PostOut
+
+
+class StoryPerson(BaseModel):
+    user: UserRef
+    is_me: bool
+    seconds_per_story: int
+    # Oldest first.
+    items: list[StoryOut]
+
+
+class StorySeenIn(BaseModel):
+    deed_id: uuid.UUID
+    role: Literal["reported", "verified"]

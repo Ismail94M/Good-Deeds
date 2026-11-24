@@ -2,7 +2,7 @@
 
 from app.core.db import SessionLocal
 from app.core.jobs import job_app
-from app.modules.feed import _comments, _top
+from app.modules.feed import _comments, _stories, _top
 from app.modules.feed._limits import load_limits
 
 # --------------------------------------------------- Top snapshots (Q26)
@@ -33,4 +33,22 @@ async def erase_deleted_comments(timestamp: int) -> int:
             count = await _comments.erase_deleted_batch(session, limits)
         total += count
         if count < _comments.ERASE_BATCH_SIZE:
+            return total
+
+
+# --------------------------------------------------- story views (D73)
+
+
+@job_app.periodic(cron="23 4 * * *", periodic_id="feed_prune_story_views")
+@job_app.task(name="feed.prune_story_views", queueing_lock="feed_prune_story_views")
+async def prune_story_views(timestamp: int) -> int:
+    """Nightly: delete story views older than ``story_seen_retention_hours`` (the stories
+    themselves end on their own: they are a window over the feed). One batch per transaction."""
+    total = 0
+    while True:
+        async with SessionLocal() as session, session.begin():
+            _, limits = await load_limits(session)
+            count = await _stories.prune_views_batch(session, limits)
+        total += count
+        if count < _stories.PRUNE_BATCH_SIZE:
             return total

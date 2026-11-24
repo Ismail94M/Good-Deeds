@@ -1,8 +1,8 @@
 import { Page } from './ui'
 
 /**
- * PLACEHOLDER (M3 F9): stands in for a screen a later M3 task builds (see the `task` prop and
- * docs/M3-DESIGN.md §7). Delete this component once no route uses it.
+ * PLACEHOLDER (M3 F9, reused by M4 F14): stands in for a screen a later task builds (see the
+ * `task` prop and the milestone design's task list). Delete this component once no route uses it.
  */
 export function PlaceholderPage({ title, task }: { title: string; task: string }) {
   return (

@@ -249,7 +249,7 @@ async def test_promotion_skips_reporter_already_counted(session: AsyncSession) -
     assert [await _counts(session, d) for d in (r1, a1, r2, b1)] == [True, True, False, False]
 
     # r2 is older, but r already has a counted report: b1 is promoted instead.
-    await withdraw(session, a, a1.id)
+    await withdraw(session, a, a1.id, at=t0 + timedelta(hours=1))
     assert await _counts(session, r2) is False
     assert await _counts(session, b1) is True
     assert await _counters(session, r1.id) == (3, 2, 2)
@@ -267,7 +267,7 @@ async def test_reporter_whose_counted_report_is_withdrawn_can_be_promoted(
     r2 = await scan_and_report(session, r, doer, at=t0 + timedelta(minutes=40), east_m=10)
     b1 = await scan_and_report(session, b, doer, at=t0 + timedelta(minutes=45), east_m=15)
 
-    await withdraw(session, r, r1.id)
+    await withdraw(session, r, r1.id, at=t0 + timedelta(hours=1))
     # r no longer has a counted verified report, and r2 is the oldest uncounted one.
     assert await _counts(session, r2) is True
     assert await _counts(session, b1) is False

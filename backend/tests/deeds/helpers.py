@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import OutboxEvent
@@ -29,6 +29,21 @@ from app.modules.identity.models import Consent, DoerCode, PhoneHistory, User
 CENTRE = (12.9716, 77.5946)
 # Metres per degree of latitude near Bangalore on the WGS84 spheroid.
 _M_PER_DEG_LAT = 111_132.92 - 559.82 * math.cos(math.radians(2 * CENTRE[0]))
+
+
+# A ward region under the seeded city (migration 0019) for a test area with this ward code: an
+# area inserted without ``region_id`` takes it (trigger ``areas_assign_region``). Works on a sync
+# connection too (``conn.execute(ADD_WARD_REGION, {...})``).
+ADD_WARD_REGION = text(
+    "INSERT INTO regions (kind, parent_id, name, code) "
+    "SELECT 'ward', c.id, :name, c.code || '-' || :ward_code FROM regions AS c "
+    "WHERE c.code = 'IN-KA-BLR' ON CONFLICT (code) DO NOTHING"
+)
+
+
+async def add_ward_regions(session: AsyncSession, *ward_codes: str) -> None:
+    for code in ward_codes:
+        await session.execute(ADD_WARD_REGION, {"name": f"Test {code}", "ward_code": code})
 
 
 @dataclass(frozen=True)

@@ -25,12 +25,13 @@ from app.modules.feed import (
     _notices,
     _reads,
     _reports,
+    _stories,
     _writes,
 )
 from app.modules.feed._limits import FeedLimits, load_limits
 from app.modules.feed._shared_limits import load_shared
 from app.modules.feed._text import ensure_clean
-from app.modules.feed.models import TopPeriod
+from app.modules.feed.models import StoryRole, TopPeriod
 from app.modules.feed.schemas import (
     CommentCaseDetail,
     CommentCasePage,
@@ -51,6 +52,9 @@ from app.modules.feed.schemas import (
     SaveOut,
     ShareIn,
     SocialOut,
+    StoryPerson,
+    StoryRings,
+    StorySeenIn,
     VisibilityOut,
 )
 from app.modules.identity import service as identity
@@ -100,6 +104,35 @@ async def get_feed(
 async def feed_options(user: CurrentUser, session: Session) -> FeedOptions:
     _, limits = await load_limits(session)
     return _reads.options(limits, await load_shared(session))
+
+
+# --------------------------------------------------- stories (D73)
+
+
+@router.get("/feed/stories", response_model=StoryRings)
+async def story_rings(user: CurrentUser, session: Session, limiter: Limiter) -> StoryRings:
+    await _feed_read_limit(session, limiter, user.id)
+    _, limits = await load_limits(session)
+    return await _stories.rings(session, user.id, limits=limits)
+
+
+@router.get("/feed/stories/{handle}", response_model=StoryPerson)
+async def person_stories(
+    handle: str, user: CurrentUser, session: Session, limiter: Limiter, storage: Storage
+) -> StoryPerson:
+    await _feed_read_limit(session, limiter, user.id)
+    _, limits = await load_limits(session)
+    return await _stories.person(session, user.id, handle, storage, limits=limits)
+
+
+@router.put("/feed/stories/seen", status_code=204)
+async def story_seen(
+    data: StorySeenIn, user: CurrentUser, session: Session, limiter: Limiter
+) -> None:
+    _, limits = await load_limits(session)
+    await limiter.hit(f"storyseen:u:{user.id}", limits.rate_story_seen_user)
+    await _stories.mark_seen(session, user.id, data.deed_id, StoryRole(data.role))
+    await session.commit()
 
 
 # --------------------------------------------------- #2 deed page

@@ -25,6 +25,7 @@ from app.core.config import get_settings
 from app.modules.deeds._areas import area_names, display_name, resolve_area_id
 from app.modules.deeds.models import Area, DeedStatus, VerificationMethod
 from tests.conftest import BACKEND_DIR
+from tests.deeds.helpers import ADD_WARD_REGION, add_ward_regions
 
 AREAS_FILE = BACKEND_DIR / "app" / "modules" / "deeds" / "data" / "bangalore_areas.geojson"
 MIGRATION = BACKEND_DIR / "alembic" / "versions" / "2026_11_19_0000-0013_deeds_v5.py"
@@ -113,6 +114,7 @@ async def test_lookup_in_the_real_wards(
 
 
 async def test_ward_code_is_unique(session: AsyncSession) -> None:
+    await add_ward_regions(session, "TEST-DUP")
     session.add(_area(30001, 10, 10, ward_code="TEST-DUP"))
     await session.flush()
     with pytest.raises(IntegrityError, match="uq_areas_ward_code"):
@@ -123,6 +125,7 @@ async def test_ward_code_is_unique(session: AsyncSession) -> None:
 
 @pytest.mark.parametrize("name", ["", "   ", "A" * 41])
 async def test_area_name_length_is_checked(session: AsyncSession, name: str) -> None:
+    await add_ward_regions(session, "TEST-30003")
     with pytest.raises(IntegrityError, match="ck_areas_name_length"):
         async with session.begin_nested():
             session.add(_area(30003, 10, 10, name=name))
@@ -139,6 +142,7 @@ async def test_deed_area_must_exist_and_cannot_be_deleted_while_used(
         async with session.begin_nested():
             session.add(_pending_deed(reporter, area_id=32000))
             await session.flush()
+    await add_ward_regions(session, "TEST-30004")
     session.add(_area(30004, 10, 10))
     await session.flush()
     session.add(_pending_deed(reporter, area_id=30004))
@@ -175,6 +179,7 @@ def sync_conn(migrated_db: None) -> Iterator[Connection]:
 
 
 def _insert_area(conn: Connection, area_id: int, lng: float, lat: float, half: float) -> None:
+    conn.execute(ADD_WARD_REGION, {"name": f"Test {area_id}", "ward_code": f"TEST-{area_id}"})
     conn.execute(
         text(
             "INSERT INTO areas (id, name, city, boundary, source, ward_code) "

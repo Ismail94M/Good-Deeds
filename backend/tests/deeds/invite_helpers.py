@@ -93,7 +93,8 @@ async def accept(
 async def withdraw(
     session: AsyncSession, reporter: Member, deed_id: uuid.UUID, *, at: datetime | None = None
 ) -> DeedOut:
-    return await _edits.withdraw_deed(session, reporter.user_id, deed_id, now=at)
+    _, limits = await load_limits(session)
+    return await _edits.withdraw_deed(session, reporter.user_id, deed_id, limits=limits, now=at)
 
 
 async def share_device(

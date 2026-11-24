@@ -7,13 +7,24 @@ transaction as the handler's work, so every handler's effect happens exactly onc
 """
 
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterable
 from datetime import UTC, datetime
 from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import DateTime, ForeignKey, String, func, select
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    String,
+    and_,
+    any_,
+    exists,
+    func,
+    literal,
+    or_,
+    select,
+)
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -47,9 +58,12 @@ class OutboxEvent(Base):
     event_type: Mapped[str] = mapped_column(String(100), index=True)
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
     occurred_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+        DateTime(timezone=True), server_default=func.now(), index=True
     )
     dispatched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    # The handlers the event was enqueued for at dispatch (null until dispatched). A handler
+    # registered later never receives it, so the barrier doesn't wait for it (M4 SEC3 M1).
+    dispatched_handlers: Mapped[list[str] | None] = mapped_column(ARRAY(String(200)))
 
 
 class ProcessedEvent(Base):
@@ -91,6 +105,12 @@ def handlers_for(event_type: str) -> dict[str, Handler]:
     return dict(_handlers.get(event_type, {}))
 
 
+def handler_names_with_prefix(prefix: str) -> list[str]:
+    """Every registered handler whose name (``module.qualname``) starts with ``prefix``, for
+    example ``"app.modules.scoring."``. Only handlers of imported modules are registered."""
+    return sorted({name for subs in _handlers.values() for name in subs if name.startswith(prefix)})
+
+
 def emit(session: AsyncSession, event: DomainEvent) -> OutboxEvent:
     """Add an event to the outbox. It is committed (or rolled back) with the caller's work."""
     row = OutboxEvent(event_type=event.event_type, payload=event.model_dump(mode="json"))
@@ -113,9 +133,11 @@ async def dispatch_pending(session: AsyncSession, enqueue: Enqueue, batch_size: 
     )
     rows = result.scalars().all()
     for row in rows:
-        for handler_name in handlers_for(row.event_type):
+        names = sorted(handlers_for(row.event_type))
+        for handler_name in names:
             await enqueue(row.id, handler_name)
         row.dispatched_at = datetime.now(UTC)
+        row.dispatched_handlers = names
     await session.flush()
     return len(rows)
 
@@ -139,3 +161,94 @@ async def run_handler(session: AsyncSession, event_id: uuid.UUID, handler_name: 
     session.add(ProcessedEvent(event_id=event_id, handler=handler_name))
     await session.flush()
     return True
+
+
+def _waiting(event_type: str, name: str) -> Any:
+    """The (event, handler) pair still waits: the handler is subscribed to the type, has not
+    processed the event, and will receive it (not dispatched yet, or enqueued at dispatch)."""
+    return and_(
+        OutboxEvent.event_type == event_type,
+        or_(
+            OutboxEvent.dispatched_at.is_(None),
+            literal(name) == any_(OutboxEvent.dispatched_handlers),
+        ),
+        ~exists().where(ProcessedEvent.event_id == OutboxEvent.id, ProcessedEvent.handler == name),
+    )
+
+
+async def unprocessed_before(
+    session: AsyncSession,
+    handler_names: Iterable[str],
+    cutoff: datetime,
+    *,
+    since: datetime | None = None,
+) -> int:
+    """How many outbox events that occurred before ``cutoff`` (and at or after ``since``) still
+    wait for at least one of ``handler_names`` (docs/M4-DESIGN.md D64: monthly finalization
+    waits for this to be 0).
+
+    An event waits for a handler when the handler is subscribed to its type, has no
+    ``processed_events`` row for the pair, and will receive the event: it is not dispatched yet,
+    or the handler was enqueued when it was dispatched (``dispatched_handlers``). An event
+    dispatched before the handler existed never reaches it, so it doesn't wait for it. A job
+    that ran out of retries still waits until ``redispatch_stale`` sends it again. Handler names
+    unknown to the registry are ignored, so the caller passes names of loaded modules. Events
+    not visible to this transaction (still uncommitted) can't be counted; callers leave a margin
+    after the cutoff for that.
+    """
+    wanted = set(handler_names)
+    pairs = [
+        (event_type, name)
+        for event_type, subs in _handlers.items()
+        for name in subs
+        if name in wanted
+    ]
+    if not pairs:
+        return 0
+    query = (
+        select(func.count())
+        .select_from(OutboxEvent)
+        .where(
+            OutboxEvent.occurred_at < cutoff,
+            OutboxEvent.event_type.in_({event_type for event_type, _ in pairs}),
+            or_(*(_waiting(event_type, name) for event_type, name in pairs)),
+        )
+    )
+    if since is not None:
+        query = query.where(OutboxEvent.occurred_at >= since)
+    count = await session.scalar(query)
+    return int(count or 0)
+
+
+async def redispatch_stale(
+    session: AsyncSession, enqueue: Enqueue, dispatched_before: datetime, batch_size: int = 500
+) -> int:
+    """Enqueue again every (event, handler) pair dispatched before ``dispatched_before`` that
+    was enqueued but never processed (its job ran out of retries, or the queue lost it), for
+    handlers still registered. Handling is idempotent, so a pair whose job is still retrying
+    is harmless to send twice. Returns the pairs enqueued (at most ``batch_size``)."""
+    pairs = (
+        select(
+            OutboxEvent.id.label("event_id"),
+            func.unnest(OutboxEvent.dispatched_handlers).label("handler"),
+        )
+        .where(OutboxEvent.dispatched_at < dispatched_before)
+        .subquery()
+    )
+    registered = sorted({name for subs in _handlers.values() for name in subs})
+    rows = (
+        await session.execute(
+            select(pairs.c.event_id, pairs.c.handler)
+            .where(
+                pairs.c.handler.in_(registered),
+                ~exists().where(
+                    ProcessedEvent.event_id == pairs.c.event_id,
+                    ProcessedEvent.handler == pairs.c.handler,
+                ),
+            )
+            .limit(batch_size)
+        )
+    ).all()
+    for event_id, handler_name in rows:
+        await enqueue(event_id, handler_name)
+    return len(rows)

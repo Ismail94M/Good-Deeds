@@ -313,3 +313,61 @@ async def test_withdraw_racing_a_prize_rank_upgrade_does_not_deadlock(
         group = await s.get(SameActGroup, deed.same_act_group_id)
         assert group is not None
         assert (group.verified_count, group.counted_count, group.distinct_reporters) == (1, 1, 1)
+
+
+async def test_concurrent_withdrawals_at_the_window_boundary(
+    committed_b6: Committed, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """M4 D64: two withdrawals of one verified deed race, one a millisecond before the window
+    ends and one at its end. The window is checked under the deed row lock, so exactly one
+    withdrawal happens (the early one) whichever runs first."""
+    witness, doer = await committed_b6.member(), await committed_b6.member()
+    async with SessionLocal() as s:
+        out = await scan_and_report(s, witness, doer, at=datetime.now(UTC) - timedelta(days=2))
+        await s.commit()
+        deed = await s.get(Deed, out.id)
+        assert deed is not None and deed.verified_at is not None
+        until = deed.verified_at + timedelta(hours=24)
+    _meet_before(monkeypatch, _grouping, "lock_doer")
+
+    early, late = await asyncio.gather(
+        _in_own_session(
+            lambda s: withdraw(s, witness, out.id, at=until - timedelta(milliseconds=1))
+        ),
+        _in_own_session(lambda s: withdraw(s, witness, out.id, at=until)),
+    )
+    assert not isinstance(early, AppError), early
+    assert early.status == "withdrawn"
+    assert isinstance(late, AppError) and late.status_code == 409
+    assert late.code in {"withdraw_window_closed", "deed_not_withdrawable"}
+    async with SessionLocal() as s:
+        deed = await s.get(Deed, out.id)
+        assert deed is not None and deed.status == DeedStatus.WITHDRAWN
+        withdrawals = await s.scalar(
+            select(func.count())
+            .select_from(VerificationEvent)
+            .where(
+                VerificationEvent.deed_id == out.id,
+                VerificationEvent.kind == VerificationEventKind.WITHDRAWN,
+            )
+        )
+        assert withdrawals == 1
+
+
+async def test_concurrent_withdrawals_after_the_window_both_fail(
+    committed_b6: Committed, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    witness, doer = await committed_b6.member(), await committed_b6.member()
+    async with SessionLocal() as s:
+        out = await scan_and_report(s, witness, doer, at=datetime.now(UTC) - timedelta(days=2))
+        await s.commit()
+    _meet_before(monkeypatch, _grouping, "lock_doer")
+
+    results = await asyncio.gather(
+        _in_own_session(lambda s: withdraw(s, witness, out.id)),
+        _in_own_session(lambda s: withdraw(s, witness, out.id)),
+    )
+    assert all(isinstance(r, AppError) and r.code == "withdraw_window_closed" for r in results)
+    async with SessionLocal() as s:
+        deed = await s.get(Deed, out.id)
+        assert deed is not None and deed.status == DeedStatus.VERIFIED

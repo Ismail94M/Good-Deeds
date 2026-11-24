@@ -54,6 +54,7 @@ const DEED: DeedOut = {
   area_name: 'Koramangala',
   can_edit: true,
   can_withdraw: true,
+  withdrawable_until: '2026-11-16T10:01:00Z',
   invite: null,
 }
 
@@ -358,9 +359,9 @@ describe('deedsApi: self-logs', () => {
 describe('deedsApi: profile counts', () => {
   it('fetches public deed counts by handle', async () => {
     const api = mockApi({
-      'GET /users/asha/deed-counts': { body: { self_logged: 25, verified: 12 } },
+      'GET /users/asha/deed-counts': { body: { verified: 12 } },
     })
-    await expect(deedsApi.deedCounts('asha')).resolves.toEqual({ self_logged: 25, verified: 12 })
+    await expect(deedsApi.deedCounts('asha')).resolves.toEqual({ verified: 12 })
     expect(api.calls('GET /users/asha/deed-counts')[0].headers.get('Authorization')).toBeNull()
   })
 })

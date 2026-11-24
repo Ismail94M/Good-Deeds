@@ -4,7 +4,7 @@
  * "Privacy/Harm") beyond what PhotoReports / CommentReports tests already pin down.
  */
 
-import { screen, waitFor, within } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { makeMe, mockApi, renderApp, signedIn } from '../../test/utils'
@@ -47,11 +47,12 @@ describe('photo reports: chips (Q44)', () => {
     })
     renderApp('/admin/photo-reports')
     await screen.findByRole('tab', { name: 'Open · 1' })
-    const row = await waitFor(() => {
-      const found = screen.getAllByRole('listitem').find((li) => li.closest('main'))
-      expect(found).toBeDefined()
-      return found!
-    })
+    // Wait for the report row itself (its reason text), not for whichever list item renders
+    // first, so the check never runs against a half-rendered page.
+    const reason = await screen.findByText('It’s inappropriate or harmful')
+    const row = reason.closest('li')
+    expect(row).not.toBeNull()
+    expect(row!.closest('main')).not.toBeNull()
     expect(row).toHaveTextContent('Privacy/Harm')
     expect(row).toHaveTextContent('It’s inappropriate or harmful')
     expect(row).not.toHaveTextContent(/\bOther\b/)

@@ -25,6 +25,7 @@ from app.modules.deeds import service as deeds_service
 from app.modules.deeds.models import Area, SelfLog
 from tests.deeds.helpers import (
     CENTRE,
+    add_ward_regions,
     members,
     offset,
     publish_limits,
@@ -56,6 +57,7 @@ async def test_areas(session: AsyncSession) -> AsyncIterator[None]:
             "-150 -60)))"
         },
     )
+    await add_ward_regions(session, "SECRET-WARD-A", "SECRET-WARD-B")
     session.add_all(
         [
             Area(

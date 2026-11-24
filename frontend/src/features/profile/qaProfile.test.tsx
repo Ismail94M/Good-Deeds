@@ -22,7 +22,7 @@ describe('profile counts', () => {
     mockApi({
       ...signedIn(makeMe()),
       'GET /users/asha': { body: ASHA_PUBLIC },
-      'GET /users/asha/deed-counts': { body: { self_logged: 2, verified: 5 } },
+      'GET /users/asha/deed-counts': { body: { verified: 5 } },
     })
     renderApp('/u/asha')
     const counts = await screen.findByRole('group', { name: 'Counts' })
@@ -33,7 +33,7 @@ describe('profile counts', () => {
   it('Verified Deeds on my profile opens My deeds on Recognised for', async () => {
     mockApi({
       ...signedIn(makeMe()),
-      'GET /users/asha/deed-counts': { body: { self_logged: 2, verified: 5 } },
+      'GET /users/asha/deed-counts': { body: { verified: 5 } },
       'GET /me/deeds': { body: { items: [], next_cursor: null } },
       'GET /deeds/options': { body: makeOptions() },
     })
@@ -50,9 +50,10 @@ describe('profile counts', () => {
     let logs = 0
     const api = mockApi({
       ...signedIn(makeMe()),
-      'GET /users/asha/deed-counts': () => ({ body: { self_logged: logs, verified: 0 } }),
+      'GET /users/asha/deed-counts': { body: { verified: 0 } },
       'GET /deeds/options': { body: makeOptions() },
-      'GET /me/self-logs': { body: { items: [], next_cursor: null } },
+      // M4 D69: my self-log count comes from `total` on my own list.
+      'GET /me/self-logs': () => ({ body: { items: [], next_cursor: null, total: logs } }),
       'POST /me/self-logs': () => {
         logs += 1
         return {
@@ -90,7 +91,7 @@ describe('profile header and account (Q22, D25)', () => {
   it('shows "@handle" alone under the name (no city or area suffix)', async () => {
     mockApi({
       ...signedIn(makeMe({ area: 'Indiranagar' })),
-      'GET /users/asha/deed-counts': { body: { self_logged: 0, verified: 0 } },
+      'GET /users/asha/deed-counts': { body: { verified: 0 } },
     })
     renderApp('/profile')
     const name = await screen.findByRole('heading', { level: 1, name: 'Asha' })
@@ -101,7 +102,7 @@ describe('profile header and account (Q22, D25)', () => {
   it('puts Log out in the Account section with a 44 px target', async () => {
     mockApi({
       ...signedIn(makeMe()),
-      'GET /users/asha/deed-counts': { body: { self_logged: 0, verified: 0 } },
+      'GET /users/asha/deed-counts': { body: { verified: 0 } },
     })
     renderApp('/profile')
     const account = await screen.findByRole('region', { name: 'Account' })
