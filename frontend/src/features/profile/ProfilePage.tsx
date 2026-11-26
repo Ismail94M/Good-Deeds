@@ -206,6 +206,21 @@ function ActivitySection() {
     // M5 §6.2: explanation requests and decision notices about your deeds.
     { to: '/me/reviews', title: 'Reviews', body: 'Questions and decisions about your deeds' },
   ]
+  // The only way into the admin area: shown to moderators and admins, never to members.
+  const role = useAuth().user?.role
+  if (role === 'admin') {
+    items.push({
+      to: '/admin/fraud',
+      title: 'Admin',
+      body: 'Fraud cases, appeals, points changes and reports',
+    })
+  } else if (role === 'moderator') {
+    items.push({
+      to: '/admin/photo-reports',
+      title: 'Moderation',
+      body: 'Photo and comment reports',
+    })
+  }
   const unread = useReviewsUnread()
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-2">

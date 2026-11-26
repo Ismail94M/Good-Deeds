@@ -80,6 +80,28 @@ describe('ProfilePage', () => {
       within(activity).getByRole('link', { name: /Self-logs Your private diary of good deeds/ }),
     ).toHaveAttribute('href', '/me/self-logs')
     // M3 adds the "{n} followers · {n} following · Saved" line (tested in feed/Connections.test).
+    expect(within(activity).queryByRole('link', { name: /^Admin/ })).not.toBeInTheDocument()
+    expect(within(activity).queryByRole('link', { name: /^Moderation/ })).not.toBeInTheDocument()
+  })
+
+  it('shows the way into the admin area only to admins and moderators', async () => {
+    mockApi({ ...signedIn(makeMe({ role: 'admin' })), ...COUNTS })
+    const { unmount } = renderApp('/profile')
+    const activity = await screen.findByRole('region', { name: 'Your activity' })
+    expect(within(activity).getByRole('link', { name: /^Admin/ })).toHaveAttribute(
+      'href',
+      '/admin/fraud',
+    )
+    unmount()
+
+    mockApi({ ...signedIn(makeMe({ role: 'moderator' })), ...COUNTS })
+    renderApp('/profile')
+    const modActivity = await screen.findByRole('region', { name: 'Your activity' })
+    expect(within(modActivity).getByRole('link', { name: /^Moderation/ })).toHaveAttribute(
+      'href',
+      '/admin/photo-reports',
+    )
+    expect(within(modActivity).queryByRole('link', { name: /^Admin/ })).not.toBeInTheDocument()
   })
 
   it('shows a dash when the counts can’t load', async () => {
