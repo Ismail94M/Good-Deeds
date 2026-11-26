@@ -2,7 +2,8 @@
 
 Payloads are IDs, codes and numbers only (no names, text or locations). Nothing subscribed in M4;
 M6 (notifications) will. From M5, ``fraud`` subscribes to ``ReporterConcentrationExceeded`` and
-``DeedNeedsReview`` (docs/M5-DESIGN.md §5, D78), which it imports through ``scoring.service``.
+``DeedNeedsReview`` (docs/M5-DESIGN.md §5, D78) and ``PointsOverridden`` (D100), which it imports
+through ``scoring.service``. ``HeroTitleRevoked`` and ``BadgeRevoked`` have no subscriber yet (M6).
 """
 
 import uuid
@@ -80,3 +81,45 @@ class HeroTitleAwarded(DomainEvent):
 class MonthFinalized(DomainEvent):
     event_type = "scoring.month_finalized"
     period_month: date
+
+
+class PointsOverridden(DomainEvent):
+    """An admin's override lowered a user's points for one deed and role (docs/M5-DESIGN.md
+    D91, D100); raising points emits nothing. ``fraud`` turns it into a decision notice the
+    person can appeal. ``new_points`` is the points in force after the override (the rule
+    result when it was cleared)."""
+
+    event_type = "scoring.points_overridden"
+    override_id: uuid.UUID
+    deed_id: uuid.UUID
+    role: Literal["doer", "reporter"]
+    user_id: uuid.UUID
+    old_points: int
+    new_points: int
+    reason_code: str
+    actor_id: uuid.UUID
+    # The admin who asked for a big cut that a second admin approved (Q77); None for a direct
+    # override. Neither of them may decide an appeal against it.
+    requested_by_id: uuid.UUID | None = None
+
+
+class HeroTitleRevoked(DomainEvent):
+    """An admin revoked a Kindness Hero title for a confirmed case (docs/M5-DESIGN.md D92). The
+    title is not passed on and the final board is not recomputed."""
+
+    event_type = "scoring.hero_title_revoked"
+    title_id: uuid.UUID
+    user_id: uuid.UUID
+    period_month: date
+    region_id: int
+    case_id: uuid.UUID
+
+
+class BadgeRevoked(DomainEvent):
+    """An admin revoked a badge for a confirmed case (docs/M5-DESIGN.md D92)."""
+
+    event_type = "scoring.badge_revoked"
+    badge_id: uuid.UUID
+    user_id: uuid.UUID
+    badge_slug: str
+    case_id: uuid.UUID

@@ -16,10 +16,13 @@ from app.modules.scoring import _badges
 from app.modules.scoring._limits import Tier
 from app.modules.scoring.events import (
     BadgeAwarded,
+    BadgeRevoked,
     DeedNeedsReview,
     HeroTitleAwarded,
+    HeroTitleRevoked,
     MonthFinalized,
     PointsChanged,
+    PointsOverridden,
     ReporterConcentrationExceeded,
 )
 from app.modules.scoring.models import (
@@ -34,13 +37,16 @@ from app.modules.scoring.models import (
 
 __all__ = [
     "BadgeAwarded",
+    "BadgeRevoked",
     "BoardEntry",
     "DeedNeedsReview",
     "FinalSnapshot",
     "HeroTitleAwarded",
+    "HeroTitleRevoked",
     "LedgerEntryView",
     "MonthFinalized",
     "PointsChanged",
+    "PointsOverridden",
     "ReporterConcentrationExceeded",
     "Tier",
     "TitleView",

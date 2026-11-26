@@ -6,7 +6,7 @@ asks ``GET /api/admin/scoring/deeds/{id}``.
 """
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -209,6 +209,9 @@ class FraudStatus(BaseModel):
     detectors: list[DetectorStatus]
     # Open and parked cases this admin may see, by type.
     open_cases_by_type: dict[str, int]
+    # Open appeals no active admin may decide (each is the decider or conflicted): they wait,
+    # and permanent steps stay paused (PO Q78). The UI shows "Appeals need a second admin".
+    appeals_waiting_for_second_admin: int
 
 
 # --------------------------------------------------- #8 audit view
@@ -229,3 +232,152 @@ class AuditItem(BaseModel):
 class AuditPage(BaseModel):
     items: list[AuditItem]
     next_cursor: str | None
+
+
+# --------------------------------------------------- #11, #12 appeals (admin)
+
+
+class AppealRow(BaseModel):
+    appeal_id: uuid.UUID
+    user: UserRef
+    kind: Literal["case", "override"]
+    case_id: uuid.UUID | None
+    deed_count: int
+    created_at: datetime
+    original_decider: UserRef
+    outcome: Literal["upheld", "overturned"] | None
+    decided_at: datetime | None
+
+
+class AppealCounts(BaseModel):
+    open: int
+    decided: int
+
+
+class AppealPage(BaseModel):
+    items: list[AppealRow]
+    counts: AppealCounts
+    next_cursor: str | None
+
+
+class AppealNoticeItem(BaseModel):
+    deed_id: uuid.UUID
+    # ``excluded``, ``pending_removal`` or ``points_changed``.
+    effect: str
+    old_points: int | None
+    new_points: int | None
+    reporter: UserRef
+    doer: UserRef
+    category_label: str
+    area_name: str
+    occurred_on: date | None
+    status: str | None
+
+
+class AppealNotice(BaseModel):
+    notice_id: uuid.UUID
+    created_at: datetime
+    reason_key: str
+    # What the person was told (D101).
+    reason_text: str
+    appeal_until: datetime
+    final_at: datetime | None
+    items: list[AppealNoticeItem]
+
+
+class AppealDetail(BaseModel):
+    appeal_id: uuid.UUID
+    user: UserRef
+    kind: Literal["case", "override"]
+    case_id: uuid.UUID | None
+    override_id: uuid.UUID | None
+    # The person's written reason.
+    reason: str
+    created_at: datetime
+    original_decider: UserRef
+    notice: AppealNotice
+    outcome: Literal["upheld", "overturned"] | None
+    reviewer: UserRef | None
+    reviewer_note: str | None
+    decided_at: datetime | None
+
+
+class AppealDecisionIn(BaseModel):
+    outcome: Literal["upheld", "overturned"]
+    note: str = Field(max_length=_MAX_BODY_TEXT)
+
+
+# --------------------------------------------------- M1 to M4 member reviews (D99 to D101)
+#
+# Member shapes never name a case type, a detector, the other people in a case or an admin,
+# and never say "fraud" (D101). ``tests/fraud/test_member_reviews.py`` scans them.
+
+
+class MyDeedRef(BaseModel):
+    """One of the member's own deeds, with the other person on that deed."""
+
+    deed_id: uuid.UUID
+    role: Literal["doer", "reporter"]
+    category_label: str
+    area_name: str
+    occurred_on: date
+    other_person: UserRef
+
+
+class MyExplanation(BaseModel):
+    id: uuid.UUID
+    requested_at: datetime
+    reply_due_at: datetime
+    replied_at: datetime | None
+    reply: str | None
+    status: Literal["waiting", "replied", "closed"]
+    # "We've finished looking. No changes." once the look ended with nothing for this person.
+    outcome_text: str | None
+    deeds: list[MyDeedRef]
+
+
+class MyNoticeItem(BaseModel):
+    deed: MyDeedRef
+    effect_text: str
+
+
+class MyAppeal(BaseModel):
+    created_at: datetime
+    reason: str
+    outcome: Literal["upheld", "overturned"] | None
+    # "We looked again and restored your deeds" / "We looked again and the decision stays".
+    outcome_text: str | None
+    decided_at: datetime | None
+
+
+class MyNotice(BaseModel):
+    id: uuid.UUID
+    created_at: datetime
+    reason_text: str
+    items: list[MyNoticeItem]
+    appeal_until: datetime
+    can_appeal: bool
+    appeal: MyAppeal | None
+    final: bool
+
+
+class MyReviewLimits(BaseModel):
+    reply_max_chars: int
+    appeal_reason_min_chars: int
+    appeal_reason_max_chars: int
+
+
+class MyReviews(BaseModel):
+    explanations: list[MyExplanation]
+    notices: list[MyNotice]
+    # Items new or changed since the member last opened the page (the Profile tab dot).
+    unread: int
+    limits: MyReviewLimits
+
+
+class ReplyIn(BaseModel):
+    reply: str = Field(max_length=_MAX_BODY_TEXT)
+
+
+class AppealIn(BaseModel):
+    reason: str = Field(max_length=_MAX_BODY_TEXT)

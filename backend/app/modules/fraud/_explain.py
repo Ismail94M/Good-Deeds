@@ -4,7 +4,7 @@ Before an admin confirms a case with an adverse outcome (``exclude`` or ``reject
 that person is asked about their deeds and may reply within ``explanation.reply_days``. Confirm
 is refused with 409 ``explanation_required`` when the person was never asked, and 409
 ``explanation_pending`` while they haven't replied and the due date hasn't passed. Dismissing
-never needs it. The member side (seeing the request, replying) is task B45.
+never needs it. The member side (seeing the request, replying) is ``_member.py``.
 """
 
 import uuid

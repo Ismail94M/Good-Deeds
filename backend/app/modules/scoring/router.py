@@ -5,34 +5,46 @@ per-account limit when signed in; the other member reads need ``CurrentUser`` an
 per account and per IP (#2 to #8, ``scoring.rate_me_user`` / ``scoring.rate_public_ip``).
 #9 and #10 are admin only (moderators get 403). Routers stay thin: limits first, then the
 read in ``_reads``.
+
+M5 (docs/M5-DESIGN.md §3.4 #13 to #18): admin overrides, big-cut requests and title/badge
+revocation, admin only, limited per account by ``fraud.rate_admin_read`` /
+``fraud.rate_admin_write``. Conflicted admins get 404 (D90).
 """
 
 import uuid
-from typing import Annotated
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
 from app.core.ratelimit import Limiter, client_ip
 from app.modules.deeds import service as deeds
+from app.modules.fraud.service import override_rules
 from app.modules.identity import service as identity
 from app.modules.identity.service import AdminUser, CurrentUser
-from app.modules.scoring import _reads
+from app.modules.scoring import _overrides, _reads, _revoke
 from app.modules.scoring._limits import load_scoring
-from app.modules.scoring.models import LedgerRole
+from app.modules.scoring.models import LedgerRole, OverrideRequest
 from app.modules.scoring.schemas import (
     AdminDeedScoring,
     AdminMonth,
+    AdminUserScoring,
     DeedPoints,
     FeaturedCityBoard,
     Heroes,
     Leaderboard,
     LedgerPage,
     MyScoring,
+    OverrideDecisionIn,
+    OverrideDecisionOut,
+    OverrideIn,
+    OverrideRequestOut,
+    OverrideRequestPage,
     PublicScoring,
     RegionOption,
+    RevokeIn,
     ScoringOptions,
     UserRanks,
 )
@@ -187,10 +199,117 @@ async def leaderboard_heroes(
 
 @router.get("/admin/scoring/deeds/{deed_id}", response_model=AdminDeedScoring, tags=["admin"])
 async def admin_deed(deed_id: uuid.UUID, admin: AdminUser, session: Session) -> AdminDeedScoring:
-    """404 for an unknown deed and for an admin who did or reported it."""
+    """404 for an unknown deed and for a conflicted admin (D90)."""
     return await _reads.admin_deed(session, admin.id, deed_id)
 
 
 @router.get("/admin/scoring/months/{month}", response_model=AdminMonth, tags=["admin"])
 async def admin_month(month: str, admin: AdminUser, session: Session) -> AdminMonth:
     return await _reads.admin_month(session, month)
+
+
+# --------------------------------------------------- M5 #13 to #18 admin
+
+
+async def _admin_limit(
+    session: AsyncSession, limiter: Limiter, admin_id: uuid.UUID, kind: Literal["read", "write"]
+) -> None:
+    rules = await override_rules(session)
+    spec = rules.rate_admin_write if kind == "write" else rules.rate_admin_read
+    await limiter.hit(f"scoring:admin:{kind}:u:{admin_id}", spec)
+
+
+@router.post(
+    "/admin/scoring/deeds/{deed_id}/overrides",
+    response_model=AdminDeedScoring | OverrideRequestOut,
+    tags=["admin"],
+)
+async def override_points(
+    deed_id: uuid.UUID,
+    body: OverrideIn,
+    response: Response,
+    admin: AdminUser,
+    session: Session,
+    limiter: Limiter,
+) -> AdminDeedScoring | OverrideRequestOut:
+    """#13: 200 with the #9 body when applied; 202 with the request when the cut needs a second
+    admin (Q77)."""
+    await _admin_limit(session, limiter, admin.id, "write")
+    result = await _overrides.create_override(session, admin.id, deed_id, body)
+    await session.commit()
+    if isinstance(result, OverrideRequest):
+        response.status_code = 202
+        (out,) = await _overrides.requests_out(session, [result])
+        return out
+    return await _reads.admin_deed(session, admin.id, deed_id)
+
+
+@router.get("/admin/scoring/override-requests", response_model=OverrideRequestPage, tags=["admin"])
+async def override_requests(
+    admin: AdminUser,
+    session: Session,
+    limiter: Limiter,
+    status: Literal["pending", "decided"] = "pending",
+    cursor: str | None = None,
+) -> OverrideRequestPage:
+    """#17: leaves out the admin's own requests and conflicted ones."""
+    await _admin_limit(session, limiter, admin.id, "read")
+    return await _overrides.list_requests(session, admin.id, status=status, cursor=cursor)
+
+
+@router.post(
+    "/admin/scoring/override-requests/{request_id}/decision",
+    response_model=OverrideDecisionOut,
+    tags=["admin"],
+)
+async def decide_override_request(
+    request_id: uuid.UUID,
+    body: OverrideDecisionIn,
+    admin: AdminUser,
+    session: Session,
+    limiter: Limiter,
+) -> OverrideDecisionOut:
+    """#18: approve or decline; 404 for the requester and conflicted admins."""
+    await _admin_limit(session, limiter, admin.id, "write")
+    request = await _overrides.decide_request(session, admin.id, request_id, body)
+    await session.commit()
+    (out,) = await _overrides.requests_out(session, [request])
+    deed = None
+    if body.decision == "approve":
+        deed = await _reads.admin_deed(session, admin.id, request.deed_id)
+    return OverrideDecisionOut(request=out, deed=deed)
+
+
+@router.get("/admin/scoring/users/{handle}", response_model=AdminUserScoring, tags=["admin"])
+async def admin_user(
+    handle: str, admin: AdminUser, session: Session, limiter: Limiter
+) -> AdminUserScoring:
+    """#14: 404 for an unknown handle, the admin themself and a related person."""
+    await _admin_limit(session, limiter, admin.id, "read")
+    return await _revoke.admin_user(session, admin.id, handle)
+
+
+@router.post(
+    "/admin/scoring/titles/{title_id}/revoke", response_model=AdminUserScoring, tags=["admin"]
+)
+async def revoke_title(
+    title_id: uuid.UUID, body: RevokeIn, admin: AdminUser, session: Session, limiter: Limiter
+) -> AdminUserScoring:
+    """#15 (D92)."""
+    await _admin_limit(session, limiter, admin.id, "write")
+    user_id = await _revoke.revoke_title(session, admin.id, title_id, body)
+    await session.commit()
+    return await _revoke.user_view(session, user_id)
+
+
+@router.post(
+    "/admin/scoring/badges/{badge_id}/revoke", response_model=AdminUserScoring, tags=["admin"]
+)
+async def revoke_badge(
+    badge_id: uuid.UUID, body: RevokeIn, admin: AdminUser, session: Session, limiter: Limiter
+) -> AdminUserScoring:
+    """#16 (D92)."""
+    await _admin_limit(session, limiter, admin.id, "write")
+    user_id = await _revoke.revoke_badge(session, admin.id, badge_id, body)
+    await session.commit()
+    return await _revoke.user_view(session, user_id)

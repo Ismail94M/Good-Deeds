@@ -8,9 +8,13 @@ Scoring detects the two patterns defined on its points and text rules and emits 
 handlers below turn each into a ``Finding`` and raise it through ``raise_flag`` like any
 detector's (D85, D86). ``raise_flag`` honours ``detectors_enabled`` and opens or joins one live
 case per (type, subjects), so a repeated event changes nothing. Opening a case holds nothing
-(``hold_on_open`` is false for every type, PO principle 1). ``PointsOverridden`` gets its
-subscriber with the notices (B45).
+(``hold_on_open`` is false for every type, PO principle 1).
+
+``PointsOverridden`` (scoring lowered someone's points with an override, D91) becomes a decision
+notice the person can appeal (D100); one per (override, person), so a retry adds nothing.
 """
+
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,9 +23,14 @@ from app.modules.deeds.service import DeedVerified
 from app.modules.fraud._cases import raise_flag
 from app.modules.fraud._detect import run_on_event
 from app.modules.fraud._limits import load_fraud
+from app.modules.fraud._notices import create_override_notice
 from app.modules.fraud.detectors.base import Finding
 from app.modules.fraud.models import FlagCaseType
-from app.modules.scoring.service import DeedNeedsReview, ReporterConcentrationExceeded
+from app.modules.scoring.service import (
+    DeedNeedsReview,
+    PointsOverridden,
+    ReporterConcentrationExceeded,
+)
 
 
 @subscribe(DeedVerified)
@@ -70,4 +79,23 @@ async def flag_content(session: AsyncSession, event: DeedNeedsReview) -> None:
             deed_ids=frozenset({event.deed_id}),
             signal={"text_check": event.reason},
         ),
+    )
+
+
+@subscribe(PointsOverridden)
+async def notify_points_overridden(session: AsyncSession, event: PointsOverridden) -> None:
+    """A ``kind='override'`` notice with one ``points_changed`` item (D100)."""
+    _, config = await load_fraud(session)
+    await create_override_notice(
+        session,
+        override_id=event.override_id,
+        deed_id=event.deed_id,
+        user_id=event.user_id,
+        old_points=event.old_points,
+        new_points=event.new_points,
+        reason_code=event.reason_code,
+        actor_id=event.actor_id,
+        requested_by_id=event.requested_by_id,
+        config=config,
+        now=datetime.now(UTC),
     )

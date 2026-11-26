@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 RegionKindName = Literal["country", "state", "city", "ward"]
 
@@ -276,12 +276,30 @@ class AdminEvaluation(BaseModel):
     prompt_version: str | None
 
 
+class OverrideOut(BaseModel):
+    """One ``score_overrides`` row (docs/M5-DESIGN.md §3.4 #13). ``points`` null: cleared."""
+
+    id: uuid.UUID
+    role: Literal["doer", "reporter"]
+    points: int | None
+    previous_points: int
+    reason_code: str
+    note: str
+    actor: UserSummary | None
+    case_id: uuid.UUID | None
+    request_id: uuid.UUID | None
+    created_at: datetime
+
+
 class AdminDeedScoring(BaseModel):
-    """#9 (§3.4 #3)."""
+    """#9 (§3.4 #3). M5: ``held`` (a prize hold from a confirmed decision, D79) and the deed's
+    overrides, oldest first (D91)."""
 
     deed_id: uuid.UUID
+    held: bool
     ledger: list[AdminLedgerEntry]
     evaluations: list[AdminEvaluation]
+    overrides: list[OverrideOut]
 
 
 class AdminMonth(BaseModel):
@@ -296,3 +314,99 @@ class AdminMonth(BaseModel):
     pending_hold_events: int
     finalized_at: datetime | None
     final_snapshots: int
+
+
+# --------------------------------------------------- M5 overrides and revocation (§3.4 #13-#18)
+
+
+class OverrideIn(BaseModel):
+    """#13. ``points`` null clears the override in force. Lengths and ranges come from the
+    ``fraud`` config and are checked by the service (422 with a code)."""
+
+    role: Literal["doer", "reporter"]
+    points: int | None
+    reason_code: str = Field(max_length=30)
+    note: str = Field(max_length=10_000)
+    case_id: uuid.UUID | None = None
+
+
+class OverrideRequestOut(BaseModel):
+    """#13 (202) and #17: a big cut waiting for a second admin (Q77)."""
+
+    id: uuid.UUID
+    deed_id: uuid.UUID
+    role: Literal["doer", "reporter"]
+    user: UserSummary | None
+    previous_points: int
+    points: int
+    reason_code: str
+    note: str
+    case_id: uuid.UUID | None
+    requested_by: UserSummary | None
+    created_at: datetime
+    expires_at: datetime
+    status: Literal["pending", "approved", "declined", "expired"]
+    decided_by: UserSummary | None
+    decision_note: str | None
+    decided_at: datetime | None
+    override_id: uuid.UUID | None
+
+
+class OverrideRequestCounts(BaseModel):
+    pending: int
+    decided: int
+
+
+class OverrideRequestPage(BaseModel):
+    items: list[OverrideRequestOut]
+    counts: OverrideRequestCounts
+    next_cursor: str | None
+
+
+class OverrideDecisionIn(BaseModel):
+    decision: Literal["approve", "decline"]
+    note: str = Field(max_length=10_000)
+
+
+class OverrideDecisionOut(BaseModel):
+    """#18: the request, plus the #9 body of the deed when approved."""
+
+    request: OverrideRequestOut
+    deed: AdminDeedScoring | None
+
+
+class AdminTitle(BaseModel):
+    id: uuid.UUID
+    label: str
+    period_month: str
+    region_name: str
+    level: RegionKindName
+    place: int
+    revoked_at: datetime | None
+    revoked_reason: str | None
+
+
+class AdminBadge(BaseModel):
+    id: uuid.UUID
+    slug: str
+    label: str
+    awarded_at: datetime
+    revoked_at: datetime | None
+    revoked_reason: str | None
+
+
+class AdminUserScoring(BaseModel):
+    """#14: a person's titles and badges (revoked ones included) and points, for revocation."""
+
+    user: UserSummary
+    titles: list[AdminTitle]
+    badges: list[AdminBadge]
+    doer_points: int
+    reporter_points: int
+
+
+class RevokeIn(BaseModel):
+    """#15, #16."""
+
+    case_id: uuid.UUID
+    note: str = Field(max_length=10_000)

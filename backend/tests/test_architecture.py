@@ -209,6 +209,7 @@ SCORING_EVENTS = frozenset(
         "deeds.deed_rejected",
         "media.deed_photo_ready",
         "fraud.deed_hold_changed",
+        "fraud.appeal_decided",
     }
 )
 
@@ -341,6 +342,10 @@ SCORING_FROM_FRAUD = frozenset(
         "confirmed_case_for_user",
         "concentration_rule",
         "ConcentrationRule",
+        "case_standing",
+        "CaseStanding",
+        "override_rules",
+        "OverrideRules",
     }
 )
 # deeds imports only the event it subscribes to, and only in deeds/handlers.py.

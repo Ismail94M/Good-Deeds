@@ -627,7 +627,8 @@ async def test_release_and_dismiss_release_holds_placed_on_open(
     assert res.status_code == 200
     assert (await case_row(session, first.case_id)).held_count == 1
     released = await outbox(session, HOLD_EVENT, first.b_to_a)
-    assert [e.payload["held"] for e in released] == [True, False]
+    # Events from one transaction can share occurred_at, so compare without order.
+    assert sorted(e.payload["held"] for e in released) == [False, True]
     assert [e.payload["held"] for e in await outbox(session, HOLD_EVENT, first.a_to_b)] == [True]
 
     res = await client.post(
@@ -638,10 +639,8 @@ async def test_release_and_dismiss_release_holds_placed_on_open(
     assert res.status_code == 200
     assert (await case_row(session, second.case_id)).held_count == 0
     for deed_id in (second.a_to_b, second.b_to_a):
-        assert [e.payload["held"] for e in await outbox(session, HOLD_EVENT, deed_id)] == [
-            True,
-            False,
-        ]
+        held = [e.payload["held"] for e in await outbox(session, HOLD_EVENT, deed_id)]
+        assert sorted(held) == [False, True]
 
 
 async def test_withdrawn_deed_may_still_be_marked_reject(

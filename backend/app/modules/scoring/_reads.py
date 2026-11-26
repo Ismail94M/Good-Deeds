@@ -2,8 +2,14 @@
 
 Points leave this file only in the owner's shapes (#2, #3, #5) and the admin-only shapes (#9,
 #10). Public shapes (#4, #6, #8) carry tier, badge and title totals, ranks and deed counts only
-(D69). Non-owners and pending deeds get 404 on #5; an admin who did or reported a deed gets 404
-on #9 (the conflict rule).
+(D69). Non-owners and pending deeds get 404 on #5; an admin who did or reported a deed, or who
+has a verified deed with either person inside ``fraud.coi_lookback_days``, gets 404 on #9 (the
+conflict rule, M5 D90).
+
+Final boards (M5 Q72): a row whose person's title for that board and month was revoked shows as
+"Unavailable account", like a suspended account (SEC3 L6); its place is unchanged and the title
+is gone. The featured-city board of a final month does the same for a person with any title of
+that month revoked.
 """
 
 import re
@@ -19,8 +25,9 @@ from sqlalchemy.orm import aliased
 from app.core.errors import AppError, NotFound
 from app.core.runtime_config import load_version
 from app.modules.deeds import service as deeds
+from app.modules.fraud.service import is_held, override_rules
 from app.modules.identity import service as identity
-from app.modules.scoring import _badges, _cursor, _finalize, _labels, _leaderboard
+from app.modules.scoring import _badges, _coi, _cursor, _finalize, _labels, _leaderboard
 from app.modules.scoring._limits import LeaderboardConfig, Tier, load_leaderboard, load_scoring
 from app.modules.scoring.models import (
     HeroTitle,
@@ -32,6 +39,7 @@ from app.modules.scoring.models import (
     LedgerRole,
     MonthFinalization,
     PointsLedger,
+    ScoreOverride,
     UserBadge,
 )
 from app.modules.scoring.schemas import (
@@ -56,6 +64,7 @@ from app.modules.scoring.schemas import (
     LevelOption,
     MyBoard,
     MyScoring,
+    OverrideOut,
     PublicScoring,
     RegionOption,
     RegionRef,
@@ -123,6 +132,23 @@ async def _board_summaries(
     found = await _summaries(session, active)
     hidden = UserSummary(handle=None, display_name=UNAVAILABLE_NAME)
     return {uid: found.get(uid, hidden) for uid in ids}
+
+
+async def _revoked_title_users(
+    session: AsyncSession, period: date, region_id: int | None
+) -> set[uuid.UUID]:
+    """People with a revoked title in the month (for one region, or any), M5 Q72."""
+    stmt = select(HeroTitle.user_id).where(
+        HeroTitle.period_month == period, HeroTitle.revoked_at.is_not(None)
+    )
+    if region_id is not None:
+        stmt = stmt.where(HeroTitle.region_id == region_id)
+    return set(await session.scalars(stmt))
+
+
+def _hide(people: dict[uuid.UUID, UserSummary], user_ids: set[uuid.UUID]) -> None:
+    for uid in user_ids & people.keys():
+        people[uid] = UserSummary(handle=None, display_name=UNAVAILABLE_NAME)
 
 
 def _tier_out(tier: Tier) -> TierOut:
@@ -590,6 +616,8 @@ async def leaderboard(
 
     users = {e.user_id for e, _ in rows} | ({me[0].user_id} if me else set())
     people = await _board_summaries(session, users)
+    if finalized:
+        _hide(people, await _revoked_title_users(session, period, region.id))
     tiers = await _badges.tiers_for(session, users, now=now)
 
     def _row(e: LeaderboardEntry, n: int) -> LeaderboardRow | None:
@@ -733,6 +761,8 @@ async def featured_city(
     top = ranked[: city.top_n]
     users = {r.user_id for r in top}
     people = await _board_summaries(session, users)
+    if final:
+        _hide(people, await _revoked_title_users(session, period, None))
     tiers = await _badges.tiers_for(session, users, now=now)
     return FeaturedCityBoard(
         city=FeaturedCityRef(key=city.key, name=city.name),
@@ -805,11 +835,16 @@ async def heroes(
 async def admin_deed(
     session: AsyncSession, admin_id: uuid.UUID, deed_id: uuid.UUID, *, now: datetime | None = None
 ) -> AdminDeedScoring:
-    """Ledger rows and evaluations of one deed. 404 for an unknown deed, and for an admin who
-    did or reported it (nobody reviews their own case)."""
+    """Ledger rows, evaluations, hold and overrides of one deed. 404 for an unknown deed, and
+    for a conflicted admin: one who did or reported it, or has a verified deed with either
+    person inside the lookback (D90; nobody reviews their own case)."""
     now = now or datetime.now(UTC)
     inputs = await deeds.scoring_inputs(session, deed_id)
-    if inputs is None or admin_id in (inputs.reporter_id, inputs.doer_id):
+    if inputs is None:
+        raise _deed_not_found()
+    rules = await override_rules(session)
+    people = (inputs.reporter_id, inputs.doer_id)
+    if await _coi.conflicted(session, admin_id, people, rules.coi_lookback_days, now):
         raise _deed_not_found()
     rows = list(
         await session.scalars(
@@ -857,7 +892,40 @@ async def admin_deed(
             .order_by(ImpactEvaluation.created_at, ImpactEvaluation.id)
         )
     ]
-    return AdminDeedScoring(deed_id=deed_id, ledger=ledger, evaluations=evaluations)
+    return AdminDeedScoring(
+        deed_id=deed_id,
+        held=await is_held(session, deed_id),
+        ledger=ledger,
+        evaluations=evaluations,
+        overrides=await overrides_out(session, deed_id),
+    )
+
+
+async def overrides_out(session: AsyncSession, deed_id: uuid.UUID) -> list[OverrideOut]:
+    """The deed's override rows, oldest first, with the admin who wrote each."""
+    rows = list(
+        await session.scalars(
+            select(ScoreOverride)
+            .where(ScoreOverride.deed_id == deed_id)
+            .order_by(ScoreOverride.created_at, ScoreOverride.id)
+        )
+    )
+    actors = await _summaries(session, {r.actor_id for r in rows})
+    return [
+        OverrideOut(
+            id=r.id,
+            role=r.role.value,
+            points=r.points,
+            previous_points=r.previous_points,
+            reason_code=r.reason_code,
+            note=r.note,
+            actor=actors.get(r.actor_id),
+            case_id=r.case_id,
+            request_id=r.request_id,
+            created_at=r.created_at,
+        )
+        for r in rows
+    ]
 
 
 async def admin_month(session: AsyncSession, month: str) -> AdminMonth:

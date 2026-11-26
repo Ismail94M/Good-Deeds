@@ -33,6 +33,13 @@ Rules:
   after the window, for any reason, can't move points through content or photos.
 - Days and months are in the configured zone (Asia/Kolkata) from the server's ``verified_at``,
   never the client's ``occurred_at`` (D58).
+- **Overrides (M5 D91, §4.6):** the latest ``score_overrides`` row of a (deed, role) is in
+  force. When the role has an award target, an override's ``points`` replace the rule result
+  (base, bonus and pair multiplier); ``0`` becomes a zero-point ``decision`` (``deed_units`` 0,
+  out of prize rank). Status, ``counts_for_points``, the daily cap and the prize hold still
+  decide whether there is an award target at all. ``points = null`` clears it (back to the
+  rules). Rows carry ``breakdown.override_id``; a change made by setting or clearing one has
+  reason ``admin_override``.
 - **Content review (M5 D86):** the first rule-based evaluation of a deed with
   ``human_review_required`` (text check ``spam_or_empty``) emits ``DeedNeedsReview`` once; a
   re-score whose evaluation is flagged again doesn't repeat it.
@@ -70,6 +77,7 @@ from app.modules.scoring.models import (
     LedgerReason,
     LedgerRole,
     PointsLedger,
+    ScoreOverride,
 )
 
 _ACTIVE_KINDS = (LedgerKind.AWARD, LedgerKind.DECISION)
@@ -101,6 +109,46 @@ class Target:
 def round_half_up(points: int, percent: int) -> int:
     """``points * percent / 100`` rounded half up, at least 1 (D53)."""
     return max(1, (points * percent + 50) // 100)
+
+
+def _overridden(target: Target | None, override: ScoreOverride | None) -> Target | None:
+    """The award target with the override in force applied (D91). A cap decision, a missing
+    target and a cleared override (``points`` null) leave the target as it is."""
+    if target is None or target.kind != LedgerKind.AWARD:
+        return target
+    if override is None or override.points is None:
+        return target
+    breakdown = {**target.breakdown, "override_id": str(override.id), "rule_points": target.points}
+    if override.points == 0:
+        return Target(
+            kind=LedgerKind.DECISION,
+            points=0,
+            deed_units=0,
+            counts_for_prize_rank=False,
+            breakdown=breakdown,
+        )
+    return Target(
+        kind=LedgerKind.AWARD,
+        points=override.points,
+        deed_units=target.deed_units,
+        counts_for_prize_rank=target.counts_for_prize_rank,
+        breakdown=breakdown,
+    )
+
+
+async def overrides_in_force(
+    session: AsyncSession, deed_id: uuid.UUID
+) -> dict[LedgerRole, ScoreOverride]:
+    """The latest override row per role of the deed (also a clearing one, ``points`` null)."""
+    rows = await session.scalars(
+        select(ScoreOverride)
+        .where(ScoreOverride.deed_id == deed_id)
+        .order_by(ScoreOverride.created_at.desc(), ScoreOverride.id)
+    )
+    latest: dict[LedgerRole, ScoreOverride] = {}
+    for row in rows:
+        latest.setdefault(row.role, row)
+    return latest
 
 
 def _decision(cap: int) -> Target:
@@ -285,13 +333,21 @@ class _Reconciler:
         entries: _RoleEntries,
         hint: LedgerReason | None,
     ) -> LedgerReason:
+        old = entries.active
+        old_override = None if old is None else old.breakdown.get("override_id")
+        new_override = target.breakdown.get("override_id")
+        # An override set or changed, or cleared back to a rule award (D91). Losing the award to
+        # the daily cap stays a cap decision.
+        if new_override is not None and new_override != old_override:
+            return LedgerReason.ADMIN_OVERRIDE
+        if new_override is None and old_override is not None and target.kind == LedgerKind.AWARD:
+            return LedgerReason.ADMIN_OVERRIDE
         if target.kind == LedgerKind.DECISION:
             return (
                 LedgerReason.DOER_DAILY_CAP
                 if role == LedgerRole.DOER
                 else LedgerReason.REPORTER_DAILY_CAP
             )
-        old = entries.active
         if old is None:
             # A first entry, or a re-award after the entry was lost (only a promotion does that).
             if entries.earlier or hint == LedgerReason.PROMOTED:
@@ -541,6 +597,92 @@ async def _settle_day(
     return written
 
 
+async def _rule_targets(
+    session: AsyncSession,
+    r: _Reconciler,
+    by_role: dict[LedgerRole, _RoleEntries],
+    roles: set[LedgerRole],
+) -> tuple[tuple[RuleResult, int, EvidenceLevel] | None, Target | None, Target | None]:
+    """The rule result and the targets of ``roles`` before any override."""
+    inputs = r.inputs
+    doer_counts = inputs.status == deeds.DeedStatus.VERIFIED and inputs.counts_for_points
+    rules = None
+    if LedgerRole.DOER in roles and doer_counts:
+        rules = await r.rules(await deeds.withdraw_window_hours(session))
+    doer_target = (
+        await r.doer_target(by_role[LedgerRole.DOER], rules) if LedgerRole.DOER in roles else None
+    )
+    reporter_target = (
+        await r.reporter_target(by_role[LedgerRole.REPORTER])
+        if LedgerRole.REPORTER in roles
+        else None
+    )
+    return rules, doer_target, reporter_target
+
+
+async def lock_deed_days(session: AsyncSession, deed_id: uuid.UUID) -> deeds.ScoringInputs | None:
+    """Take the deed's doer-day and reporter-day locks (§4.1), as ``reconcile_deed`` does, and
+    return its inputs; None (no lock) for a deed that was never verified. The locks are held to
+    the end of the transaction; ``reconcile_deed`` may take them again (they are re-entrant)."""
+    inputs = await deeds.scoring_inputs(session, deed_id)
+    if inputs is None or inputs.doer_id is None or inputs.verified_at is None:
+        return None
+    _, config = await load_scoring(session)
+    day = inputs.verified_at.astimezone(config.zone).date()
+    await advisory_xact_lock(session, "points_doer_day", str(inputs.doer_id), day.isoformat())
+    await advisory_xact_lock(
+        session, "points_reporter_day", str(inputs.reporter_id), day.isoformat()
+    )
+    return inputs
+
+
+@dataclass(frozen=True)
+class RoleState:
+    """One role of a deed, for an override (D91). ``user_id``: whose points they are;
+    ``active``: the active entry (None if none); ``rule_points``: the award target's points
+    before any override, None when the role has no award target (not verified, not counted,
+    capped), so there is nothing to override."""
+
+    user_id: uuid.UUID
+    active: PointsLedger | None
+    rule_points: int | None
+
+    @property
+    def points(self) -> int:
+        return 0 if self.active is None else self.active.points
+
+
+async def role_states(
+    session: AsyncSession, inputs: deeds.ScoringInputs
+) -> dict[LedgerRole, RoleState]:
+    """Both roles of a verified deed. The caller holds the day locks (``lock_deed_days``)."""
+    assert inputs.doer_id is not None
+    version, config = await load_scoring(session)
+    r = _Reconciler(session, inputs, config, version, None)
+    entries = list(
+        await session.scalars(
+            select(PointsLedger)
+            .where(PointsLedger.deed_id == inputs.id)
+            .order_by(PointsLedger.created_at, PointsLedger.id)
+            .execution_options(populate_existing=True)
+        )
+    )
+    by_role = _by_role(entries)
+    _, doer_target, reporter_target = await _rule_targets(session, r, by_role, set(LedgerRole))
+
+    def award_points(target: Target | None) -> int | None:
+        return target.points if target is not None and target.kind == LedgerKind.AWARD else None
+
+    return {
+        LedgerRole.DOER: RoleState(
+            inputs.doer_id, by_role[LedgerRole.DOER].active, award_points(doer_target)
+        ),
+        LedgerRole.REPORTER: RoleState(
+            inputs.reporter_id, by_role[LedgerRole.REPORTER].active, award_points(reporter_target)
+        ),
+    }
+
+
 async def _reconcile_locked(
     session: AsyncSession,
     deed_id: uuid.UUID,
@@ -565,18 +707,10 @@ async def _reconcile_locked(
         )
     )
     by_role = _by_role(entries)
-    doer_counts = inputs.status == deeds.DeedStatus.VERIFIED and inputs.counts_for_points
-    rules = None
-    if LedgerRole.DOER in roles and doer_counts:
-        rules = await r.rules(await deeds.withdraw_window_hours(session))
-    doer_target = (
-        await r.doer_target(by_role[LedgerRole.DOER], rules) if LedgerRole.DOER in roles else None
-    )
-    reporter_target = (
-        await r.reporter_target(by_role[LedgerRole.REPORTER])
-        if LedgerRole.REPORTER in roles
-        else None
-    )
+    rules, doer_target, reporter_target = await _rule_targets(session, r, by_role, roles)
+    overrides = await overrides_in_force(session, deed_id)
+    doer_target = _overridden(doer_target, overrides.get(LedgerRole.DOER))
+    reporter_target = _overridden(reporter_target, overrides.get(LedgerRole.REPORTER))
 
     if entries:
         region_id = entries[0].region_id  # frozen at the first entry (D66)

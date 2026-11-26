@@ -125,6 +125,14 @@ async def active_user_ids_in_city(
     return set(rows)
 
 
+async def active_admin_ids(session: AsyncSession) -> set[uuid.UUID]:
+    """Every active admin account (M5: whether an appeal has an admin who may decide it)."""
+    rows = await session.scalars(
+        select(User.id).where(User.role == Role.ADMIN, User.status == UserStatus.ACTIVE)
+    )
+    return set(rows)
+
+
 async def get_user_by_handle(session: AsyncSession, handle: str) -> User | None:
     return await session.scalar(select(User).where(User.handle == handle.lower()))
 

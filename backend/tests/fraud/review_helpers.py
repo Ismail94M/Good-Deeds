@@ -129,7 +129,7 @@ async def ask(
 
 
 async def reply(session: AsyncSession, case_id: uuid.UUID, person: Member) -> None:
-    """What the member reply endpoint (B45) will write."""
+    """What the member reply endpoint (M2) writes, without its checks."""
     request = await session.scalar(
         select(ExplanationRequest).where(
             ExplanationRequest.case_id == case_id, ExplanationRequest.user_id == person.user_id

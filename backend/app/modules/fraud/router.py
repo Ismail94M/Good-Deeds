@@ -1,25 +1,33 @@
 """Fraud HTTP routes (docs/M5-DESIGN.md §3.3), mounted under /api.
 
-Admin only (``identity.service.AdminUser``: signed out 401, members and moderators 403).
-Conflicted admins get 404 on a case (D90). Reads are limited per account by
+``/api/admin/*`` is admin only (``identity.service.AdminUser``: signed out 401, members and
+moderators 403). Conflicted admins get 404 on a case or an appeal (D90), and so does the admin
+who made the decision under appeal (D100). Reads are limited per account by
 ``fraud.rate_admin_read``, writes by ``fraud.rate_admin_write``. Routers stay thin: limit, call
-the service, commit, then read the case back. There is no hold endpoint (PO Q73). Appeals and
-the member ``/api/reviews`` endpoints are task B45.
+the service, commit, then read the result back. There is no hold endpoint (PO Q73).
+
+``/api/reviews`` (M1 to M4) is for any signed-in person, about their own items only (404 for
+anyone else's). The member writes (reply, appeal) share ``fraud.rate_admin_write`` per account:
+the ``fraud`` config has no separate member rate yet.
 """
 
 import uuid
 from datetime import datetime
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
 from app.core.ratelimit import Limiter
-from app.modules.fraud import _audit_view, _explain, _review
+from app.modules.fraud import _appeals, _audit_view, _explain, _member, _review
 from app.modules.fraud._common import utcnow
 from app.modules.fraud._limits import FraudConfig, load_fraud
 from app.modules.fraud.schemas import (
+    AppealDecisionIn,
+    AppealDetail,
+    AppealIn,
+    AppealPage,
     AuditPage,
     CaseDetail,
     CasePage,
@@ -27,9 +35,13 @@ from app.modules.fraud.schemas import (
     ExplanationsIn,
     FraudOptions,
     FraudStatus,
+    MyExplanation,
+    MyNotice,
+    MyReviews,
     NoteIn,
+    ReplyIn,
 )
-from app.modules.identity.service import AdminUser
+from app.modules.identity.service import AdminUser, CurrentUser
 
 router = APIRouter(tags=["admin"])
 Session = Annotated[AsyncSession, Depends(get_session)]
@@ -183,3 +195,82 @@ async def audit_view(
         config=config,
         now=utcnow(),
     )
+
+
+# --------------------------------------------------- #11, #12 appeals (D100)
+
+
+@router.get("/admin/fraud/appeals", response_model=AppealPage)
+async def list_appeals(
+    admin: AdminUser,
+    session: Session,
+    limiter: Limiter,
+    status: Literal["open", "decided"] = "open",
+    cursor: Annotated[str | None, Query(max_length=500)] = None,
+) -> AppealPage:
+    config = await _read(session, limiter, admin.id)
+    return await _appeals.list_appeals(
+        session, admin.id, queue=status, cursor=cursor, config=config, now=utcnow()
+    )
+
+
+@router.get("/admin/fraud/appeals/{appeal_id}", response_model=AppealDetail)
+async def appeal_detail(
+    appeal_id: uuid.UUID, admin: AdminUser, session: Session, limiter: Limiter
+) -> AppealDetail:
+    config = await _read(session, limiter, admin.id)
+    return await _appeals.appeal_detail(session, admin.id, appeal_id, config=config, now=utcnow())
+
+
+@router.post("/admin/fraud/appeals/{appeal_id}/decision", response_model=AppealDetail)
+async def decide_appeal(
+    appeal_id: uuid.UUID,
+    data: AppealDecisionIn,
+    admin: AdminUser,
+    session: Session,
+    limiter: Limiter,
+) -> AppealDetail:
+    config = await _write(session, limiter, admin.id)
+    await _appeals.decide_appeal(session, admin.id, appeal_id, data, config=config, now=utcnow())
+    await session.commit()
+    return await _appeals.appeal_detail(session, admin.id, appeal_id, config=config, now=utcnow())
+
+
+# --------------------------------------------------- M1 to M4 member reviews (D99 to D101)
+
+
+@router.get("/reviews", response_model=MyReviews, tags=["reviews"])
+async def my_reviews(user: CurrentUser, session: Session) -> MyReviews:
+    _, config = await load_fraud(session)
+    return await _member.my_reviews(session, user.id, config=config, now=utcnow())
+
+
+@router.post(
+    "/reviews/explanations/{request_id}/reply", response_model=MyExplanation, tags=["reviews"]
+)
+async def reply_to_explanation(
+    request_id: uuid.UUID, data: ReplyIn, user: CurrentUser, session: Session, limiter: Limiter
+) -> MyExplanation:
+    config = await _write(session, limiter, user.id)
+    await _member.reply(session, user.id, request_id, data.reply, config=config, now=utcnow())
+    await session.commit()
+    return await _member.my_explanation(session, user.id, request_id, config=config, now=utcnow())
+
+
+@router.post("/reviews/notices/{notice_id}/appeal", response_model=MyNotice, tags=["reviews"])
+async def appeal_notice(
+    notice_id: uuid.UUID, data: AppealIn, user: CurrentUser, session: Session, limiter: Limiter
+) -> MyNotice:
+    config = await _write(session, limiter, user.id)
+    await _appeals.create_appeal(
+        session, user.id, notice_id, data.reason, config=config, now=utcnow()
+    )
+    await session.commit()
+    return await _member.my_notice(session, user.id, notice_id, config=config, now=utcnow())
+
+
+@router.post("/reviews/seen", status_code=204, tags=["reviews"])
+async def reviews_seen(user: CurrentUser, session: Session) -> Response:
+    await _member.mark_seen(session, user.id, utcnow())
+    await session.commit()
+    return Response(status_code=204)

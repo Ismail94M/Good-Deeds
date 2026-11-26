@@ -22,6 +22,8 @@ REASON_LABELS: dict[str, str] = {
     LedgerReason.REJECTED: "Report rejected",
     LedgerReason.REMOVED: "Deed removed",
     LedgerReason.COUNTS_FOR_POINTS_LOST: "Report no longer counts",
+    # Neutral (M5 D101): never says why.
+    LedgerReason.ADMIN_OVERRIDE: "Points changed after review",
 }
 
 

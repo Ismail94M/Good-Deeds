@@ -44,7 +44,7 @@ class AppealRules(_Frozen):
     """D100: one appeal per notice within ``window_days``."""
 
     window_days: int = Field(ge=7, le=90)
-    reason_min_chars: int = Field(ge=1)
+    reason_min_chars: int = Field(ge=10)  # the appeals table CHECK requires 10
     reason_max_chars: int = Field(ge=1, le=2000)
 
     @model_validator(mode="after")

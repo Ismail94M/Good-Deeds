@@ -2,7 +2,7 @@
 
 from app.core.db import SessionLocal
 from app.core.jobs import job_app
-from app.modules.scoring import _badges, _concentration, _finalize, _leaderboard
+from app.modules.scoring import _badges, _concentration, _finalize, _leaderboard, _overrides
 
 
 @job_app.periodic(cron="* * * * *", periodic_id="scoring_refresh_leaderboards")
@@ -43,3 +43,13 @@ async def check_concentration(timestamp: int) -> int:
     each (docs/M5-DESIGN.md D85, §4.4). Skipped while the check is off in the fraud config."""
     async with SessionLocal() as session, session.begin():
         return len(await _concentration.check_concentration(session))
+
+
+@job_app.periodic(cron="7 * * * *", periodic_id="scoring_expire_override_requests")
+@job_app.task(
+    name="scoring.expire_override_requests", queueing_lock="scoring_expire_override_requests"
+)
+async def expire_override_requests(timestamp: int) -> int:
+    """Hourly: big-cut override requests nobody decided in time become ``expired`` (Q77)."""
+    async with SessionLocal() as session, session.begin():
+        return await _overrides.expire_requests(session)

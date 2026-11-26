@@ -36,7 +36,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import Conflict
 from app.core.events import emit
 from app.modules.deeds import service as deeds
-from app.modules.fraud import _actions, _coi, _cursor, _explain, _notices
+from app.modules.fraud import _actions, _appeals, _coi, _cursor, _explain, _notices
 from app.modules.fraud._cases import LIVE, month_review_deadline
 from app.modules.fraud._common import Invalid, clean_note, user_not_found
 from app.modules.fraud._limits import FraudConfig
@@ -199,7 +199,12 @@ async def status(
     by_type = {t.value: 0 for t in FlagCaseType}
     by_type.update({t.value: int(n) for t, n in rows})
     return FraudStatus(
-        config_version=config_version, detectors=detectors, open_cases_by_type=by_type
+        config_version=config_version,
+        detectors=detectors,
+        open_cases_by_type=by_type,
+        appeals_waiting_for_second_admin=await _appeals.waiting_for_second_admin(
+            session, config=config, now=now
+        ),
     )
 
 

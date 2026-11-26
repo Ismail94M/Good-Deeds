@@ -54,11 +54,13 @@ class FlagDecisionFinal(DomainEvent):
     event_type = "fraud.flag_decision_final"
     case_id: uuid.UUID
     rejected_deed_ids: list[uuid.UUID]
+    # The admin who decided the case (the rejection's actor), if known.
+    actor_id: uuid.UUID | None = None
 
 
 class AppealDecided(DomainEvent):
     """A second admin decided an appeal (D100). On ``overturned`` for an override notice,
-    scoring writes a clearing override."""
+    scoring writes a clearing override (actor: ``reviewer_id``)."""
 
     event_type = "fraud.appeal_decided"
     appeal_id: uuid.UUID
@@ -67,3 +69,4 @@ class AppealDecided(DomainEvent):
     override_id: uuid.UUID | None
     user_id: uuid.UUID
     outcome: Literal["upheld", "overturned"]
+    reviewer_id: uuid.UUID
