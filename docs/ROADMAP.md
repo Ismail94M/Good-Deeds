@@ -105,7 +105,10 @@ Each milestone is built, tested and reviewed by the product owner before the nex
   - The public Self-log Deeds count is removed (Q55). This changes built M2/M3 code.
   - No leaderboard opt-out (Q51).
 
-**M5 Fraud & Review**
+**M5 Fraud & Review** — **Built**, awaiting PO approval (2026-11-27; design `docs/M5-DESIGN.md` rev 4, decisions D77–D102, PO answers Q59–Q84, security review `docs/M5-SEC5.md`). Baseline approach, built to be replaced in parts (D102).
+- PO principles: detection alone changes nothing; only an admin confirms, after asking for an explanation; one appeal to a different admin; irreversible steps wait for the appeal.
+- Before invites are switched on: the invite-anomaly detector, human review of invite deeds and the SEC3 L7 fix must ship together (D87).
+- M8 carries: the 30 % concentration cap in prize ranking, and an open case delays (never denies) a payout (Q61, Q76).
 - Detectors: reciprocal verification, rings (graph cycles over a recent window), 30% reporter concentration, invite anomalies.
 - `FlagCase`. Flagged deeds are excluded from prize rank.
 - Admin queue, score overrides with a required reason, audit view.
