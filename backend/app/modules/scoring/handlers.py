@@ -6,6 +6,10 @@ Deliberately **not** subscribed: any photo removal or moderation event (Q29, D51
 photo never changes points) and every ``feed`` event (visibility never reaches scoring, D47).
 ``DeedPhotoReady`` is the only ``media`` import scoring has, through ``media.service``: the event
 class only, never photo state (D47).
+
+M5: ``DeedHoldChanged`` (``fraud.service``) re-scores a deed whose prize hold was placed or
+released (docs/M5-DESIGN.md D79); ``reconcile_deed`` reads the hold itself, so the event's
+``held`` flag is never trusted and a late or repeated event changes nothing.
 """
 
 from datetime import UTC, datetime, timedelta
@@ -24,6 +28,7 @@ from app.modules.deeds.service import (
     scoring_inputs,
     withdraw_window_hours,
 )
+from app.modules.fraud.service import DeedHoldChanged
 from app.modules.media.service import DeedPhotoReady
 from app.modules.scoring._evidence import record_photo_ready
 from app.modules.scoring._ledger import reconcile_deed
@@ -47,6 +52,11 @@ async def rescore_counts_for_points(
 
 @subscribe(DeedPrizeRankChanged)
 async def rescore_prize_rank(session: AsyncSession, event: DeedPrizeRankChanged) -> None:
+    await reconcile_deed(session, event.deed_id)
+
+
+@subscribe(DeedHoldChanged)
+async def rescore_held_deed(session: AsyncSession, event: DeedHoldChanged) -> None:
     await reconcile_deed(session, event.deed_id)
 
 

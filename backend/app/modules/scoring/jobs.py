@@ -2,7 +2,7 @@
 
 from app.core.db import SessionLocal
 from app.core.jobs import job_app
-from app.modules.scoring import _badges, _finalize, _leaderboard
+from app.modules.scoring import _badges, _concentration, _finalize, _leaderboard
 
 
 @job_app.periodic(cron="* * * * *", periodic_id="scoring_refresh_leaderboards")
@@ -34,3 +34,12 @@ async def award_badges(timestamp: int) -> int:
     """Every 15 minutes: award badges whose threshold deed is past its window (D70)."""
     async with SessionLocal() as session, session.begin():
         return await _badges.award_badges(session)
+
+
+@job_app.periodic(cron="*/15 * * * *", periodic_id="scoring_check_concentration")
+@job_app.task(name="scoring.check_concentration", queueing_lock="scoring_check_concentration")
+async def check_concentration(timestamp: int) -> int:
+    """Every 15 minutes: signal reporters over the concentration limit in open months, once
+    each (docs/M5-DESIGN.md D85, §4.4). Skipped while the check is off in the fraud config."""
+    async with SessionLocal() as session, session.begin():
+        return len(await _concentration.check_concentration(session))

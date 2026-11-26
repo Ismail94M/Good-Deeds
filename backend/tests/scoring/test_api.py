@@ -301,6 +301,8 @@ async def test_admin_endpoints_are_admin_only_with_the_conflict_rule(
         "period_month",
         "cutoff_at",
         "pending_scoring_events",
+        "pending_fraud_events",
+        "pending_hold_events",
         "finalized_at",
         "final_snapshots",
     }

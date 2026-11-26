@@ -12,6 +12,11 @@
    come after its report, and a report is verified within ``invite_expiry_hours`` (7 days) of
    it. A handler job that ran out of retries is sent again by the hourly
    ``core.redispatch_stale`` job (SEC3 M1).
+   M5 (docs/M5-DESIGN.md D93): the same check covers the ``fraud`` handlers (prefix
+   ``app.modules.fraud.``), so every ``DeedVerified`` before the cutoff has been through the
+   detectors; and no ``fraud.deed_hold_changed`` event of any time since the month's start may
+   still wait for scoring's hold handler, so a hold placed before finalization is always in the
+   final board. Finalization never waits for a review decision (an open case holds nothing).
 
 It then, in one transaction under the advisory lock ``finalize_month:(month)`` and only if no
 ``month_finalizations`` row exists: writes a final snapshot of every board of every enabled
@@ -36,8 +41,9 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import advisory_xact_lock
-from app.core.events import emit, handler_names_with_prefix, unprocessed_before
+from app.core.events import emit, handler_names_with_prefix, handlers_for, unprocessed_before
 from app.modules.deeds import service as deeds
+from app.modules.fraud.service import DeedHoldChanged
 from app.modules.scoring._leaderboard import (
     BoardRow,
     compute_boards,
@@ -52,6 +58,9 @@ from app.modules.scoring.models import HeroTitle, MonthFinalization, PointsLedge
 log = logging.getLogger(__name__)
 
 SCORING_HANDLER_PREFIX = "app.modules.scoring."
+FRAUD_HANDLER_PREFIX = "app.modules.fraud."
+# "Any time" for the hold check: hold events have no cutoff (D93 b ii).
+_NO_END = datetime(9999, 1, 1, tzinfo=UTC)
 
 
 class Outcome(StrEnum):
@@ -82,15 +91,52 @@ async def cutoff_for(session: AsyncSession, month: date) -> datetime:
     )
 
 
-async def pending_scoring_events(session: AsyncSession, month: date, cutoff: datetime) -> int:
-    """Outbox events from the start of the month before ``month`` to ``cutoff`` some scoring
-    handler has not processed yet (step 2)."""
+@dataclass(frozen=True)
+class Barrier:
+    """What finalization waits for (step 2), per kind, as admin #10 shows it."""
+
+    # Events from the start of the previous month to the cutoff, per waiting handler group.
+    scoring: int
+    fraud: int
+    # ``fraud.deed_hold_changed`` events since the month's start, any time, not yet scored.
+    holds: int
+
+    @property
+    def total(self) -> int:
+        return self.scoring + self.fraud + self.holds
+
+
+def hold_handler_names() -> list[str]:
+    """Scoring's handlers of ``DeedHoldChanged`` (``rescore_held_deed``)."""
+    return sorted(
+        name
+        for name in handlers_for(DeedHoldChanged.event_type)
+        if name.startswith(SCORING_HANDLER_PREFIX)
+    )
+
+
+async def barrier(session: AsyncSession, month: date, cutoff: datetime) -> Barrier:
     _, scoring = await load_scoring(session)
     previous = (month - timedelta(days=1)).replace(day=1)
     since = datetime.combine(previous, time(0), tzinfo=scoring.zone)
-    return await unprocessed_before(
-        session, handler_names_with_prefix(SCORING_HANDLER_PREFIX), cutoff, since=since
+    month_start = datetime.combine(month, time(0), tzinfo=scoring.zone)
+    return Barrier(
+        scoring=await unprocessed_before(
+            session, handler_names_with_prefix(SCORING_HANDLER_PREFIX), cutoff, since=since
+        ),
+        fraud=await unprocessed_before(
+            session, handler_names_with_prefix(FRAUD_HANDLER_PREFIX), cutoff, since=since
+        ),
+        holds=await unprocessed_before(session, hold_handler_names(), _NO_END, since=month_start),
     )
+
+
+async def pending_scoring_events(session: AsyncSession, month: date, cutoff: datetime) -> int:
+    """Everything finalization of ``month`` still waits for (step 2): outbox events from the
+    start of the month before ``month`` to ``cutoff`` some scoring or fraud handler has not
+    processed yet, plus unscored hold changes since the month's start (D93). An event waiting
+    for both a scoring and a fraud handler counts in both groups."""
+    return (await barrier(session, month, cutoff)).total
 
 
 async def closed_without_deeds(session: AsyncSession, month: date, now: datetime) -> bool:

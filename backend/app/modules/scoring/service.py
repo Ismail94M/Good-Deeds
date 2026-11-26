@@ -14,7 +14,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.scoring import _badges
 from app.modules.scoring._limits import Tier
-from app.modules.scoring.events import BadgeAwarded, HeroTitleAwarded, MonthFinalized, PointsChanged
+from app.modules.scoring.events import (
+    BadgeAwarded,
+    DeedNeedsReview,
+    HeroTitleAwarded,
+    MonthFinalized,
+    PointsChanged,
+    ReporterConcentrationExceeded,
+)
 from app.modules.scoring.models import (
     HeroTitle,
     LeaderboardEntry,
@@ -28,11 +35,13 @@ from app.modules.scoring.models import (
 __all__ = [
     "BadgeAwarded",
     "BoardEntry",
+    "DeedNeedsReview",
     "FinalSnapshot",
     "HeroTitleAwarded",
     "LedgerEntryView",
     "MonthFinalized",
     "PointsChanged",
+    "ReporterConcentrationExceeded",
     "Tier",
     "TitleView",
     "active_entries",

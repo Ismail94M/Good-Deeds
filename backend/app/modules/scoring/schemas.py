@@ -285,10 +285,14 @@ class AdminDeedScoring(BaseModel):
 
 
 class AdminMonth(BaseModel):
-    """#10 (§3.4 #3)."""
+    """#10 (§3.4 #3). The pending counts are what finalization waits for (M4 D64, M5 D93):
+    events before the cutoff not yet handled by scoring, the same for the fraud detectors, and
+    prize-hold changes since the month's start not yet scored."""
 
     period_month: str
     cutoff_at: datetime
     pending_scoring_events: int
+    pending_fraud_events: int
+    pending_hold_events: int
     finalized_at: datetime | None
     final_snapshots: int

@@ -208,6 +208,7 @@ SCORING_EVENTS = frozenset(
         "deeds.deed_withdrawn",
         "deeds.deed_rejected",
         "media.deed_photo_ready",
+        "fraud.deed_hold_changed",
     }
 )
 

@@ -297,10 +297,12 @@ def deed_body(scan_id: str | uuid.UUID, **overrides: Any) -> dict[str, Any]:
 
 async def outbox(session: AsyncSession, event_type: str, deed_id: uuid.UUID) -> list[OutboxEvent]:
     rows = await session.scalars(
-        select(OutboxEvent).where(
+        select(OutboxEvent)
+        .where(
             OutboxEvent.event_type == event_type,
             OutboxEvent.payload["deed_id"].astext == str(deed_id),
         )
+        .order_by(OutboxEvent.occurred_at)
     )
     return list(rows)
 

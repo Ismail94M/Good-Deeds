@@ -10,8 +10,11 @@ Rules:
 
 - **Doer:** a verified, counted report earns ``base`` (category points, or ``min_points`` for
   ``spam_or_empty``) plus the photo bonus, times the pair multiplier, rounded half up, at least
-  1 (D53). It counts for prize rank when the deed is prize-rank eligible; reporter rows never do
-  (D57).
+  1 (D53). It counts for prize rank when the deed is prize-rank eligible and not held by a
+  confirmed fraud decision (``fraud.service.is_held``, docs/M5-DESIGN.md D79); reporter rows
+  never do (D57). A hold or release flips only that flag: a reversal and a new award with the
+  same points, reason ``prize_rank_changed``, and a ``PointsChanged`` with ``notify=false``
+  (D95).
 - **Reporter:** a verified report earns ``reporter_points`` if counted, else
   ``reporter_points_beyond_cap``, times the pair multiplier.
 - **Daily caps (D52, PO QA3):** strict order by verification time. The user's deeds that take a
@@ -30,6 +33,9 @@ Rules:
   after the window, for any reason, can't move points through content or photos.
 - Days and months are in the configured zone (Asia/Kolkata) from the server's ``verified_at``,
   never the client's ``occurred_at`` (D58).
+- **Content review (M5 D86):** the first rule-based evaluation of a deed with
+  ``human_review_required`` (text check ``spam_or_empty``) emits ``DeedNeedsReview`` once; a
+  re-score whose evaluation is flagged again doesn't repeat it.
 
 Lock order (§4.1): advisory ``points_doer_day:(doer, day)``, then
 ``points_reporter_day:(reporter, day)``, then reads and writes. The database trigger refuses a
@@ -50,10 +56,11 @@ from sqlalchemy.orm import aliased
 from app.core.db import advisory_xact_lock
 from app.core.events import emit
 from app.modules.deeds import service as deeds
+from app.modules.fraud.service import is_held
 from app.modules.scoring._evidence import first_photo_ready_at
 from app.modules.scoring._limits import PairRole, ScoringConfig, load_scoring
 from app.modules.scoring._rules import RuleResult, evaluate
-from app.modules.scoring.events import PointsChanged
+from app.modules.scoring.events import DeedNeedsReview, PointsChanged
 from app.modules.scoring.models import (
     EvaluationMethod,
     EvaluationMode,
@@ -222,11 +229,15 @@ class _Reconciler:
             return _decision(self.config.doer_daily_cap)
         pair = await self._pair("doer", entries.award)
         result, bonus, _ = rules
+        # A held deed keeps its points but leaves boards and prize rank (M5 D79).
+        prize_rank = self.inputs.prize_rank_eligible and not await is_held(
+            self.session, self.inputs.id
+        )
         return Target(
             kind=LedgerKind.AWARD,
             points=round_half_up(result.base + bonus, pair.percent),
             deed_units=1,
-            counts_for_prize_rank=self.inputs.prize_rank_eligible,
+            counts_for_prize_rank=prize_rank,
             breakdown={
                 "base": result.base,
                 "text_check": result.text_check.value,
@@ -399,6 +410,9 @@ class _Reconciler:
                 role=role.value,
                 delta=delta,
                 reason=reason.value,
+                # Only the leaderboard eligibility flipped (a prize hold or its release): never
+                # notified, flags are private (M5 D95).
+                notify=not (delta == 0 and reason == LedgerReason.PRIZE_RANK_CHANGED),
             ),
         )
         return written
@@ -422,6 +436,21 @@ def _evaluation(
         human_review_required=result.needs_review,
         scoring_config_version=config_version,
     )
+
+
+async def _flagged_before(session: AsyncSession, deed_id: uuid.UUID) -> bool:
+    """Whether an earlier rule-based evaluation of the deed was flagged for review (M5 D86: the
+    content case is raised once per deed). AI evaluations are never read (D62)."""
+    flagged = await session.scalar(
+        select(
+            exists().where(
+                ImpactEvaluation.deed_id == deed_id,
+                ImpactEvaluation.method == EvaluationMethod.RULE_BASED,
+                ImpactEvaluation.human_review_required.is_(True),
+            )
+        )
+    )
+    return bool(flagged)
 
 
 async def reconcile_deed(
@@ -569,6 +598,16 @@ async def _reconcile_locked(
             and (doer_active is None or not doer_target.same_as(doer_active))
         ):
             evaluation = _evaluation(deed_id, rules, version)
+            if evaluation.human_review_required and not await _flagged_before(session, deed_id):
+                emit(
+                    session,
+                    DeedNeedsReview(
+                        deed_id=deed_id,
+                        doer_id=r.doer_id,
+                        reporter_id=inputs.reporter_id,
+                        reason="spam_or_empty",
+                    ),
+                )
         written += await r.apply(
             LedgerRole.DOER, by_role[LedgerRole.DOER], doer_target, region_id, hint, evaluation
         )

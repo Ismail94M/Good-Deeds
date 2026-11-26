@@ -90,9 +90,12 @@ class BoardRow:
         return (-self.rank_score, -self.distinct_reporters, -self.distinct_days)
 
 
-async def _counted_deeds(session: AsyncSession, month: date) -> list[_CountedDeed]:
-    """Each deed counted for prize rank in ``month``, with its net points (step 1)."""
-    rows = await session.execute(
+async def _counted_deeds(
+    session: AsyncSession, month: date, *, as_of: datetime | None = None
+) -> list[_CountedDeed]:
+    """Each deed counted for prize rank in ``month``, with its net points (step 1). With
+    ``as_of``, only ledger rows created at or before it count."""
+    stmt = (
         select(
             PointsLedger.user_id,
             PointsLedger.region_id,
@@ -114,6 +117,9 @@ async def _counted_deeds(session: AsyncSession, month: date) -> list[_CountedDee
         )
         .having(func.sum(PointsLedger.deed_units) > 0)
     )
+    if as_of is not None:
+        stmt = stmt.where(PointsLedger.created_at <= as_of)
+    rows = await session.execute(stmt)
     return [
         _CountedDeed(user, region, reporter, day, int(points))
         for user, region, reporter, day, points in rows
@@ -166,8 +172,15 @@ async def featured_city_rows(
 ) -> list[BoardRow]:
     """Every member registered in ``city`` with a counted deed in ``month``, ranked by the same
     rules as the boards (D59, D67, ``shared_rank_style``) over all their counted deeds that month,
-    wherever they were done (D72). Computed on read: it is one month of ledger rows."""
-    counted = await _counted_deeds(session, month)
+    wherever they were done (D72). Computed on read: it is one month of ledger rows.
+
+    A finalized month reads as frozen (M5 D94): only ledger rows created at or before its
+    ``finalized_at``, so a later hold, override or rejection (rows dated in that month) never
+    moves it, as it never moves the final boards. Open months stay live."""
+    done = await session.get(MonthFinalization, month)
+    counted = await _counted_deeds(
+        session, month, as_of=None if done is None else done.finalized_at
+    )
     members = await identity.active_user_ids_in_city(
         session, {d.user_id for d in counted}, city.registered_city_names
     )
