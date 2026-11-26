@@ -16,7 +16,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.deeds._areas import DEFAULT_AREA_NAME
 from app.modules.deeds._common import ist_month
+from app.modules.deeds._fraud_reads import (
+    Edge,
+    EdgeMatch,
+    PairSignals,
+    pair_signals,
+    related_users,
+    verified_edges,
+)
 from app.modules.deeds._limits import load_limits
+from app.modules.deeds._reject import FRAUD_CONFIRMED_REASON, reject_for_fraud
 from app.modules.deeds.events import (
     DeedCountsForPointsChanged,
     DeedEdited,
@@ -40,6 +49,7 @@ from app.modules.deeds.models import (
 
 __all__ = [
     "DEFAULT_AREA_NAME",
+    "FRAUD_CONFIRMED_REASON",
     # Events other modules subscribe to (M3 feed projection §5; M4 scoring §5)
     "DeedContent",
     "DeedCountsForPointsChanged",
@@ -50,6 +60,10 @@ __all__ = [
     "DeedVerified",
     "DeedView",
     "DeedWithdrawn",
+    # Fraud reads and the fraud rejection (docs/M5-DESIGN.md §3.1, D89)
+    "Edge",
+    "EdgeMatch",
+    "PairSignals",
     "RegionKind",
     "RegionView",
     "SameActGroupView",
@@ -64,15 +78,19 @@ __all__ = [
     "get_deed",
     "get_deeds",
     "pair_ordinal",
+    "pair_signals",
     "region_ancestor_map",
     "region_ancestors",
     "region_by_code",
     "regions",
     "regions_by_id",
+    "reject_for_fraud",
+    "related_users",
     "revision_time",
     "same_act_group_view",
     "scoring_inputs",
     "self_log_owner",
+    "verified_edges",
     "withdraw_window_hours",
 ]
 

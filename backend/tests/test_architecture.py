@@ -316,3 +316,229 @@ def test_scoring_rules_catch_violations(tmp_path: Path) -> None:
         "modules/scoring/_ledger.py",
         "modules/scoring/_finalize.py",
     }
+
+
+# --- M5: who may import fraud, and what fraud may import (docs/M5-DESIGN.md D78) ---
+
+FRAUD = "app.modules.fraud"
+FRAUD_SERVICE = FRAUD + ".service"
+SCORING_SERVICE = "app.modules.scoring.service"
+# fraud reads scoring only for the event classes it subscribes to; fraud/service.py never.
+FRAUD_FROM_SCORING = frozenset(
+    {"ReporterConcentrationExceeded", "DeedNeedsReview", "PointsOverridden"}
+)
+# fraud may also read these modules' service.py (anything in it).
+FRAUD_SERVICE_DEPS = frozenset({"deeds", "identity"})
+# What scoring may import from fraud.service. ``concentration_rule`` (and its result type) is
+# how scoring reads the concentration thresholds, which live in the fraud config (D97).
+SCORING_FROM_FRAUD = frozenset(
+    {
+        "DeedHoldChanged",
+        "AppealDecided",
+        "held_deed_ids",
+        "is_held",
+        "confirmed_case_for_user",
+        "concentration_rule",
+        "ConcentrationRule",
+    }
+)
+# deeds imports only the event it subscribes to, and only in deeds/handlers.py.
+DEEDS_FROM_FRAUD = ("deeds/handlers.py", frozenset({"FlagDecisionFinal"}))
+# Feature modules that exist now or may later, even if a test tree lacks them.
+KNOWN_MODULES = frozenset({"identity", "deeds", "media", "feed", "scoring", "fraud"})
+
+Imported = tuple[str, tuple[str, ...]]
+
+
+def _imports_with_names(path: Path, app_dir: Path) -> list[Imported]:
+    """``(module, names)`` per import statement, relative imports resolved; a plain ``import x``
+    gives ``(x, ())``."""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    found: list[Imported] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            found.extend((alias.name, ()) for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            names = tuple(alias.name for alias in node.names)
+            if node.level == 0:
+                found.append((node.module or "", names))
+                continue
+            package = _module_name(path, app_dir)
+            if path.name != "__init__.py":
+                package = package[:-1]
+            package = package[: len(package) - (node.level - 1)]
+            found.append((".".join([*package, *([node.module] if node.module else [])]), names))
+    return found
+
+
+def _imports_of(path: Path, app_dir: Path, target: str) -> list[Imported]:
+    """Imports of ``path`` that reach the package ``target`` (``from app.modules import x``
+    counts as importing all of ``x``)."""
+    parent, _, leaf = target.rpartition(".")
+    hits: list[Imported] = []
+    for module, names in _imports_with_names(path, app_dir):
+        if module == target or module.startswith(target + "."):
+            hits.append((module, names))
+        elif module == parent and leaf in names:
+            hits.append((target, ()))
+    return hits
+
+
+def _named_ok(module: str, names: tuple[str, ...], service: str, allowed: frozenset[str]) -> bool:
+    return module == service and bool(names) and set(names) <= allowed
+
+
+def _describe(path: Path, app_dir: Path, module: str, names: tuple[str, ...]) -> str:
+    listed = f" ({', '.join(names)})" if names else ""
+    return f"{path.relative_to(app_dir).as_posix()} imports {module}{listed}"
+
+
+def _module_dirs(app_dir: Path) -> set[str]:
+    modules = app_dir / "modules"
+    found = {p.name for p in modules.iterdir() if p.is_dir()} if modules.is_dir() else set()
+    return (found | KNOWN_MODULES) - {"__pycache__"}
+
+
+def _who_imports_fraud_violations(app_dir: Path) -> list[str]:
+    """Imports of fraud from other modules: scoring only SCORING_FROM_FRAUD, deeds/handlers.py
+    only FlagDecisionFinal, everyone else (feed, media, identity, ...) nothing."""
+    modules = app_dir / "modules"
+    problems: list[str] = []
+    for path in sorted(modules.rglob("*.py")) if modules.is_dir() else []:
+        rel = path.relative_to(modules)
+        owner = rel.parts[0] if len(rel.parts) > 1 else None
+        if owner is None or owner == "fraud":
+            continue
+        if owner == "scoring":
+            allowed = SCORING_FROM_FRAUD
+        elif rel.as_posix() == DEEDS_FROM_FRAUD[0]:
+            allowed = DEEDS_FROM_FRAUD[1]
+        else:
+            allowed = frozenset()
+        for module, names in _imports_of(path, app_dir, FRAUD):
+            if not _named_ok(module, names, FRAUD_SERVICE, allowed):
+                problems.append(_describe(path, app_dir, module, names))
+    return problems
+
+
+def _fraud_imports_violations(app_dir: Path) -> list[str]:
+    """What fraud imports from other modules: deeds.service and identity.service; from
+    scoring.service only FRAUD_FROM_SCORING, and nothing at all in fraud/service.py; never feed,
+    media or any other module."""
+    fraud = app_dir / "modules" / "fraud"
+    if not fraud.is_dir():
+        return []
+    problems: list[str] = []
+    for path in sorted(fraud.rglob("*.py")):
+        is_service = path.relative_to(fraud).as_posix() == "service.py"
+        for other in sorted(_module_dirs(app_dir) - {"fraud"}):
+            target = f"app.modules.{other}"
+            for module, names in _imports_of(path, app_dir, target):
+                if other in FRAUD_SERVICE_DEPS:
+                    service = f"{target}.service"
+                    ok = module == service or (module == target and names == ("service",))
+                elif other == "scoring":
+                    ok = not is_service and _named_ok(
+                        module, names, SCORING_SERVICE, FRAUD_FROM_SCORING
+                    )
+                else:
+                    ok = False
+                if not ok:
+                    problems.append(_describe(path, app_dir, module, names))
+    return problems
+
+
+def test_only_scoring_and_deeds_import_fraud_and_only_their_names() -> None:
+    problems = _who_imports_fraud_violations(APP)
+    assert problems == [], (
+        "Only scoring (hold reads and events) and deeds/handlers.py (FlagDecisionFinal) may "
+        "import fraud.service (D78):\n" + "\n".join(problems)
+    )
+
+
+def test_fraud_imports_only_core_deeds_identity_and_scoring_events() -> None:
+    problems = _fraud_imports_violations(APP)
+    assert problems == [], (
+        "fraud may import only app.core, deeds.service, identity.service and three scoring "
+        "event classes; fraud/service.py nothing from scoring (D78):\n" + "\n".join(problems)
+    )
+
+
+def test_fraud_rules_catch_violations(tmp_path: Path) -> None:
+    """The D78 rules pass trivially while the scoring events don't exist yet; prove they bite."""
+    app_dir = tmp_path / "app"
+    # What fraud imports.
+    _write(app_dir, "modules/fraud/_ok.py", "from app.modules.deeds.service import Edge\n")
+    _write(app_dir, "modules/fraud/_id.py", "from app.modules.identity import service\n")
+    _write(
+        app_dir,
+        "modules/fraud/handlers.py",
+        "from app.modules.scoring.service import DeedNeedsReview, PointsOverridden\n",
+    )
+    _write(
+        app_dir,
+        "modules/fraud/service.py",
+        "from app.modules.scoring.service import ReporterConcentrationExceeded\n",
+    )
+    _write(
+        app_dir, "modules/fraud/_pts.py", "from app.modules.scoring.service import doer_points\n"
+    )
+    _write(app_dir, "modules/fraud/_led.py", "from app.modules.scoring import _ledger\n")
+    _write(app_dir, "modules/fraud/_feed.py", "from app.modules.feed.service import x\n")
+    _write(app_dir, "modules/fraud/detectors/_m.py", "from ...media import service\n")
+    _write(app_dir, "modules/fraud/_dm.py", "import app.modules.deeds.models\n")
+    # Who imports fraud.
+    _write(
+        app_dir,
+        "modules/scoring/handlers.py",
+        "from app.modules.fraud.service import AppealDecided, DeedHoldChanged\n",
+    )
+    _write(app_dir, "modules/scoring/_ledger.py", "from app.modules.fraud.service import is_held\n")
+    _write(
+        app_dir,
+        "modules/scoring/_bad.py",
+        "from app.modules.fraud.service import is_held, open_case_user_ids\n",
+    )
+    _write(
+        app_dir, "modules/scoring/_models.py", "from app.modules.fraud.models import PrizeHold\n"
+    )
+    _write(
+        app_dir,
+        "modules/deeds/handlers.py",
+        "from app.modules.fraud.service import FlagDecisionFinal\n",
+    )
+    _write(
+        app_dir,
+        "modules/deeds/service.py",
+        "from app.modules.fraud.service import FlagDecisionFinal\n",
+    )
+    _write(
+        app_dir, "modules/feed/handlers.py", "from app.modules.fraud.service import FlagRaised\n"
+    )
+    _write(app_dir, "modules/media/_x.py", "from app.modules import fraud\n")
+    _write(app_dir, "modules/identity/_y.py", "import app.modules.fraud.service\n")
+
+    assert _fraud_imports_violations(app_dir) == [
+        "modules/fraud/_dm.py imports app.modules.deeds.models",
+        "modules/fraud/_feed.py imports app.modules.feed.service (x)",
+        "modules/fraud/_led.py imports app.modules.scoring (_ledger)",
+        "modules/fraud/_pts.py imports app.modules.scoring.service (doer_points)",
+        "modules/fraud/detectors/_m.py imports app.modules.media (service)",
+        "modules/fraud/service.py imports app.modules.scoring.service "
+        "(ReporterConcentrationExceeded)",
+    ]
+    assert _who_imports_fraud_violations(app_dir) == [
+        "modules/deeds/service.py imports app.modules.fraud.service (FlagDecisionFinal)",
+        "modules/feed/handlers.py imports app.modules.fraud.service (FlagRaised)",
+        "modules/identity/_y.py imports app.modules.fraud.service",
+        "modules/media/_x.py imports app.modules.fraud",
+        "modules/scoring/_bad.py imports app.modules.fraud.service (is_held, open_case_user_ids)",
+        "modules/scoring/_models.py imports app.modules.fraud.models (PrizeHold)",
+    ]
+
+
+def test_fraud_rules_pass_without_fraud_package(tmp_path: Path) -> None:
+    app_dir = tmp_path / "app"
+    _write(app_dir, "modules/deeds/service.py", "import app.core.db\n")
+    assert _fraud_imports_violations(app_dir) == []
+    assert _who_imports_fraud_violations(app_dir) == []

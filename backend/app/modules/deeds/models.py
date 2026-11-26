@@ -349,6 +349,12 @@ class Deed(Base):
             "doer_user_id",
             postgresql_where=text("status = 'verified' AND counts_for_points"),
         ),
+        # Fraud detector window reads (verified_edges, M5 §3.1; migration 0027).
+        Index(
+            "ix_deeds_verified_at",
+            "verified_at",
+            postgresql_where=text("status = 'verified'"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)

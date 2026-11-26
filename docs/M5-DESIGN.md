@@ -270,7 +270,7 @@ CaseDetail   { case: CaseRow + {signal, detector_config_version}, users: CaseUse
 | 8 | `GET /api/admin/audit?entity_type=&entity_id=&actor={handle}&action=&from=&to=&cursor=` | | `{items: [{id, created_at, entity_type, entity_id, action, actor: UserRef\|null, reason, old_value, new_value}], next_cursor}` newest first, `page_size` | 400 `invalid_cursor`, `invalid_range` (from > to or > 366 days) |
 
 **Decision effects (#6), one transaction, case row locked `FOR UPDATE`:**
-- `dismissed`: release every unreleased hold of the case (`release_reason='dismissed'`), emit `DeedHoldChanged(held=false)` for each deed that is no longer held by any case. No notice to anyone (they were never told, or they see "No action taken" on an explanation request they received).
+- `dismissed`: nothing to release (open and parked cases never hold deeds, D80). No notice to anyone (they were never told, or they see "No action taken" on an explanation request they received).
 - `confirmed`: first check D99 for every person with an adverse outcome on one of their deeds (409 `explanation_required` / `explanation_pending`). Then per deed: `exclude` → hold (created now if none); `release` → release (`released_on_confirm`); `reject` → hold now, rejected later when final (D100). Create a `decision_notices` row per person with an adverse item (`appeal_until = now + appeal.window_days`). A confirm where every deed is `release` is refused (422 `use_dismiss`).
 - Write `flag_case_decisions`, `flag_case_deed_outcomes`, `audit_log` (`flag_case.confirmed` / `.dismissed`, `new_value` = counts per outcome, `reason` = note), set status/outcome, emit `FlagCaseResolved`.
 
