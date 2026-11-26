@@ -182,13 +182,13 @@ function AuditRow({ item }: { item: AuditItem }) {
   const hasValues = item.old_value !== null || item.new_value !== null
   return (
     <div className="flex flex-col gap-2 rounded-[14px] border border-slate-200 bg-white p-3.5">
-      <div className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm lg:grid-cols-[11rem_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-center">
+      <div className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm lg:grid-cols-[10rem_minmax(0,2fr)_minmax(0,3fr)_13rem] lg:items-start">
         <span className="text-slate-600">{formatDateTime(item.created_at)}</span>
         <span className="min-w-0 font-semibold break-all text-slate-900">{item.action}</span>
-        <span className="min-w-0 break-all text-slate-700">
+        <span className="min-w-0 break-words text-slate-700">
           {item.entity_type} · {item.entity_id}
         </span>
-        <span className="text-slate-700">
+        <span className="min-w-0 break-words text-slate-700 lg:text-right">
           {item.actor ? `${item.actor.display_name} @${item.actor.handle}` : 'System'}
         </span>
       </div>

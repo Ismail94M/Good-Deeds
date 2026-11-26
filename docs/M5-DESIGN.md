@@ -1,6 +1,6 @@
 # M5 Fraud & Review: design
 
-**Status:** Revision 4 **approved by the PO on 2026-11-26**. This is the **baseline** fraud and review system, not a final strategy: detectors, rules and review steps are expected to be added, improved or replaced in later milestones (D102). Revisions 2–4 apply the PO's three principles (§0.0) and record the PO answers to Q59–Q78 in the decision log (§11). Every threshold is a config row (one new version changes it).
+**Status:** Revision 4 **approved by the PO on 2026-11-26**. This is the **baseline** fraud and review system, not a final strategy: detectors, rules and review steps are expected to be added, improved or replaced in later milestones (D102). Revisions 2–4 apply the PO's three principles (§0.0) and record the PO answers to Q59–Q82 in the decision log (§11). Every threshold is a config row (one new version changes it).
 **Baseline:** `main` at af5d00f (M1–M4 approved; M4a and D71–D76 merged, migrations up to 0025). Branch `m5-fraud`.
 **Sources used:** PRD §5 (anti-collusion measures, invite safeguards, invites off, edit and withdraw), §6.5 (feed: "withdrawn, rejected, flagged or moderator-removed deeds disappear from the feed"), §6.9, §6.14 (flagged-cases metric), §8 (FlagCase, ScoreOverride / AuditLog, ImpactEvaluation status, PointsLedger), §9 (reporter points never in prize rank, title revocation for confirmed fraud, finalization, badges revocable for fraud, "flagged scores go to a review queue"), §10 steps 4 and 7, §11 module table (Fraud Checks, Review & Audit), §12 (prize eligibility "No open flag cases", limits table, open item 9); ROADMAP M5; `docs/M4-DESIGN.md` (D47–D52, D55, D57, D59, D64, D67, D70, D72, A3, A5, §4.2, §4.6, SEC3 L6/L7); `docs/M3-DESIGN.md` (D42, D43, D45, §3.4a, §3.5: report cases, append-only decisions, conflict of interest); `docs/M2-DESIGN.md` (D6, D13, D17, D21, §3.4/§3.4b prize-rank upgrade, security notes on M5); the code: `backend/app/modules/scoring/` (`_ledger.py`, `_leaderboard.py`, `_finalize.py`, `handlers.py`, `jobs.py`, `models.py`, `events.py`, `_labels.py`, `_reads.py`), `deeds/service.py`, `deeds/events.py`, `deeds/models.py`, `media/_admin.py`, `feed/_moderation.py`, `identity/service.py` (`ReviewerUser`, `AdminUser`), `core/audit.py`, `core/events.py`, `core/runtime_config.py`, `modules/registry.py`, `tests/test_architecture.py`, `frontend/src/features/admin/`, `frontend/src/app/routes.tsx`.
 
@@ -560,8 +560,12 @@ Agents: **DB**, **BE**, **FE**, **QA**, **SEC**, **AD**, **DOC** (main session).
 | Q76 | A. In M8, an open case delays a cash payout until decided, with a time limit; it never denies it | A14, §10 |
 | Q77 | **B.** A second admin must approve an override to 0 or a cut of more than 10 points; smaller changes apply at once | D91, #17–#18 |
 | Q78 | A. With no other eligible admin, an appeal waits and permanent steps stay paused; the status page warns | D100, §9 |
+| Q79 | A. A cut is "big" (second admin) when the new points are more than `max_cut_points` below the **rule points**, however many steps it took (SEC5-M2) | D91 |
+| Q80 | A. A raise to more than `max_cut_points` above the rule points also needs a second admin; raises are audited the same way (SEC5-M3) | D91 |
+| Q81 | A. One ring case per connected group of colluders (all cycles that share people), with a bounded search (SEC5-M5) | D84 |
+| Q82 | A. The audit view leaves out rows about cases an admin is conflicted on, like the case queue (SEC5-M1) | D90, D96 |
 
-The original questions follow for the record. Q73–Q78 were asked on 2026-11-26 in the multiple-choice format the PO now prefers.
+The original questions follow for the record. Q73–Q82 were asked on 2026-11-26 (Q79–Q82 after the SEC5 security review) in the multiple-choice format the PO now prefers.
 
 **Q59. How short is the "short period" for reciprocal verification?**
 Example: Priya recognises Ahmed on 1 November; Ahmed recognises Priya on 20 November.

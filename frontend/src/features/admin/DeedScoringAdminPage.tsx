@@ -268,7 +268,7 @@ function OverrideForm({ deedId, options }: { deedId: string; options: FraudOptio
   const error = problem ?? (mutation.isError ? overrideError(mutation.error, limits) : null)
   return (
     <ReviewCard title="Change the points">
-      <form onSubmit={submit} noValidate className="flex flex-col gap-3.5">
+      <form onSubmit={submit} noValidate className="flex max-w-2xl flex-col gap-3.5">
         <div className="flex flex-col gap-1.5">
           <label htmlFor={ids.role} className="text-[15px] font-semibold">
             Whose points
