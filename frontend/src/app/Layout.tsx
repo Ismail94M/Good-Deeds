@@ -1,6 +1,7 @@
 import { Link, NavLink, Outlet, ScrollRestoration, useLocation } from 'react-router'
 import { LinkButton, LogoMark } from '../components/ui'
 import { useAuth } from '../features/auth/authContext'
+import { useReviewsUnread } from '../features/reviews/reviewsApi'
 
 const focusRing =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700'
@@ -33,6 +34,18 @@ function PlusIcon() {
     >
       <path d="M12 5v14M5 12h14" />
     </svg>
+  )
+}
+
+/** M5 §6.2: a dot on Profile while the person has unseen review items (`GET /reviews` unread). */
+function ReviewsDot() {
+  const unread = useReviewsUnread()
+  if (!unread) return null
+  return (
+    <>
+      <span aria-hidden className="ml-1.5 size-2 shrink-0 rounded-full bg-red-600" />
+      <span className="sr-only"> (new review update)</span>
+    </>
   )
 }
 
@@ -94,6 +107,7 @@ export function Layout() {
                 <li>
                   <NavLink to="/profile" className={navClass}>
                     Profile
+                    <ReviewsDot />
                   </NavLink>
                 </li>
               </ul>

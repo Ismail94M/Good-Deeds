@@ -78,6 +78,7 @@ from app.modules.fraud.schemas import (
     FraudOptions,
     FraudStatus,
     ReasonCodeOption,
+    SecondAdminRule,
     UserRef,
 )
 from app.modules.identity import service as identity
@@ -151,6 +152,11 @@ def options(config: FraudConfig) -> FraudOptions:
             for c in config.override_reason_codes
         ],
         override_max_points=config.override_max_points,
+        override_second_admin=SecondAdminRule(
+            max_cut_points=config.override_second_admin.max_cut_points,
+            cut_to_zero=config.override_second_admin.cut_to_zero,
+            expire_days=config.override_second_admin.expire_days,
+        ),
         explanation_reply_days=config.explanation.reply_days,
         appeal_window_days=config.appeal.window_days,
     )

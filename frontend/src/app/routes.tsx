@@ -1,9 +1,17 @@
 import type { RouteObject } from 'react-router'
 import { AdminLayout } from '../features/admin/AdminLayout'
+import { AppealReviewPage } from '../features/admin/AppealReviewPage'
+import { AppealsPage } from '../features/admin/AppealsPage'
+import { AuditLogPage } from '../features/admin/AuditLogPage'
 import { CommentReportReviewPage } from '../features/admin/CommentReportReviewPage'
 import { CommentReportsPage } from '../features/admin/CommentReportsPage'
+import { DeedScoringAdminPage } from '../features/admin/DeedScoringAdminPage'
+import { FraudCaseReviewPage } from '../features/admin/FraudCaseReviewPage'
+import { FraudCasesPage } from '../features/admin/FraudCasesPage'
 import { PhotoReportReviewPage } from '../features/admin/PhotoReportReviewPage'
+import { OverrideRequestsPage } from '../features/admin/OverrideRequestsPage'
 import { PhotoReportsPage } from '../features/admin/PhotoReportsPage'
+import { UserScoringAdminPage } from '../features/admin/UserScoringAdminPage'
 import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage'
 import { LoginPage } from '../features/auth/LoginPage'
 import { SignupPage } from '../features/auth/SignupPage'
@@ -21,6 +29,7 @@ import { PhotoGuidelinesPage } from '../features/legal/PhotoGuidelinesPage'
 import { OnboardingPage } from '../features/onboarding/OnboardingPage'
 import { ProfilePage } from '../features/profile/ProfilePage'
 import { PublicProfilePage } from '../features/profile/PublicProfilePage'
+import { ReviewsPage } from '../features/reviews/ReviewsPage'
 import { MyQrPage } from '../features/qr/MyQrPage'
 import { ManualCodePage } from '../features/report/ManualCodePage'
 import { ReportHubPage } from '../features/report/ReportHubPage'
@@ -37,6 +46,7 @@ import { RedirectIfAuthed, RequireAuth, RequireOnboarded, RequireRole } from './
 import { Layout } from './Layout'
 
 const ADMIN_ROLES = ['moderator', 'admin'] as const
+const ADMIN_ONLY = ['admin'] as const
 
 export const routes: RouteObject[] = [
   {
@@ -67,6 +77,8 @@ export const routes: RouteObject[] = [
           { path: '/me/points', element: <MyPointsPage /> },
           { path: '/leaderboard', element: <LeaderboardPage /> },
           { path: '/leaderboard/:regionCode', element: <LeaderboardPage /> },
+          // M5 member reviews (M5-DESIGN §6.2): explanation requests and decision notices.
+          { path: '/me/reviews', element: <ReviewsPage /> },
         ],
       },
       {
@@ -103,6 +115,23 @@ export const routes: RouteObject[] = [
               { path: '/admin/photo-reports/:caseId', element: <PhotoReportReviewPage /> },
               { path: '/admin/comment-reports', element: <CommentReportsPage /> },
               { path: '/admin/comment-reports/:caseId', element: <CommentReportReviewPage /> },
+              {
+                // M5 fraud and review (M5-DESIGN §6.1, D90): admins only; moderators see NotFound.
+                element: <RequireRole roles={ADMIN_ONLY} />,
+                children: [
+                  { path: '/admin/fraud', element: <FraudCasesPage /> },
+                  { path: '/admin/fraud/:caseId', element: <FraudCaseReviewPage /> },
+                  { path: '/admin/appeals', element: <AppealsPage /> },
+                  { path: '/admin/appeals/:appealId', element: <AppealReviewPage /> },
+                  { path: '/admin/audit', element: <AuditLogPage /> },
+                  { path: '/admin/scoring/deeds/:deedId', element: <DeedScoringAdminPage /> },
+                  { path: '/admin/users/:handle', element: <UserScoringAdminPage /> },
+                  {
+                    path: '/admin/scoring/override-requests',
+                    element: <OverrideRequestsPage />,
+                  },
+                ],
+              },
             ],
           },
         ],

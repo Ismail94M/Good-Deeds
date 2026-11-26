@@ -37,6 +37,15 @@ class ReasonCodeOption(BaseModel):
     label: str
 
 
+class SecondAdminRule(BaseModel):
+    """Q77: overrides that need a second admin's approval (to 0 when ``cut_to_zero``, or a cut
+    of more than ``max_cut_points``); requests expire after ``expire_days``."""
+
+    max_cut_points: int
+    cut_to_zero: bool
+    expire_days: int
+
+
 class FraudOptions(BaseModel):
     types: list[CaseTypeOption]
     statuses: list[str]
@@ -46,6 +55,7 @@ class FraudOptions(BaseModel):
     note_max_chars: int
     override_reason_codes: list[ReasonCodeOption]
     override_max_points: int
+    override_second_admin: SecondAdminRule
     explanation_reply_days: int
     appeal_window_days: int
 

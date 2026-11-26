@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
 import { useUnreadOutcome } from '../media/outcomeSeen'
+import { RemovedAfterReview } from '../reviews/RemovedAfterReview'
 import { formatCardDate } from '../report/format'
 import type { Category, DeedOut } from './deedsApi'
 import { useCanWithdraw } from './withdrawWindow'
@@ -38,7 +39,11 @@ export function DeedCard({
   return (
     <article className="flex flex-col gap-1.5 rounded-2xl border border-slate-200 bg-white px-4 py-3.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <StatusBadge status={deed.status} />
+        {deed.status === 'rejected' ? (
+          <RemovedAfterReview deedId={deed.id} />
+        ) : (
+          <StatusBadge status={deed.status} />
+        )}
         <span className="text-[13px] text-[#586579]">
           {formatCardDate(deed.occurred_at)}
           {deed.last_edited_at ? ' · Edited' : ''}

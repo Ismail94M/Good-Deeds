@@ -293,10 +293,14 @@ class OverrideOut(BaseModel):
 
 class AdminDeedScoring(BaseModel):
     """#9 (§3.4 #3). M5: ``held`` (a prize hold from a confirmed decision, D79) and the deed's
-    overrides, oldest first (D91)."""
+    overrides, oldest first (D91). ``period_month`` (``YYYY-MM``) is the IST month the deed's
+    ledger rows belong to (null with no rows); ``month_final`` is true once that month is
+    finalized, so a change shows in points but not on the final leaderboard."""
 
     deed_id: uuid.UUID
     held: bool
+    period_month: str | None
+    month_final: bool
     ledger: list[AdminLedgerEntry]
     evaluations: list[AdminEvaluation]
     overrides: list[OverrideOut]

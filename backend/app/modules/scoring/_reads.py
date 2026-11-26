@@ -892,9 +892,14 @@ async def admin_deed(
             .order_by(ImpactEvaluation.created_at, ImpactEvaluation.id)
         )
     ]
+    # Every row of a deed carries the month it was earned in (a reversal copies it).
+    period = rows[0].period_month if rows else None
+    final = period is not None and await session.get(MonthFinalization, period) is not None
     return AdminDeedScoring(
         deed_id=deed_id,
         held=await is_held(session, deed_id),
+        period_month=None if period is None else _labels.month_param(period),
+        month_final=final,
         ledger=ledger,
         evaluations=evaluations,
         overrides=await overrides_out(session, deed_id),

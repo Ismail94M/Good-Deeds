@@ -106,11 +106,31 @@ async def test_options_and_status(client: AsyncClient, session: AsyncSession) ->
         "fraud_confirmed",
         "other",
     ]
+    assert body["override_second_admin"] == {
+        "max_cut_points": 10,
+        "cut_to_zero": True,
+        "expire_days": 14,
+    }
     status = await client.get("/api/admin/fraud/status", headers=who.headers)
     assert status.status_code == 200
     data = status.json()
     assert {d["detector"] for d in data["detectors"]} >= {"reciprocal", "ring"}
     assert data["open_cases_by_type"]["reciprocal"] >= 1
+
+
+async def test_options_follow_second_admin_config(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    who = await admin(session)
+    await publish_fraud(session, override_second_admin={"max_cut_points": 3, "cut_to_zero": False})
+    await session.commit()
+    res = await client.get("/api/admin/fraud/options", headers=who.headers)
+    assert res.status_code == 200
+    assert res.json()["override_second_admin"] == {
+        "max_cut_points": 3,
+        "cut_to_zero": False,
+        "expire_days": 14,
+    }
 
 
 async def test_reads_are_rate_limited_per_account(

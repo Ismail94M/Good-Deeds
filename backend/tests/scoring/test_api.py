@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.runtime_config import publish
@@ -15,6 +15,7 @@ from app.modules.identity.models import Role, User
 from app.modules.scoring import _leaderboard
 from app.modules.scoring._finalize import cutoff_for, finalize_month
 from app.modules.scoring._limits import load_scoring
+from app.modules.scoring.models import MonthFinalization, PointsLedger
 from tests.deeds.helpers import Member, members, scan_and_report
 from tests.scoring.board_helpers import city, counted, ist, month, publish_board, ward
 from tests.scoring.helpers import run_scoring
@@ -312,3 +313,38 @@ async def test_admin_endpoints_are_admin_only_with_the_conflict_rule(
     ).status_code == 403
     bad = await client.get("/api/admin/scoring/months/sept", headers=admin.headers)
     assert bad.json()["code"] == "invalid_month"
+
+
+async def test_admin_deed_reports_its_month_and_whether_it_is_final(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    reporter, doer, admin = await members(session, 3)
+    await _role(session, admin, Role.ADMIN)
+    out = await scan_and_report(session, reporter, doer)
+    path = f"/api/admin/scoring/deeds/{out.id}"
+
+    # Not scored yet: no ledger rows, so no month.
+    body = (await client.get(path, headers=admin.headers)).json()
+    assert (body["ledger"], body["period_month"], body["month_final"]) == ([], None, False)
+
+    await run_scoring(session, out.id)
+    period = await session.scalar(
+        select(PointsLedger.period_month).where(PointsLedger.deed_id == out.id).limit(1)
+    )
+    assert period is not None
+    body = (await client.get(path, headers=admin.headers)).json()
+    assert (body["period_month"], body["month_final"]) == (period.strftime("%Y-%m"), False)
+
+    session.add(
+        MonthFinalization(
+            period_month=period,
+            cutoff_at=datetime.now(UTC) - timedelta(minutes=1),
+            finalized_at=datetime.now(UTC),
+            config_version=1,
+            snapshot_count=0,
+            titles_awarded=0,
+        )
+    )
+    await session.commit()
+    body = (await client.get(path, headers=admin.headers)).json()
+    assert (body["period_month"], body["month_final"]) == (period.strftime("%Y-%m"), True)
