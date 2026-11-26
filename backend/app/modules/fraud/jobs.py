@@ -16,9 +16,11 @@ from app.modules.fraud.models import DetectorRunTrigger
 @job_app.periodic(cron="0 21 * * *", periodic_id="fraud_sweep")
 @job_app.task(name="fraud.sweep", queue="fraud", queueing_lock="fraud_sweep")
 async def sweep(timestamp: int) -> list[str]:
-    """Nightly at 02:30 IST: re-run every enabled detector over its window, one transaction and
-    one ``fraud_detector_runs`` row each. The safety net after a config change or an outage;
-    raising is idempotent, so cases the per-deed handler already opened don't change."""
+    """Nightly at 02:30 IST: re-run every enabled detector over its window, one
+    ``fraud_detector_runs`` row each, in chunks of ``sweep_chunk_edges`` deeds committed one by
+    one (SEC5-L7). The safety net after a config change or an outage, and the retry of per-deed
+    ring checks that were truncated (with ``ring.retry_max_search_edges``); raising is
+    idempotent, so cases the per-deed handler already opened don't change."""
     now = datetime.now(UTC)
     statuses: list[str] = []
     for detector, window in await nightly_windows(now):

@@ -34,7 +34,7 @@ from tests.fraud.appeal_helpers import (
     finalize,
     notice_of,
 )
-from tests.fraud.helpers import days_ago, deed
+from tests.fraud.helpers import deed
 from tests.fraud.review_helpers import admin, open_case
 from tests.scoring.board_helpers import city, counted, ist, month, ward
 from tests.scoring.helpers import ledger, points, run_scoring
@@ -167,10 +167,11 @@ async def _hero(session: AsyncSession) -> tuple[Member, HeroTitle]:
 
 
 async def _confirmed_about(session: AsyncSession, hero: Member, decider: Member) -> uuid.UUID:
-    """A real reciprocal case hero <-> x, confirmed with hero's deed excluded."""
+    """A real reciprocal case hero <-> x, confirmed with hero's deed excluded. Its deeds are
+    from September, the title's month (SEC5-L4, ``case_not_for_this_month``)."""
     (x,) = await members(session, 1)
-    hx = await deed(session, hero, x, days_ago(4))
-    xh = await deed(session, x, hero, days_ago(3))
+    hx = await deed(session, hero, x, ist(2026, 9, 10))
+    xh = await deed(session, x, hero, ist(2026, 9, 11))
     case_id = await open_case(session, FlagCaseType.RECIPROCAL, [hero, x], [hx, xh])
     await confirm(session, decider, case_id, {hx: "exclude", xh: "release"})
     return case_id

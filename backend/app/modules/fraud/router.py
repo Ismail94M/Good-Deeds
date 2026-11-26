@@ -7,8 +7,9 @@ who made the decision under appeal (D100). Reads are limited per account by
 the service, commit, then read the result back. There is no hold endpoint (PO Q73).
 
 ``/api/reviews`` (M1 to M4) is for any signed-in person, about their own items only (404 for
-anyone else's). The member writes (reply, appeal) share ``fraud.rate_admin_write`` per account:
-the ``fraud`` config has no separate member rate yet.
+anyone else's). Its reads (``GET /api/reviews``, ``POST /api/reviews/seen``) are limited per
+account by ``fraud.rate_member_read`` and its writes (reply, appeal) by
+``fraud.rate_member_write``, in their own buckets (SEC5-L5).
 """
 
 import uuid
@@ -57,6 +58,18 @@ async def _read(session: AsyncSession, limiter: Limiter, admin_id: uuid.UUID) ->
 async def _write(session: AsyncSession, limiter: Limiter, admin_id: uuid.UUID) -> FraudConfig:
     _, config = await load_fraud(session)
     await limiter.hit(f"fraud:write:u:{admin_id}", config.rate_admin_write)
+    return config
+
+
+async def _member_read(session: AsyncSession, limiter: Limiter, user_id: uuid.UUID) -> FraudConfig:
+    _, config = await load_fraud(session)
+    await limiter.hit(f"reviews:read:u:{user_id}", config.rate_member_read)
+    return config
+
+
+async def _member_write(session: AsyncSession, limiter: Limiter, user_id: uuid.UUID) -> FraudConfig:
+    _, config = await load_fraud(session)
+    await limiter.hit(f"reviews:write:u:{user_id}", config.rate_member_write)
     return config
 
 
@@ -185,6 +198,7 @@ async def audit_view(
     config = await _read(session, limiter, admin.id)
     return await _audit_view.audit_page(
         session,
+        admin.id,
         entity_type=entity_type,
         entity_id=entity_id,
         actor_handle=actor,
@@ -240,8 +254,8 @@ async def decide_appeal(
 
 
 @router.get("/reviews", response_model=MyReviews, tags=["reviews"])
-async def my_reviews(user: CurrentUser, session: Session) -> MyReviews:
-    _, config = await load_fraud(session)
+async def my_reviews(user: CurrentUser, session: Session, limiter: Limiter) -> MyReviews:
+    config = await _member_read(session, limiter, user.id)
     return await _member.my_reviews(session, user.id, config=config, now=utcnow())
 
 
@@ -251,7 +265,7 @@ async def my_reviews(user: CurrentUser, session: Session) -> MyReviews:
 async def reply_to_explanation(
     request_id: uuid.UUID, data: ReplyIn, user: CurrentUser, session: Session, limiter: Limiter
 ) -> MyExplanation:
-    config = await _write(session, limiter, user.id)
+    config = await _member_write(session, limiter, user.id)
     await _member.reply(session, user.id, request_id, data.reply, config=config, now=utcnow())
     await session.commit()
     return await _member.my_explanation(session, user.id, request_id, config=config, now=utcnow())
@@ -261,7 +275,7 @@ async def reply_to_explanation(
 async def appeal_notice(
     notice_id: uuid.UUID, data: AppealIn, user: CurrentUser, session: Session, limiter: Limiter
 ) -> MyNotice:
-    config = await _write(session, limiter, user.id)
+    config = await _member_write(session, limiter, user.id)
     await _appeals.create_appeal(
         session, user.id, notice_id, data.reason, config=config, now=utcnow()
     )
@@ -270,7 +284,8 @@ async def appeal_notice(
 
 
 @router.post("/reviews/seen", status_code=204, tags=["reviews"])
-async def reviews_seen(user: CurrentUser, session: Session) -> Response:
+async def reviews_seen(user: CurrentUser, session: Session, limiter: Limiter) -> Response:
+    await _member_read(session, limiter, user.id)
     await _member.mark_seen(session, user.id, utcnow())
     await session.commit()
     return Response(status_code=204)

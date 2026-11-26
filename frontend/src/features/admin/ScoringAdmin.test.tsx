@@ -9,6 +9,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { makeMe, mockApi, renderApp, signedIn } from '../../test/utils'
+import { formatLongDate } from './adminFormat'
 import type { AdminDeedScoring, OverrideRequest, AdminUserScoring } from './scoringAdminApi'
 import { AHMED, MOD, PRIYA } from './testFixtures'
 
@@ -189,7 +190,7 @@ describe('deed scoring admin page', () => {
     renderApp('/admin/scoring/deeds/deed-1')
     await fillForm('0')
     expect(await screen.findByRole('status')).toHaveTextContent(
-      'Sent for a second admin’s approval: cuts to 0 or by more than 10 points need one.',
+      'Sent for a second admin’s approval: changes of more than 10 points from the rule points, or to 0, need one.',
     )
     expect(screen.getByText('No overrides yet.')).toBeInTheDocument()
     expect(api.calls('POST /admin/scoring/deeds/deed-1/overrides')[0].body).toMatchObject({
@@ -305,7 +306,7 @@ describe('override requests page', () => {
     const user = userEvent.setup()
     renderApp('/admin/scoring/override-requests')
     await user.click(await screen.findByRole('button', { name: /^Approve: Ahmed Khan/ }))
-    const dialog = screen.getByRole('dialog', { name: 'Approve this cut?' })
+    const dialog = screen.getByRole('dialog', { name: 'Approve this change?' })
     await user.click(within(dialog).getByRole('button', { name: 'Approve' }))
     expect(within(dialog).getByRole('alert')).toHaveTextContent('at least 10 characters')
     await user.type(within(dialog).getByLabelText(/Note for the record/), 'Checked the photo')
@@ -334,7 +335,7 @@ describe('override requests page', () => {
     const user = userEvent.setup()
     renderApp('/admin/scoring/override-requests')
     await user.click(await screen.findByRole('button', { name: /^Decline: Ahmed Khan/ }))
-    const dialog = screen.getByRole('dialog', { name: 'Decline this cut?' })
+    const dialog = screen.getByRole('dialog', { name: 'Decline this change?' })
     await user.type(within(dialog).getByLabelText(/Note for the record/), 'Not enough reason')
     await user.click(within(dialog).getByRole('button', { name: 'Decline' }))
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(text)
@@ -452,9 +453,12 @@ describe('user scoring admin page', () => {
     await waitFor(() => expect(button).toBeEnabled())
     await user.click(button)
     const dialog = screen.getByRole('dialog')
-    expect(within(dialog).getByLabelText('Confirmed case')).toHaveDisplayValue(
-      /Ahmed, Priya and Ravi recognised each other 9 times/,
-    )
+    const group = within(dialog).getByRole('group', { name: 'Confirmed case' })
+    expect(
+      within(group).getByRole('radio', {
+        name: /Ahmed, Priya and Ravi recognised each other 9 times/,
+      }),
+    ).toBeChecked()
     await user.type(within(dialog).getByLabelText(/Note for the record/), 'Ring confirmed')
     await user.click(within(dialog).getByRole('button', { name: 'Revoke' }))
     expect(await screen.findByRole('status')).toHaveTextContent('Revoked:')
@@ -462,6 +466,54 @@ describe('user scoring admin page', () => {
       case_id: 'case-9',
       note: 'Ring confirmed',
     })
+  })
+
+  it('lists each confirmed case as a radio with its full summary; Tab stays in the dialog', async () => {
+    const LONG = {
+      ...CONFIRMED,
+      case_id: 'case-10',
+      resolved_at: '2026-11-02T06:00:00Z',
+      summary:
+        'Ahmed Khan, Priya Sharma, Ravi Kumar and Meena Iyer recognised each other 14 times in 20 days',
+    }
+    const api = base({
+      'GET /admin/scoring/users/ahmedk': { body: makeUser() },
+      'GET /admin/fraud/cases': cases([CONFIRMED, LONG]),
+      'POST /admin/scoring/titles/t1/revoke': { body: makeUser() },
+    })
+    const user = userEvent.setup()
+    renderApp('/admin/users/ahmedk')
+    const button = await screen.findByRole('button', { name: /^Revoke Kindness Hero/ })
+    await waitFor(() => expect(button).toBeEnabled())
+    await user.click(button)
+    const dialog = screen.getByRole('dialog')
+    const group = within(dialog).getByRole('group', { name: 'Confirmed case' })
+    const radios = within(group).getAllByRole('radio')
+    expect(radios).toHaveLength(2)
+    expect(radios[0]).toBeChecked()
+    // The checked case gets focus first.
+    expect(radios[0]).toHaveFocus()
+    // The whole summary and its date are shown, not clipped into an option.
+    expect(group).toHaveTextContent(LONG.summary)
+    expect(group).toHaveTextContent(`decided ${formatLongDate(LONG.resolved_at)}`)
+    await user.click(within(group).getByText(LONG.summary))
+    expect(radios[1]).toBeChecked()
+
+    // Focus trap: Shift+Tab from the radio group wraps to Cancel; Tab from Cancel wraps back.
+    radios[1].focus()
+    await user.tab({ shift: true })
+    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus()
+    await user.tab()
+    expect(radios[1]).toHaveFocus()
+
+    await user.type(within(dialog).getByLabelText(/Note for the record/), 'Ring confirmed')
+    await user.click(within(dialog).getByRole('button', { name: 'Revoke' }))
+    await waitFor(() =>
+      expect(api.calls('POST /admin/scoring/titles/t1/revoke')[0].body).toEqual({
+        case_id: 'case-10',
+        note: 'Ring confirmed',
+      }),
+    )
   })
 
   it.each([

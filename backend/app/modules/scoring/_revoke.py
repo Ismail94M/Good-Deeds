@@ -9,6 +9,12 @@ tells the two apart). ``revoked_*`` is set once (the database refuses a second c
 is not passed to the next person and the final board is not recomputed (Q67): the board row
 shows as "Unavailable account" (Q72, ``_reads``). Admins can't see or revoke their own, or a
 related person's (D90: 404).
+
+SEC5-L4: the admin must also not be conflicted with the case: no subject of it may be the admin
+or related to them (``deeds.service.related_users`` inside the lookback, checked per person with
+``fraud.service.case_has_subject``), else 404 as for an unknown title or badge. A title also
+needs the case to cover its month (``fraud.service.case_covers_month``), else 409
+``case_not_for_this_month``.
 """
 
 import uuid
@@ -23,6 +29,7 @@ from app.core.events import emit
 from app.modules.deeds import service as deeds
 from app.modules.fraud.service import (
     OverrideRules,
+    case_covers_month,
     case_standing,
     confirmed_case_for_user,
     override_rules,
@@ -30,7 +37,7 @@ from app.modules.fraud.service import (
 from app.modules.identity import service as identity
 from app.modules.scoring import _coi, _labels
 from app.modules.scoring._limits import load_leaderboard
-from app.modules.scoring._overrides import clean_note
+from app.modules.scoring._overrides import case_conflicted, clean_note
 from app.modules.scoring._reads import _TitleLabels
 from app.modules.scoring.events import BadgeRevoked, HeroTitleRevoked
 from app.modules.scoring.models import HeroTitle, LedgerRole, PointsLedger, UserBadge
@@ -170,7 +177,13 @@ async def revoke_title(
     await _check_person(session, admin_id, title.user_id, rules, now, not_found)
     if title.revoked_at is not None:
         raise _already_revoked()
+    if await case_conflicted(session, admin_id, body.case_id, rules, now):
+        raise not_found
     await _check_case(session, body.case_id, title.user_id)
+    if not await case_covers_month(session, body.case_id, title.period_month):
+        raise Conflict(
+            "This case has no deeds from the title's month.", code="case_not_for_this_month"
+        )
     title.revoked_at, title.revoked_reason, title.revoked_by = now, note, admin_id
     await session.flush()
     record_audit(
@@ -222,6 +235,8 @@ async def revoke_badge(
     await _check_person(session, admin_id, badge.user_id, rules, now, not_found)
     if badge.revoked_at is not None:
         raise _already_revoked()
+    if await case_conflicted(session, admin_id, body.case_id, rules, now):
+        raise not_found
     await _check_case(session, body.case_id, badge.user_id)
     badge.revoked_at, badge.revoked_reason, badge.revoked_by = now, note, admin_id
     await session.flush()

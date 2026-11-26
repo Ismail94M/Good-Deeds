@@ -8,6 +8,28 @@ export const NOTE_MIN = 5
 export const NOTE_TOO_SHORT = 'Write a short note (at least 5 characters) before you decide.'
 
 /**
+ * The dialog's Tab stops in order. A radio group is one stop: its checked radio (or its first
+ * radio when none is checked), as browsers tab through radios.
+ */
+function tabStops(root: HTMLElement | null): HTMLElement[] {
+  if (!root) return []
+  const all = root.querySelectorAll<HTMLElement>(
+    'button:not(:disabled), select, textarea, input[type="radio"]:not(:disabled)',
+  )
+  // Sorted into document order: some engines (jsdom) return a selector list group by group.
+  const ordered = Array.from(all).sort((a, b) =>
+    a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1,
+  )
+  return ordered.filter((el) => {
+    if (!(el instanceof HTMLInputElement) || el.type !== 'radio') return true
+    const group = Array.from(
+      root.querySelectorAll<HTMLInputElement>('input[type="radio"]:not(:disabled)'),
+    ).filter((r) => r.name === el.name)
+    return el.checked || (!group.some((r) => r.checked) && group[0] === el)
+  })
+}
+
+/**
  * Modal shell for the admin dialogs: `role="dialog"`, `aria-modal`, Esc and a click outside
  * dismiss, Tab stays inside, focus returns to the opener.
  */
@@ -39,10 +61,8 @@ export function AdminDialog({
       return
     }
     if (event.key !== 'Tab') return
-    const focusable = ref.current?.querySelectorAll<HTMLElement>(
-      'button:not(:disabled), select, textarea',
-    )
-    if (!focusable || focusable.length === 0) return
+    const focusable = tabStops(ref.current)
+    if (focusable.length === 0) return
     const first = focusable[0]
     const last = focusable[focusable.length - 1]
     if (event.shiftKey && document.activeElement === first) {

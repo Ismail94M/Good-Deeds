@@ -16,6 +16,7 @@ import {
   AHMED,
   answeredExplanations,
   hoursFromNow,
+  makeCaseDeed,
   makeCaseDetail,
   makeCasePage,
   makeCaseRow,
@@ -230,6 +231,38 @@ describe('case review', () => {
       '/admin/scoring/deeds/deed-1',
     )
     expect(screen.getByText(/November 2026 board final/)).toBeInTheDocument()
+  })
+
+  it('shows each deed fact once: no repeated Rejected and no Held once rejected', async () => {
+    review(
+      makeCaseDetail({
+        deeds: [
+          makeCaseDeed({
+            deed_id: 'deed-1',
+            status: 'rejected',
+            counts_for_points: false,
+            held: true,
+            outcome: 'reject',
+          }),
+          makeCaseDeed({ deed_id: 'deed-2', held: true, outcome: 'exclude' }),
+          makeCaseDeed({ deed_id: 'deed-3', held: true, outcome: 'reject' }),
+        ],
+      }),
+    )
+    renderApp('/admin/fraud/case-1')
+    const deeds = await screen.findByRole('region', { name: 'Deeds (3)' })
+    const [rejected, excluded, pending] = within(deeds).getAllByRole('listitem')
+    expect(within(rejected).getAllByText('Rejected')).toHaveLength(1)
+    expect(within(rejected).queryByText('Held')).toBeNull()
+    expect(within(rejected).getByText('Not counted for points')).toBeInTheDocument()
+    // Still verified: the hold and the decision are separate facts.
+    expect(within(excluded).getByText('Verified')).toBeInTheDocument()
+    expect(within(excluded).getByText('Held')).toBeInTheDocument()
+    expect(within(excluded).getByText('Excluded from leaderboards')).toBeInTheDocument()
+    // Rejection waiting for the appeal window (D100): verified, held, outcome Rejected.
+    expect(within(pending).getByText('Verified')).toBeInTheDocument()
+    expect(within(pending).getByText('Held')).toBeInTheDocument()
+    expect(within(pending).getAllByText('Rejected')).toHaveLength(1)
   })
 
   it('a 404 (unknown or conflicted) shows NotFound', async () => {

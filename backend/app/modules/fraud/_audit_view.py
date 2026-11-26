@@ -2,21 +2,28 @@
 
 Reads ``audit_log`` (``app.core.audit``) with exact-match filters, a ``from``/``to`` range
 (both inclusive; a naive time is UTC) of at most 366 days, and a keyset cursor on
-``(created_at, id)``. An admin sees their own actions too (§3.5): the view has no conflict rule.
-When only ``from`` is given, the range ends now.
+``(created_at, id)``. An admin sees their own actions too (§3.5). When only ``from`` is given,
+the range ends now.
+
+Conflicts (D90, PO Q82, SEC5-M1): rows about a case the admin is conflicted on are left out,
+exactly like the case queue (the same ``_coi.visibility``): the case's own rows
+(``flag_case``: park, explanation requests, decisions), its decision notices
+(``decision_notice``), appeals of those notices (``appeal``) and any other row that names the
+case in ``old_value``/``new_value`` ``case_id`` (deed rejections, overrides, revocations).
 """
 
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select, tuple_
+from sqlalchemy import ColumnElement, String, and_, cast, false, func, or_, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import AuditLog
 from app.core.errors import AppError
-from app.modules.fraud import _cursor
+from app.modules.fraud import _appeals, _coi, _cursor, _notices
 from app.modules.fraud._common import user_not_found
 from app.modules.fraud._limits import FraudConfig
+from app.modules.fraud.models import Appeal, DecisionNotice, FlagCase
 from app.modules.fraud.schemas import AuditItem, AuditPage, UserRef
 from app.modules.identity import service as identity
 
@@ -36,8 +43,43 @@ def _utc(at: datetime | None) -> datetime | None:
     return at.replace(tzinfo=UTC) if at.tzinfo is None else at
 
 
+def _hidden(visibility: _coi.Visibility) -> ColumnElement[bool]:
+    """Audit rows about a case hidden from the admin (never NULL)."""
+    hidden_cases = select(cast(FlagCase.id, String)).where(~visibility.condition())
+    hidden_notices = (
+        select(cast(DecisionNotice.id, String))
+        .join(FlagCase, FlagCase.id == DecisionNotice.case_id)
+        .where(~visibility.condition())
+    )
+    hidden_appeals = (
+        select(cast(Appeal.id, String))
+        .join(DecisionNotice, DecisionNotice.id == Appeal.notice_id)
+        .join(FlagCase, FlagCase.id == DecisionNotice.case_id)
+        .where(~visibility.condition())
+    )
+    named = func.coalesce(
+        AuditLog.new_value["case_id"].astext, AuditLog.old_value["case_id"].astext
+    )
+    return func.coalesce(
+        or_(
+            and_(AuditLog.entity_type == "flag_case", AuditLog.entity_id.in_(hidden_cases)),
+            and_(
+                AuditLog.entity_type == _notices.NOTICE_AUDIT_ENTITY,
+                AuditLog.entity_id.in_(hidden_notices),
+            ),
+            and_(
+                AuditLog.entity_type == _appeals.AUDIT_ENTITY,
+                AuditLog.entity_id.in_(hidden_appeals),
+            ),
+            named.in_(hidden_cases),
+        ),
+        false(),
+    )
+
+
 async def audit_page(
     session: AsyncSession,
+    admin_id: uuid.UUID,
     *,
     entity_type: str | None,
     entity_id: str | None,
@@ -55,7 +97,8 @@ async def audit_page(
         if since > end or end - since > MAX_RANGE:
             raise invalid_range()
 
-    stmt = select(AuditLog)
+    visibility = await _coi.visibility(session, admin_id, config, now)
+    stmt = select(AuditLog).where(~_hidden(visibility))
     if entity_type:
         stmt = stmt.where(AuditLog.entity_type == entity_type)
     if entity_id:

@@ -172,6 +172,8 @@ export type FraudStatus = {
       edges_scanned: number
       cases_opened: number
     } | null
+    /** Per-deed checks that hit a search limit in the last 7 days (SEC5-M6); the nightly sweep retries them. */
+    truncated_checks_7d: number
   }[]
   open_cases_by_type: Record<string, number>
   /** Open appeals no active admin may decide: they wait (PO Q78). */

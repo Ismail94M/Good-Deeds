@@ -207,7 +207,7 @@ function RevokeDialog({
   const options = useScoringFraudOptions()
   const noteMin = options.data?.note_min_chars ?? 5
   const noteMax = options.data?.note_max_chars ?? 1000
-  const caseId = useId()
+  const caseName = useId()
   const noteId = useId()
   const countId = useId()
   const [chosen, setChosen] = useState(cases[0]?.case_id ?? '')
@@ -235,24 +235,38 @@ function RevokeDialog({
               ? 'The title is removed from their profile. It isn’t passed to anyone else, and the final leaderboard stays as it is.'
               : 'The badge is removed from their profile.'}
           </p>
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor={caseId} className="text-[15px] font-semibold">
-              Confirmed case
-            </label>
-            <select
-              id={caseId}
-              value={chosen}
-              onChange={(e) => setChosen(e.target.value)}
-              className={`${fieldClass} min-h-11`}
-            >
-              {cases.map((c) => (
-                <option key={c.case_id} value={c.case_id}>
-                  {c.summary}
-                  {c.resolved_at ? ` · decided ${formatLongDate(c.resolved_at)}` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* A radio list, not a select: case summaries are long and a native option clips them. */}
+          <fieldset className="flex flex-col gap-1.5">
+            <legend className="mb-1.5 text-[15px] font-semibold">Confirmed case</legend>
+            {cases.map((c) => (
+              <label
+                key={c.case_id}
+                className={`flex w-full cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand-700 ${
+                  chosen === c.case_id
+                    ? 'border-brand-700 bg-brand-50'
+                    : 'border-slate-300 bg-white hover:bg-slate-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name={caseName}
+                  value={c.case_id}
+                  checked={chosen === c.case_id}
+                  onChange={() => setChosen(c.case_id)}
+                  data-autofocus={chosen === c.case_id ? '' : undefined}
+                  className="mt-1 size-4 shrink-0 accent-brand-700"
+                />
+                <span className="flex min-w-0 flex-col">
+                  <span className="text-[15px] break-words text-slate-900">{c.summary}</span>
+                  {c.resolved_at && (
+                    <span className="text-sm text-slate-600">
+                      decided {formatLongDate(c.resolved_at)}
+                    </span>
+                  )}
+                </span>
+              </label>
+            ))}
+          </fieldset>
           <div className="flex flex-col gap-1">
             <label htmlFor={noteId} className="text-[15px] font-semibold">
               Note for the record <span className="font-normal text-slate-600">(required)</span>

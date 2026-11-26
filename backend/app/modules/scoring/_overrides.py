@@ -5,17 +5,22 @@
   it (``_ledger``), in the request transaction under the M4 day locks, so the ledger keeps one
   writer (D49). The role needs an award target (verified, counted, inside the daily cap), else
   409 ``nothing_to_override``.
-- **Big cuts (Q77):** an override to 0 (when ``override_second_admin.cut_to_zero``) or one lowering
-  points by more than ``override_second_admin.max_cut_points`` is stored as a pending
-  ``override_requests`` row instead and changes nothing until a different, non-conflicted admin
-  approves it. One pending request per (deed, role): while it waits, any other override of that
-  role is 409 ``request_pending``. Requests expire after ``override_second_admin.expire_days``
-  (job ``scoring.expire_override_requests``).
+- **Big changes (Q77, Q79, Q80):** an override to 0 (when ``override_second_admin.cut_to_zero``),
+  or one setting points more than ``override_second_admin.max_cut_points`` below or above the
+  **rule points** (what the rules give without any override, so several small steps add up), is
+  stored as a pending ``override_requests`` row instead and changes nothing until a different,
+  non-conflicted admin approves it. One pending request per (deed, role): while it waits, any
+  other override of that role is 409 ``request_pending``. Requests expire after
+  ``override_second_admin.expire_days`` (job ``scoring.expire_override_requests``).
 - Clearing never needs a second admin: it returns to the rules.
 - Every applied override writes ``audit_log`` (``entity_type="deed_points"``, old and new points).
   One that lowers points emits ``PointsOverridden``, which ``fraud`` turns into a decision notice
-  the person can appeal (D100). An overturned appeal writes a clearing override
-  (``clear_for_appeal``, from the ``AppealDecided`` handler).
+  the person can appeal (D100). A raise sends no notice. An overturned appeal writes a clearing
+  override (``clear_for_appeal``, from the ``AppealDecided`` handler); when there is nothing to
+  clear it writes only an audit row ``deed_points.appeal_overturn_noop`` (SEC5-L2).
+- ``case_id`` (optional) must name a case that has the deed's person as a subject and that the
+  admin is not conflicted with (no subject is the admin or related to them), else 422
+  ``unknown_case`` (SEC5-L3), so the id is no oracle and the audit link is meaningful.
 - Conflict of interest (D90): own deeds and deeds with a related person are 404.
 """
 
@@ -30,7 +35,7 @@ from app.core.audit import record_audit
 from app.core.errors import AppError, Conflict, NotFound
 from app.core.events import emit
 from app.modules.deeds import service as deeds
-from app.modules.fraud.service import OverrideRules, case_standing, override_rules
+from app.modules.fraud.service import OverrideRules, case_has_subject, override_rules
 from app.modules.identity import service as identity
 from app.modules.scoring import _coi, _cursor
 from app.modules.scoring._ledger import (
@@ -100,13 +105,47 @@ def clean_note(note: str, rules: OverrideRules) -> str:
     return text
 
 
-def needs_second_admin(old: int, new: int | None, rules: OverrideRules) -> bool:
-    """Q77: an override to 0, or a cut of more than ``max_cut_points``."""
-    if new is None or new >= old:
+def needs_second_admin(rule_points: int, new: int | None, rules: OverrideRules) -> bool:
+    """Q77, Q79, Q80: an override to 0, or one more than ``max_cut_points`` below or above the
+    rule points (measured from the rules, not from the points in force, so a cut or raise in
+    several small steps still needs a second admin). Clearing never does. The caller refuses an
+    override equal to the points in force, so ``new == 0`` here is always a cut."""
+    if new is None:
         return False
     if new == 0 and rules.second_admin_cut_to_zero:
         return True
-    return old - new > rules.second_admin_max_cut_points
+    return abs(new - rule_points) > rules.second_admin_max_cut_points
+
+
+async def case_conflicted(
+    session: AsyncSession,
+    admin_id: uuid.UUID,
+    case_id: uuid.UUID,
+    rules: OverrideRules,
+    now: datetime,
+) -> bool:
+    """Whether a subject of ``case_id`` is the admin or related to them inside the lookback
+    (D90), checked through ``fraud.service.case_has_subject`` for each blocked person."""
+    for user_id in await _coi.blocked_users(session, admin_id, rules.coi_lookback_days, now):
+        if await case_has_subject(session, case_id, user_id):
+            return True
+    return False
+
+
+async def _check_case(
+    session: AsyncSession,
+    admin_id: uuid.UUID,
+    case_id: uuid.UUID,
+    user_id: uuid.UUID,
+    rules: OverrideRules,
+    now: datetime,
+) -> None:
+    """SEC5-L3: the case must exist, have ``user_id`` as a subject and be visible to the admin;
+    every failure is the same 422, so it tells nothing about other cases."""
+    if not await case_has_subject(session, case_id, user_id) or await case_conflicted(
+        session, admin_id, case_id, rules, now
+    ):
+        raise Invalid("We couldn't find that case.", code="unknown_case")
 
 
 async def _visible_inputs(
@@ -256,10 +295,8 @@ async def create_override(
     role = LedgerRole(body.role)
     user_id = inputs.doer_id if role == LedgerRole.DOER else inputs.reporter_id
     assert user_id is not None
-    if body.case_id is not None and await case_standing(session, body.case_id, user_id) == (
-        "unknown"
-    ):
-        raise Invalid("We couldn't find that case.", code="unknown_case")
+    if body.case_id is not None:
+        await _check_case(session, admin_id, body.case_id, user_id, rules, now)
 
     if await lock_deed_days(session, deed_id) is None:
         raise _nothing_to_override()
@@ -277,7 +314,8 @@ async def create_override(
     if (body.points is None and current_override is None) or body.points == state.points:
         raise Conflict("That wouldn't change anything.", code="override_unchanged")
 
-    if needs_second_admin(state.points, body.points, rules):
+    assert state.rule_points is not None
+    if needs_second_admin(state.rule_points, body.points, rules):
         assert body.points is not None
         request = OverrideRequest(
             id=uuid.uuid4(),
@@ -305,6 +343,7 @@ async def create_override(
             new_value={
                 "role": role.value,
                 "points": body.points,
+                "rule_points": state.rule_points,
                 "request_id": str(request.id),
                 "reason_code": body.reason_code,
                 "case_id": None if body.case_id is None else str(body.case_id),
@@ -545,32 +584,94 @@ async def expire_requests(session: AsyncSession, *, now: datetime | None = None)
 # --------------------------------------------------- appeals (D100)
 
 
+def _record_noop(
+    session: AsyncSession,
+    *,
+    override_id: uuid.UUID,
+    appealed: ScoreOverride | None,
+    reviewer_id: uuid.UUID,
+    appeal_id: uuid.UUID | None,
+    in_force: ScoreOverride | None,
+) -> None:
+    """SEC5-L2: an overturned appeal that cleared nothing is recorded, so the trail shows that
+    no points came back (the member's notice wording is decided in ``fraud``)."""
+    record_audit(
+        session,
+        entity_type=AUDIT_ENTITY,
+        entity_id=str(override_id if appealed is None else appealed.deed_id),
+        action="deed_points.appeal_overturn_noop",
+        actor_id=reviewer_id,
+        new_value={
+            "override_id": str(override_id),
+            "appeal_id": None if appeal_id is None else str(appeal_id),
+            "role": None if appealed is None else appealed.role.value,
+            "in_force_override_id": None if in_force is None else str(in_force.id),
+            "in_force_points": None if in_force is None else in_force.points,
+        },
+        reason=APPEAL_NOTE,
+    )
+
+
 async def clear_for_appeal(
-    session: AsyncSession, override_id: uuid.UUID, reviewer_id: uuid.UUID
+    session: AsyncSession,
+    override_id: uuid.UUID,
+    reviewer_id: uuid.UUID,
+    *,
+    appeal_id: uuid.UUID | None = None,
 ) -> ScoreOverride | None:
     """An appeal against ``override_id`` was overturned: clear it (a new row with ``points``
-    null, reason ``other``, actor the reviewer) and re-score. Nothing happens when the override
-    is not the one in force any more (cleared already, or replaced by a later override, which
-    has its own notice), so a repeated event changes nothing."""
+    null, reason ``other``, actor the reviewer) and re-score. Returns None when nothing was
+    cleared: the override is not the one in force any more (cleared already, or replaced by a
+    later override, which has its own notice) or it was itself a clearing row. Then no new
+    override or event is written, only an audit row ``deed_points.appeal_overturn_noop``
+    (SEC5-L2). The handler runs once per event (``processed_events``)."""
     appealed = await session.get(ScoreOverride, override_id)
     if appealed is None:
+        _record_noop(
+            session,
+            override_id=override_id,
+            appealed=None,
+            reviewer_id=reviewer_id,
+            appeal_id=appeal_id,
+            in_force=None,
+        )
         return None
     await lock_deed_days(session, appealed.deed_id)
     in_force = (await overrides_in_force(session, appealed.deed_id)).get(appealed.role)
     if in_force is None or in_force.id != appealed.id or in_force.points is None:
+        _record_noop(
+            session,
+            override_id=override_id,
+            appealed=appealed,
+            reviewer_id=reviewer_id,
+            appeal_id=appeal_id,
+            in_force=in_force,
+        )
         return None
     states = await _states(session, appealed.deed_id)
     old_points = 0 if states is None else states[appealed.role].points
     inputs = await deeds.scoring_inputs(session, appealed.deed_id)
     assert inputs is not None and inputs.doer_id is not None
     user_id = inputs.doer_id if appealed.role == LedgerRole.DOER else inputs.reporter_id
+    # An overturn undoes exactly the appealed change (PO principle 3): go back to the override
+    # that was in force before it, or to the rules when there was none.
+    before = await session.scalar(
+        select(ScoreOverride)
+        .where(
+            ScoreOverride.deed_id == appealed.deed_id,
+            ScoreOverride.role == appealed.role,
+            ScoreOverride.created_at < appealed.created_at,
+        )
+        .order_by(ScoreOverride.created_at.desc(), ScoreOverride.id.desc())
+        .limit(1)
+    )
     return await _apply(
         session,
         deed_id=appealed.deed_id,
         role=appealed.role,
         user_id=user_id,
         old_points=old_points,
-        points=None,
+        points=before.points if before is not None else None,
         reason_code=APPEAL_REASON,
         note=APPEAL_NOTE,
         case_id=appealed.case_id,

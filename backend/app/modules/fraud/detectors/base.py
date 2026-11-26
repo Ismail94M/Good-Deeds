@@ -1,8 +1,10 @@
 """The detector plug-in interface (docs/M5-DESIGN.md D102).
 
-A detector finds an unusual pattern and returns ``Finding``s. It never writes anything: the
+A detector finds an unusual pattern and returns ``Finding``s. It never writes a case: the
 caller (``fraud._detect``) passes each finding to ``fraud._cases.raise_flag``, which opens or
-joins a case. Opening a case changes nothing for anyone (PO principle 1, D98).
+joins a case. (A detector may record its own truncated per-deed check in
+``fraud_detector_runs``, as the ring detector does, SEC5-M6.) Opening a case changes nothing
+for anyone (PO principle 1, D98).
 
 To add a detector: write a class satisfying ``Detector`` in a new file of this package, list an
 instance in ``DETECTORS`` (``detectors/__init__.py``) and publish a ``fraud`` config version with
@@ -36,6 +38,10 @@ class Finding:
     subject_ids: frozenset[uuid.UUID]
     deed_ids: frozenset[uuid.UUID]
     signal: Mapping[str, SignalValue] = field(default_factory=dict)
+    # Join a live case of the same type that shares any subject (adding the new subjects to it)
+    # instead of opening a case per exact subject set: for detectors whose findings are parts of
+    # one group, such as rings (PO Q81). ``raise_flag`` implements it generically.
+    join_overlapping: bool = False
 
     def __post_init__(self) -> None:
         if not self.subject_ids:
@@ -102,6 +108,12 @@ def merge_findings(findings: Iterable[Finding]) -> list[Finding]:
         merged[key] = (
             f
             if old is None
-            else Finding(f.case_type, f.subject_ids, old.deed_ids | f.deed_ids, f.signal)
+            else Finding(
+                f.case_type,
+                f.subject_ids,
+                old.deed_ids | f.deed_ids,
+                f.signal,
+                join_overlapping=f.join_overlapping or old.join_overlapping,
+            )
         )
     return list(merged.values())

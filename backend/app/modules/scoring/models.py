@@ -544,13 +544,14 @@ Index(
 
 
 class OverrideRequest(Base):
-    """A big cut (to 0, or by more than ``override_second_admin.max_cut_points``) waiting for a
-    different admin (Q77). No effect until approved; decided once, from ``pending`` only. One
-    pending request per (deed, role)."""
+    """A big change (to 0, or more than ``override_second_admin.max_cut_points`` below or above
+    the rule points) waiting for a different admin (Q77, Q79, Q80). No effect until approved;
+    decided once, from ``pending`` only. One pending request per (deed, role). A request may
+    lower or raise the points (migration 0028)."""
 
     __tablename__ = "override_requests"
     __table_args__ = (
-        CheckConstraint("points >= 0 AND points < previous_points", name="points_is_cut"),
+        CheckConstraint("points >= 0 AND points <> previous_points", name="points_changed"),
         CheckConstraint(_REASON_CODE, name="reason_code_format"),
         CheckConstraint(_NOTE_MIN, name="note_required"),
         CheckConstraint("expires_at > created_at", name="expires_after_created"),

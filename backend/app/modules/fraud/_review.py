@@ -44,6 +44,8 @@ from app.modules.fraud.detectors import DETECTORS
 from app.modules.fraud.events import DeedHoldChanged, FlagCaseResolved
 from app.modules.fraud.models import (
     DeedOutcome,
+    DetectorRunStatus,
+    DetectorRunTrigger,
     FlagCase,
     FlagCaseAction,
     FlagCaseDecision,
@@ -102,6 +104,9 @@ REASON_CODE_LABELS: dict[str, str] = {
 LIST_USERS = 5
 _GONE = UserRef(handle="", display_name="")
 _HOUR = timedelta(hours=1)
+
+# The admin status page counts truncated per-deed checks over this period (SEC5-M6).
+TRUNCATED_CHECKS_PERIOD = timedelta(days=7)
 
 
 class _Named(Protocol):
@@ -177,9 +182,22 @@ async def status(
     for name in names:
         run = await session.scalar(
             select(FraudDetectorRun)
-            .where(FraudDetectorRun.detector == name)
+            .where(
+                FraudDetectorRun.detector == name,
+                FraudDetectorRun.trigger != DetectorRunTrigger.EVENT,
+            )
             .order_by(FraudDetectorRun.started_at.desc(), FraudDetectorRun.id.desc())
             .limit(1)
+        )
+        truncated = await session.scalar(
+            select(func.count())
+            .select_from(FraudDetectorRun)
+            .where(
+                FraudDetectorRun.detector == name,
+                FraudDetectorRun.trigger == DetectorRunTrigger.EVENT,
+                FraudDetectorRun.status == DetectorRunStatus.TRUNCATED,
+                FraudDetectorRun.started_at >= now - TRUNCATED_CHECKS_PERIOD,
+            )
         )
         detectors.append(
             DetectorStatus(
@@ -194,6 +212,7 @@ async def status(
                     edges_scanned=run.edges_scanned,
                     cases_opened=run.cases_opened,
                 ),
+                truncated_checks_7d=int(truncated or 0),
             )
         )
     visible = await _coi.visibility(session, admin_id, config, now)

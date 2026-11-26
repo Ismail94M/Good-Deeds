@@ -41,7 +41,13 @@ from tests.fraud.helpers import cases_for, days_ago, deed, run_fraud
 from tests.fraud.review_helpers import NOTE, admin, ask, confirm_body, with_role
 from tests.scoring.board_helpers import entries
 from tests.scoring.helpers import active, points
-from tests.scoring.override_helpers import decide, override, run_scoring_for, scored_deed
+from tests.scoring.override_helpers import (
+    decide,
+    deed_worth,
+    override,
+    run_scoring_for,
+    scored_deed,
+)
 
 IST = ZoneInfo("Asia/Kolkata")
 LATER = timedelta(days=31)
@@ -379,10 +385,10 @@ async def test_small_cut_needs_no_second_admin_and_is_appealable(
     client: AsyncClient, session: AsyncSession
 ) -> None:
     """Boundary of Q77: a cut of exactly ``max_cut_points`` (10) applies at once and tells the
-    person; one more point needs a second admin."""
-    _, doer, deed_id = await scored_deed(session)
+    person; one more point needs a second admin. Rule points 25 (cuts are measured from the
+    rule points, Q79)."""
+    _, doer, deed_id = await deed_worth(session, 25)
     a1 = await admin(session)
-    assert (await override(client, a1, deed_id, points=25)).status_code == 200
     res = await override(client, a1, deed_id, points=15)  # cut of exactly 10
     assert res.status_code == 200, res.text
     assert await points(session, deed_id, LedgerRole.DOER) == 15

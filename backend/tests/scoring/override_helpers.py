@@ -9,9 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import AuditLog
 from app.core.events import OutboxEvent, handlers_for, run_handler
-from app.modules.scoring.models import ScoreOverride
+from app.core.runtime_config import publish
+from app.modules.scoring._limits import load_scoring
+from app.modules.scoring.models import LedgerRole, ScoreOverride
 from tests.deeds.helpers import Member, members, scan_and_report
-from tests.scoring.helpers import run_scoring
+from tests.scoring.helpers import points, run_scoring
 
 NOTE = "The photo shows a different street."
 SCORING_PREFIX = "app.modules.scoring."
@@ -24,6 +26,26 @@ async def scored_deed(session: AsyncSession) -> tuple[Member, Member, uuid.UUID]
     assert out.status == "verified"
     await run_scoring(session, out.id)
     await session.commit()
+    return reporter, doer, out.id
+
+
+async def deed_worth(session: AsyncSession, base: int) -> tuple[Member, Member, uuid.UUID]:
+    """A verified QR deed whose doer rule points are ``base`` (every category's base points set
+    to ``base`` in a new scoring config version). Committed."""
+    _, scoring = await load_scoring(session)
+    bases = {name: base for name in scoring.category_base_points}
+    await publish(
+        session,
+        scoring.model_copy(update={"category_base_points": bases}),
+        actor_id=None,
+        reason="test",
+    )
+    reporter, doer = await members(session, 2)
+    out = await scan_and_report(session, reporter, doer)
+    assert out.status == "verified"
+    await run_scoring(session, out.id)
+    await session.commit()
+    assert await points(session, out.id, LedgerRole.DOER) == base
     return reporter, doer, out.id
 
 

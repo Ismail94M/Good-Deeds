@@ -313,7 +313,7 @@ M4 #9 `GET /api/admin/scoring/deeds/{deed_id}` gains `held: bool` and `overrides
 | Override points | – | – | ✓ (big cuts as a request) | – (404) |
 | Approve or decline a big cut | – | – | ✓ not the requester | – (404) |
 | Revoke title or badge | – | – | ✓ with a confirmed case | – (404) |
-| Audit view | – | – | ✓ (own actions included) | ✓ |
+| Audit view | – | – | ✓ (own actions included) | ✓ but without rows about their cases (case actions, explanation requests, notices, appeals and rows naming the case; Q82) |
 
 ---
 

@@ -22,9 +22,12 @@ export function useScoringFraudOptions() {
 export const NOTHING_TO_OVERRIDE =
   'This report earns no points to change: it is capped, not counted or no longer verified.'
 
-/** 202 from #13: the cut waits for a second admin (`n` = `override_second_admin.max_cut_points`). */
+/**
+ * 202 from #13: the change waits for a second admin (`n` = `override_second_admin.max_cut_points`;
+ * measured from the rule points, up or down, Q79/Q80).
+ */
 export function secondAdminSent(n: number): string {
-  return `Sent for a second admin’s approval: cuts to 0 or by more than ${n} points need one.`
+  return `Sent for a second admin’s approval: changes of more than ${n} points from the rule points, or to 0, need one.`
 }
 
 export const FINAL_MONTH =

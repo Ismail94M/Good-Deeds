@@ -33,6 +33,7 @@ from tests.scoring.override_helpers import (
     NOTE,
     audits,
     decide,
+    deed_worth,
     overridden_events,
     override,
     overrides,
@@ -294,10 +295,9 @@ async def test_cut_to_zero_waits_for_a_second_admin_then_applies(
 
 
 async def test_big_cut_declined_changes_nothing(client: AsyncClient, session: AsyncSession) -> None:
-    """25 -> 12 is a cut of 13."""
-    _, _, deed_id = await scored_deed(session)
+    """Rule points 25: 25 -> 12 is a cut of 13."""
+    _, _, deed_id = await deed_worth(session, 25)
     a1, a2 = await admin(session), await admin(session)
-    assert (await override(client, a1, deed_id, points=25)).status_code == 200
     res = await override(client, a1, deed_id, points=12)
     assert res.status_code == 202, res.json()
     short = await decide(client, a2, res.json()["id"], "decline", note="no")

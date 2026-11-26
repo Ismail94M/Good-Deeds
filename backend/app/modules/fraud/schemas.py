@@ -211,7 +211,11 @@ class DetectorRunOut(BaseModel):
 class DetectorStatus(BaseModel):
     detector: str
     enabled: bool
+    # The last sweep or CLI run.
     last_run: DetectorRunOut | None
+    # Per-deed checks that hit a search limit in the last 7 days and flagged nothing (SEC5-M6);
+    # the nightly sweep retries them with a bigger budget.
+    truncated_checks_7d: int
 
 
 class FraudStatus(BaseModel):

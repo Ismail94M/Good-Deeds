@@ -6,8 +6,14 @@ from scoring's events), goes through ``raise_flag``. Opening a case changes noth
 notice. Every write is insert-or-join with ``ON CONFLICT DO NOTHING``, so raising the same
 finding twice changes nothing.
 
-Lock order (§4.1): advisory ``fraud_case:(type, subject_key)`` -> ``flag_cases`` row ->
-``prize_holds`` inserts. A case never takes deeds or scoring locks.
+A finding with ``join_overlapping`` (rings, PO Q81) joins the oldest live case of its type that
+shares any subject, adding its new subjects to ``flag_case_users``; the case keeps its
+``subject_key`` (it never changes), so the live case is found through its users. Deeds already
+decided in a resolved case of the type with any of these subjects are not flagged again (D81).
+
+Lock order (§4.1): advisory ``fraud_case_join:(type)`` (joining findings only, so two
+overlapping groups can't open two cases at once) -> advisory ``fraud_case:(type, subject_key)``
+-> ``flag_cases`` row -> ``prize_holds`` inserts. A case never takes deeds or scoring locks.
 """
 
 import hashlib
@@ -17,7 +23,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -108,6 +114,60 @@ async def _already_decided(
     return set(rows)
 
 
+async def _already_decided_overlapping(
+    session: AsyncSession,
+    case_type: str,
+    user_ids: Iterable[uuid.UUID],
+    deed_ids: Iterable[uuid.UUID],
+) -> set[uuid.UUID]:
+    """D81 for joining findings: deeds already in a resolved case of the same type that has any
+    of these people as a subject."""
+    rows = await session.scalars(
+        select(FlagCaseDeed.deed_id)
+        .join(FlagCase, FlagCase.id == FlagCaseDeed.case_id)
+        .where(
+            FlagCase.type == case_type,
+            FlagCase.status == FlagCaseStatus.RESOLVED,
+            FlagCaseDeed.deed_id.in_(set(deed_ids)),
+            exists().where(
+                FlagCaseUser.case_id == FlagCase.id, FlagCaseUser.user_id.in_(set(user_ids))
+            ),
+        )
+    )
+    return set(rows)
+
+
+async def _live_overlapping(
+    session: AsyncSession, case_type: str, user_ids: Iterable[uuid.UUID]
+) -> FlagCase | None:
+    """The oldest live case of the type with any of these people as a subject (locked)."""
+    return await session.scalar(
+        select(FlagCase)
+        .where(
+            FlagCase.type == case_type,
+            FlagCase.status.in_(LIVE),
+            exists().where(
+                FlagCaseUser.case_id == FlagCase.id, FlagCaseUser.user_id.in_(set(user_ids))
+            ),
+        )
+        .order_by(FlagCase.opened_at, FlagCase.id)
+        .limit(1)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+
+
+async def _case_row(session: AsyncSession, case_id: uuid.UUID) -> FlagCase:
+    row = await session.scalar(
+        select(FlagCase)
+        .where(FlagCase.id == case_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    assert row is not None
+    return row
+
+
 async def _held(session: AsyncSession, deed_ids: Iterable[uuid.UUID]) -> set[uuid.UUID]:
     rows = await session.scalars(
         select(PrizeHold.deed_id)
@@ -131,7 +191,9 @@ async def _open_case(
         )
         .on_conflict_do_nothing(
             index_elements=[FlagCase.type, FlagCase.subject_key],
-            index_where=FlagCase.status.in_(LIVE),
+            # A literal predicate: with bound parameters, a prepared (generic) plan can't match
+            # the partial index ``uq_flag_cases_live`` once psycopg prepares the statement.
+            index_where=text("status IN ('open', 'parked')"),
         )
         .returning(FlagCase.id)
     )
@@ -164,18 +226,42 @@ async def raise_flag(
     if not config.enabled(case_type):
         return None
     now = now or datetime.now(UTC)
+    join = finding.join_overlapping
     key = subject_key(case_type, finding.subject_ids)
+    if join:
+        await advisory_xact_lock(session, "fraud_case_join", case_type)
     await advisory_xact_lock(session, "fraud_case", case_type, key)
 
-    deed_ids = set(finding.deed_ids) - await _already_decided(
-        session, case_type, key, finding.deed_ids
+    decided = (
+        await _already_decided_overlapping(
+            session, case_type, finding.subject_ids, finding.deed_ids
+        )
+        if join
+        else await _already_decided(session, case_type, key, finding.deed_ids)
     )
+    deed_ids = set(finding.deed_ids) - decided
     if not deed_ids:
         return None
 
     case = await _live_case(session, case_type, key)
+    if case is None and join:
+        case = await _live_overlapping(session, case_type, finding.subject_ids)
     created = case is None
     case_id = await _open_case(session, finding, key, config_version) if case is None else case.id
+    subjects_added = False
+    if case is not None and join:
+        subjects_added = bool(
+            list(
+                await session.scalars(
+                    insert(FlagCaseUser)
+                    .values(
+                        [{"case_id": case_id, "user_id": u} for u in sorted(finding.subject_ids)]
+                    )
+                    .on_conflict_do_nothing()
+                    .returning(FlagCaseUser.user_id)
+                )
+            )
+        )
 
     added = set(
         await session.scalars(
@@ -211,9 +297,8 @@ async def raise_flag(
             ),
         )
 
-    if created or added:
-        row = await _live_case(session, case_type, key)
-        assert row is not None and row.id == case_id
+    if created or added or subjects_added:
+        row = await _case_row(session, case_id)
         all_deeds = set(
             await session.scalars(
                 select(FlagCaseDeed.deed_id).where(FlagCaseDeed.case_id == case_id)

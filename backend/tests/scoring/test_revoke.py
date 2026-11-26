@@ -9,16 +9,18 @@ from typing import Any
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.deeds import service as deeds
+from app.modules.deeds.models import Deed
 from app.modules.fraud._cases import subject_key
 from app.modules.fraud.models import (
     Appeal,
     AppealOutcome,
     DecisionNotice,
     FlagCase,
+    FlagCaseDeed,
     FlagCaseOutcome,
     FlagCaseStatus,
     FlagCaseType,
@@ -50,6 +52,11 @@ async def _hero(session: AsyncSession) -> tuple[Member, Member, int, HeroTitle]:
     for day, reporter in ((6, r1), (7, r2), (8, r1)):
         await counted(session, b, reporter, region_id=kora, verified_at=ist(2026, 9, day), points=5)
     await finalize_month(session, SEP, now=ist(2026, 10, 3))
+    # ``counted`` writes ledger rows only; give a's deeds their September verification time so
+    # a case about them covers the title's month (SEC5-L4, ``fraud.service.case_covers_month``).
+    await session.execute(
+        update(Deed).where(Deed.doer_user_id == a.user_id).values(verified_at=Deed.reported_at)
+    )
     await session.commit()
     title = await session.scalar(
         select(HeroTitle).where(
@@ -69,8 +76,11 @@ async def _case(
     outcome: FlagCaseOutcome | None = FlagCaseOutcome.CONFIRMED,
     notice: bool = True,
     final: bool = True,
+    with_deeds: bool = True,
+    others: tuple[Member, ...] = (),
 ) -> tuple[uuid.UUID, uuid.UUID | None]:
-    """A case about ``user`` and, if ``notice``, their decision notice (final or not)."""
+    """A case about ``user`` (and ``others`` as co-subjects) with, if ``with_deeds``, every deed
+    ``user`` did as case deeds, and, if ``notice``, their decision notice (final or not)."""
     now = datetime.now(UTC)
     resolved = status == FlagCaseStatus.RESOLVED
     case = FlagCase(
@@ -88,7 +98,13 @@ async def _case(
     )
     session.add(case)
     await session.flush()
-    session.add(FlagCaseUser(case_id=case.id, user_id=user.user_id))
+    for subject in (user, *others):
+        session.add(FlagCaseUser(case_id=case.id, user_id=subject.user_id))
+    if with_deeds:
+        for deed_id in await session.scalars(
+            select(Deed.id).where(Deed.doer_user_id == user.user_id)
+        ):
+            session.add(FlagCaseDeed(case_id=case.id, deed_id=deed_id))
     await session.flush()
     notice_id = None
     if notice:
@@ -275,3 +291,53 @@ async def test_user_view_and_badge_revocation(client: AsyncClient, session: Asyn
     assert (event["badge_id"], event["badge_slug"]) == (str(badge.id), slug)
     status, out = await _revoke(client, adm, badge.id, case_id, kind="badges")
     assert (status, out["code"]) == (409, "already_revoked")
+
+
+# --------------------------------------------------- SEC5-L4
+
+
+async def test_title_needs_a_case_about_its_month(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """A confirmed, final case with no deed verified in September can't revoke September's
+    title (409 ``case_not_for_this_month``); badges have no month."""
+    a, _, _, title = await _hero(session)
+    adm, decider = await admin(session), await admin(session)
+    no_deeds, _ = await _case(session, a, decider, with_deeds=False)
+    status, body = await _revoke(client, adm, title.id, no_deeds)
+    assert (status, body["code"]) == (409, "case_not_for_this_month")
+    await session.refresh(title)
+    assert title.revoked_at is None
+
+    _, config = await load_leaderboard(session)
+    badge = UserBadge(user_id=a.user_id, badge_slug=config.badges[0].slug, config_version=1)
+    session.add(badge)
+    await session.commit()
+    status, body = await _revoke(client, adm, badge.id, no_deeds, kind="badges")
+    assert status == 200, body
+
+
+async def test_admin_related_to_another_subject_gets_404(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """The admin has no deed with the title owner, but recognised a co-subject of the case:
+    conflicted with the case, so 404 as for an unknown title or badge (D90)."""
+    a, _, _, title = await _hero(session)
+    decider, related = await admin(session), await admin(session)
+    (partner,) = await members(session, 1)
+    await scan_and_report(session, related, partner)
+    await session.commit()
+    case_id, _ = await _case(session, a, decider, others=(partner,))
+
+    status, body = await _revoke(client, related, title.id, case_id)
+    assert (status, body["code"]) == (404, "title_not_found")
+    _, config = await load_leaderboard(session)
+    badge = UserBadge(user_id=a.user_id, badge_slug=config.badges[0].slug, config_version=1)
+    session.add(badge)
+    await session.commit()
+    status, body = await _revoke(client, related, badge.id, case_id, kind="badges")
+    assert (status, body["code"]) == (404, "badge_not_found")
+
+    # A non-conflicted admin may revoke with the same case.
+    status, body = await _revoke(client, decider, title.id, case_id)
+    assert status == 200, body

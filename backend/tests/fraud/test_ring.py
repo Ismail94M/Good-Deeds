@@ -52,7 +52,13 @@ async def test_three_cycle_opens_one_case_whichever_edge_closes_it(
 
     [case] = await cases_for(session, RING, *people)
     assert await case_deeds(session, case.id) == set(made.values())
-    assert case.signal == {"size": 3, "internal_share_pct": 100, "edges": 3}
+    assert case.signal == {
+        "size": 3,
+        "internal_share_pct": 100,
+        "edges": 3,
+        "cycles": 1,
+        "capped": False,
+    }
     assert case.held_count == 0
     assert await session.scalar(select(func.count()).select_from(PrizeHold)) == 0
     # No pair recognised each other both ways, so no reciprocal case.
@@ -141,8 +147,8 @@ async def test_two_cycles_are_reciprocal_only(session: AsyncSession) -> None:
 async def test_truncated_search_flags_nothing_and_the_sweep_records_it(
     session: AsyncSession,
 ) -> None:
-    # Closing edge C -> A: the search loads A's out-edge, B's out-edge, then C's: 3 > 2.
-    await publish_fraud(session, ring={"max_search_edges": 2})
+    # The search needs more than 2 edges (and the sweep's retry budget is as small).
+    await publish_fraud(session, ring={"max_search_edges": 2, "retry_max_search_edges": 2})
     people = await members(session, 3)
     made = await _cycle(session, people, [0, 1, 2], days_ago(10))
     await run_fraud(session, *made.values())
@@ -161,7 +167,7 @@ async def test_truncated_search_flags_nothing_and_the_sweep_records_it(
     assert await cases_for(session, RING, *people) == []
 
     # With room to search, the same sweep finds it.
-    await publish_fraud(session, ring={"max_search_edges": 5000})
+    await publish_fraud(session, ring={"max_search_edges": 5000, "retry_max_search_edges": 5000})
     run = await run_sweep(
         session,
         ring,

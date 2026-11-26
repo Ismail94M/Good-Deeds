@@ -669,43 +669,51 @@ function DeedsCard({ deeds }: { deeds: CaseDeed[] }) {
   return (
     <ReviewCard title={`Deeds (${deeds.length})`}>
       <ul className="flex flex-col">
-        {deeds.map((deed, index) => (
-          <li
-            key={deed.deed_id}
-            className={`flex flex-col gap-1 ${index > 0 ? 'mt-2.5 border-t border-slate-200 pt-2.5' : ''}`}
-          >
-            <p className="font-semibold break-words text-slate-900">
-              {deed.reporter.display_name} → {deed.doer.display_name}
-            </p>
-            <p className="text-sm text-slate-600">
-              {deed.category_label} · {deed.area_name}
-              {deed.verified_at ? ` · Verified ${formatShortDate(deed.verified_at)}` : ''}
-            </p>
-            {deed.description && (
-              <p className="line-clamp-3 text-sm break-words text-slate-700">
-                “{deed.description}”
-              </p>
-            )}
-            <div className="flex flex-wrap gap-1.5">
-              <Chip>{STATUS_WORDS[deed.status] ?? deed.status}</Chip>
-              {!deed.counts_for_points && <Chip>Not counted for points</Chip>}
-              {deed.held && <Chip tone="amber">Held</Chip>}
-              {deed.independent_witness && <Chip tone="green">Independent witness too</Chip>}
-              {deed.outcome && (
-                <Chip tone={deed.outcome === 'release' ? 'green' : 'red'}>
-                  {OUTCOME_LABELS[deed.outcome]}
-                </Chip>
-              )}
-            </div>
-            <Link
-              to={deedHref(deed.deed_id)}
-              className={`${linkClass} self-start text-sm`}
-              aria-label={`Points and overrides for ${deed.reporter.display_name} → ${deed.doer.display_name}, ${deed.category_label}`}
+        {deeds.map((deed, index) => {
+          // Each fact is shown once: a rejected deed reads "Rejected", not "Rejected · Held · Rejected".
+          const rejected = deed.status === 'rejected'
+          return (
+            <li
+              key={deed.deed_id}
+              className={`flex flex-col gap-1 ${index > 0 ? 'mt-2.5 border-t border-slate-200 pt-2.5' : ''}`}
             >
-              Points and overrides
-            </Link>
-          </li>
-        ))}
+              <p className="font-semibold break-words text-slate-900">
+                {deed.reporter.display_name} → {deed.doer.display_name}
+              </p>
+              <p className="text-sm text-slate-600">
+                {deed.category_label} · {deed.area_name}
+                {deed.verified_at ? ` · Verified ${formatShortDate(deed.verified_at)}` : ''}
+              </p>
+              {deed.description && (
+                <p className="line-clamp-3 text-sm break-words text-slate-700">
+                  “{deed.description}”
+                </p>
+              )}
+              <div className="flex flex-wrap gap-1.5">
+                <Chip tone={rejected ? 'red' : 'grey'}>
+                  {STATUS_WORDS[deed.status] ?? deed.status}
+                </Chip>
+                {!deed.counts_for_points && <Chip>Not counted for points</Chip>}
+                {/* Once rejected, a hold no longer matters (D80: it becomes moot). */}
+                {deed.held && !rejected && <Chip tone="amber">Held</Chip>}
+                {deed.independent_witness && <Chip tone="green">Independent witness too</Chip>}
+                {/* "Rejected" outcome on a rejected deed would repeat the status chip. */}
+                {deed.outcome && !(rejected && deed.outcome === 'reject') && (
+                  <Chip tone={deed.outcome === 'release' ? 'green' : 'red'}>
+                    {OUTCOME_LABELS[deed.outcome]}
+                  </Chip>
+                )}
+              </div>
+              <Link
+                to={deedHref(deed.deed_id)}
+                className={`${linkClass} self-start text-sm`}
+                aria-label={`Points and overrides for ${deed.reporter.display_name} → ${deed.doer.display_name}, ${deed.category_label}`}
+              >
+                Points and overrides
+              </Link>
+            </li>
+          )
+        })}
       </ul>
     </ReviewCard>
   )

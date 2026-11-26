@@ -65,7 +65,13 @@ class ReciprocalRules(_Frozen):
 class RingRules(_Frozen):
     """D84: cycles of ``min_size``..``max_size`` people in ``window_days``, each edge with at
     least ``min_edge_deeds`` deeds, whose members received at least ``min_internal_share_pct`` of
-    their deeds from each other. The search loads at most ``max_search_edges`` deed edges."""
+    their deeds from each other.
+
+    Bounds of one check (SEC5-M5, M6; Q81): at most ``max_search_edges`` deed edges loaded and
+    ``max_queries_per_check`` edge reads (a check past either is *truncated* and flags nothing);
+    at most ``max_cycles`` cycles evaluated and ``max_group_size`` people in one finding (the
+    finding is then marked ``capped``). The nightly sweep re-runs a truncated check with
+    ``retry_max_search_edges``."""
 
     window_days: WindowDays
     min_size: int = Field(ge=3)
@@ -73,11 +79,22 @@ class RingRules(_Frozen):
     min_edge_deeds: int = Field(ge=1)
     min_internal_share_pct: Percent
     max_search_edges: int = Field(ge=1, le=1_000_000)
+    max_queries_per_check: int = Field(ge=3, le=50)
+    max_cycles: int = Field(ge=1, le=100_000)
+    max_group_size: int = Field(ge=3, le=500)
+    retry_max_search_edges: int = Field(ge=1, le=1_000_000)
 
     @model_validator(mode="after")
     def _valid(self) -> Self:
         if self.min_size > self.max_size:
             raise ValueError("ring.min_size must not exceed ring.max_size")
+        if self.max_group_size < self.max_size:
+            raise ValueError("ring.max_group_size must be at least ring.max_size")
+        # One read per hop (max_size - 1) plus the internal-share read.
+        if self.max_queries_per_check < self.max_size:
+            raise ValueError("ring.max_queries_per_check must be at least ring.max_size")
+        if self.retry_max_search_edges < self.max_search_edges:
+            raise ValueError("ring.retry_max_search_edges must be at least max_search_edges")
         return self
 
 
@@ -137,6 +154,12 @@ class FraudConfig(RuntimeConfig):
     page_size: int = Field(gt=0, le=200)
     rate_admin_read: str = Field(pattern=RATE_SPEC)
     rate_admin_write: str = Field(pattern=RATE_SPEC)
+    # ``/api/reviews`` (SEC5-L5): a member's reads and writes (reply, appeal), per account.
+    rate_member_read: str = Field(pattern=RATE_SPEC)
+    rate_member_write: str = Field(pattern=RATE_SPEC)
+    # The nightly sweep and the CLI work in chunks of at most this many trigger deeds, one
+    # transaction each (SEC5-L7).
+    sweep_chunk_edges: int = Field(ge=1, le=100_000)
 
     @model_validator(mode="after")
     def _valid(self) -> Self:

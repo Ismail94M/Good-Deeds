@@ -346,6 +346,8 @@ SCORING_FROM_FRAUD = frozenset(
         "CaseStanding",
         "override_rules",
         "OverrideRules",
+        "case_has_subject",
+        "case_covers_month",
     }
 )
 # deeds imports only the event it subscribes to, and only in deeds/handlers.py.

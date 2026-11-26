@@ -11,8 +11,9 @@ M5: ``DeedHoldChanged`` (``fraud.service``) re-scores a deed whose prize hold wa
 released (docs/M5-DESIGN.md D79); ``reconcile_deed`` reads the hold itself, so the event's
 ``held`` flag is never trusted and a late or repeated event changes nothing.
 ``AppealDecided`` (``fraud.service``): an overturned appeal against an override notice clears
-that override (D100, ``_overrides.clear_for_appeal``), which is a no-op when it is no longer the
-one in force.
+that override (D100, ``_overrides.clear_for_appeal``). When it is no longer the one in force
+nothing is cleared and no event is emitted; only an audit row
+``deed_points.appeal_overturn_noop`` records it (SEC5-L2).
 """
 
 from datetime import UTC, datetime, timedelta
@@ -70,7 +71,7 @@ async def clear_overturned_override(session: AsyncSession, event: AppealDecided)
         return
     if event.override_id is None:
         return
-    await clear_for_appeal(session, event.override_id, event.reviewer_id)
+    await clear_for_appeal(session, event.override_id, event.reviewer_id, appeal_id=event.appeal_id)
 
 
 @subscribe(DeedEdited)

@@ -74,6 +74,32 @@ function makeReviews(overrides: Partial<MyReviews> = {}): MyReviews {
   }
 }
 
+function rejectedDeed(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'deed-2',
+    status: 'rejected',
+    verification_method: 'qr',
+    category: 'cleaning',
+    description: 'Cleaned the park',
+    beneficiaries_count: null,
+    occurred_at: '2026-11-05T06:00:00Z',
+    reported_at: '2026-11-05T06:00:00Z',
+    verified_at: '2026-11-05T06:01:00Z',
+    withdrawn_at: null,
+    last_edited_at: null,
+    reporter: { handle: 'asha', display_name: 'Asha' },
+    doer: RAVI,
+    same_act: null,
+    prize_rank_eligible: false,
+    has_location: true,
+    area_name: 'Indiranagar',
+    can_edit: false,
+    can_withdraw: false,
+    withdrawable_until: null,
+    ...overrides,
+  }
+}
+
 function base(extra: Parameters<typeof mockApi>[0] = {}) {
   return mockApi({
     ...signedIn(makeMe()),
@@ -309,34 +335,41 @@ describe('Profile dot and links', () => {
   })
 
   it('links a rejected deed in My deeds to its notice as "Removed after review"', async () => {
-    const deed = {
-      id: 'deed-2',
-      status: 'rejected',
-      verification_method: 'qr',
-      category: 'cleaning',
-      description: 'Cleaned the park',
-      beneficiaries_count: null,
-      occurred_at: '2026-11-05T06:00:00Z',
-      reported_at: '2026-11-05T06:00:00Z',
-      verified_at: '2026-11-05T06:01:00Z',
-      withdrawn_at: null,
-      last_edited_at: null,
-      reporter: { handle: 'asha', display_name: 'Asha' },
-      doer: RAVI,
-      same_act: null,
-      prize_rank_eligible: false,
-      has_location: true,
-      area_name: 'Indiranagar',
-      can_edit: false,
-      can_withdraw: false,
-      withdrawable_until: null,
-    }
     base({
       'GET /deeds/options': { body: makeOptions() },
-      'GET /me/deeds': { body: { items: [deed], next_cursor: null } },
+      'GET /me/deeds': { body: { items: [rejectedDeed()], next_cursor: null } },
     })
     renderApp('/me/deeds?tab=reported')
     const link = await screen.findByRole('link', { name: 'Removed after review' })
     await waitFor(() => expect(link).toHaveAttribute('href', '/me/reviews#notice-no-1'))
+  })
+
+  it('shows the doer their rejected deed under Recognised for, linked to its notice', async () => {
+    // D101: the doer sees it too (the API lists `rejected` for role=doer, owner-only).
+    const notice = makeNotice({
+      id: 'no-7',
+      items: [
+        {
+          deed: { ...makeNotice().items[0].deed, deed_id: 'deed-2', role: 'doer' },
+          effect_text: 'Removed',
+        },
+      ],
+    })
+    const api = base({
+      'GET /reviews': { body: makeReviews({ notices: [notice] }) },
+      'GET /deeds/options': { body: makeOptions() },
+      'GET /me/deeds': {
+        body: {
+          items: [rejectedDeed({ reporter: RAVI, doer: { handle: 'asha', display_name: 'Asha' } })],
+          next_cursor: null,
+        },
+      },
+    })
+    renderApp('/me/deeds')
+    expect(await screen.findByText('Ravi Kumar recognised you')).toBeInTheDocument()
+    const link = screen.getByRole('link', { name: 'Removed after review' })
+    await waitFor(() => expect(link).toHaveAttribute('href', '/me/reviews#notice-no-7'))
+    expect(api.calls('GET /me/deeds')[0].query.get('role')).toBe('doer')
+    expect(document.body.textContent?.toLowerCase()).not.toContain('fraud')
   })
 })

@@ -3,7 +3,8 @@
 Other modules may import only this file from fraud, and only what D78 lists:
 ``scoring`` -> ``DeedHoldChanged``, ``AppealDecided``, ``held_deed_ids``, ``is_held``,
 ``confirmed_case_for_user`` (and ``concentration_rule``, D97; ``override_rules`` and
-``case_standing`` for overrides and revocations, D91, D92); ``deeds`` -> ``FlagDecisionFinal``.
+``case_standing``, ``case_has_subject`` and ``case_covers_month`` for overrides and revocations,
+D91, D92, SEC5-L3, L4); ``deeds`` -> ``FlagDecisionFinal``.
 ``tests/test_architecture.py`` enforces the lists. This file imports nothing from ``scoring``.
 
 Nothing here may reach a public or member response: flags are private (D95).
@@ -12,11 +13,13 @@ Nothing here may reach a public or member response: flags are private (D95).
 import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import date, datetime, timedelta
 from typing import Literal
 
 from sqlalchemy import exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.deeds.service import get_deeds
 from app.modules.fraud._limits import load_fraud
 from app.modules.fraud.events import (
     AppealDecided,
@@ -30,11 +33,15 @@ from app.modules.fraud.models import (
     AppealOutcome,
     DecisionNotice,
     FlagCase,
+    FlagCaseDeed,
     FlagCaseOutcome,
     FlagCaseStatus,
     FlagCaseUser,
+    NoticeKind,
     PrizeHold,
 )
+
+CaseStanding = Literal["unknown", "not_confirmed", "not_final", "final"]
 
 __all__ = [
     "AppealDecided",
@@ -45,6 +52,8 @@ __all__ = [
     "FlagDecisionFinal",
     "FlagRaised",
     "OverrideRules",
+    "case_covers_month",
+    "case_has_subject",
     "case_standing",
     "concentration_rule",
     "confirmed_case_for_user",
@@ -76,36 +85,111 @@ async def held_deed_ids(session: AsyncSession, deed_ids: Iterable[uuid.UUID]) ->
     return set(rows)
 
 
+async def _notice_states(
+    session: AsyncSession, case_id: uuid.UUID
+) -> dict[uuid.UUID, tuple[bool, bool, bool]]:
+    """Subject -> (final, appeal open, overturned) of their notice in ``case_id``."""
+    out: dict[uuid.UUID, tuple[bool, bool, bool]] = {}
+    for user_id, final_at, appeal_id, outcome in await session.execute(
+        select(DecisionNotice.user_id, DecisionNotice.final_at, Appeal.id, Appeal.outcome)
+        .outerjoin(Appeal, Appeal.notice_id == DecisionNotice.id)
+        .where(DecisionNotice.case_id == case_id, DecisionNotice.kind == NoticeKind.CASE)
+    ):
+        appeal_open = appeal_id is not None and outcome is None
+        out[user_id] = (
+            final_at is not None and not appeal_open,
+            appeal_open,
+            outcome == AppealOutcome.OVERTURNED,
+        )
+    return out
+
+
+async def _co_parties(
+    session: AsyncSession, case_id: uuid.UUID, user_id: uuid.UUID
+) -> set[uuid.UUID]:
+    """The other subjects of ``case_id`` who share a case deed with ``user_id`` (the other
+    party on it), whose decision is part of "final for everyone on it" (D100)."""
+    subjects = set(
+        await session.scalars(select(FlagCaseUser.user_id).where(FlagCaseUser.case_id == case_id))
+    )
+    deed_ids = set(
+        await session.scalars(select(FlagCaseDeed.deed_id).where(FlagCaseDeed.case_id == case_id))
+    )
+    parties: set[uuid.UUID] = set()
+    for view in (await get_deeds(session, deed_ids)).values():
+        people = {p for p in (view.reporter_id, view.doer_id) if p is not None}
+        if user_id in people:
+            parties |= people
+    return (parties & subjects) - {user_id}
+
+
+async def case_standing(
+    session: AsyncSession, case_id: uuid.UUID, user_id: uuid.UUID
+) -> CaseStanding:
+    """Where ``case_id`` stands for ``user_id`` (D91, D92, D100), so scoring can tell its
+    errors apart:
+
+    - ``unknown``: no such case;
+    - ``not_confirmed``: not resolved ``confirmed``, the user is not a subject with an adverse
+      outcome (no case notice), or the appeal of the user or of a co-subject who shares deeds
+      with them in the case was overturned (an overturn restores the shared deeds, so it blocks
+      revocation for that case, D100);
+    - ``not_final``: confirmed, but the appeal window of the user or of such a co-subject is
+      still open, or one of their appeals is pending (SEC5-M4);
+    - ``final``: the decision is final for everyone on the user's deeds."""
+    case = await session.get(FlagCase, case_id)
+    if case is None:
+        return "unknown"
+    if case.status != FlagCaseStatus.RESOLVED or case.outcome != FlagCaseOutcome.CONFIRMED:
+        return "not_confirmed"
+    states = await _notice_states(session, case_id)
+    own = states.get(user_id)
+    if own is None:
+        return "not_confirmed"
+    # Co-parties without a notice had no adverse outcome: nothing of theirs can be appealed.
+    involved = [own] + [
+        states[p] for p in await _co_parties(session, case_id, user_id) if p in states
+    ]
+    if any(overturned for _, _, overturned in involved):
+        return "not_confirmed"
+    return "final" if all(final for final, _, _ in involved) else "not_final"
+
+
 async def confirmed_case_for_user(
     session: AsyncSession, case_id: uuid.UUID, user_id: uuid.UUID
 ) -> bool:
-    """Whether ``case_id`` lets an admin revoke ``user_id``'s titles and badges (D92): resolved
-    ``confirmed``, the user is a subject with an adverse outcome (a case notice is written only
-    for those), and the decision is final for them (D100: the notice's ``final_at`` is set) and
-    was not overturned on appeal."""
-    overturned = exists().where(
-        Appeal.notice_id == DecisionNotice.id, Appeal.outcome == AppealOutcome.OVERTURNED
-    )
+    """Whether ``case_id`` lets an admin revoke ``user_id``'s titles and badges (D92, D100):
+    resolved ``confirmed``, the user is a subject with an adverse outcome (a case notice), and
+    the decision is final for the user **and** for every co-subject who shares a case deed with
+    them: each such notice is final with no appeal pending, and none was overturned (SEC5-M4).
+    The same as ``case_standing(...) == "final"``."""
+    return await case_standing(session, case_id, user_id) == "final"
+
+
+async def case_has_subject(session: AsyncSession, case_id: uuid.UUID, user_id: uuid.UUID) -> bool:
+    """Whether ``user_id`` is a subject of ``case_id`` (false for an unknown case)."""
     found = await session.scalar(
-        select(
-            exists()
-            .where(
-                FlagCase.id == case_id,
-                FlagCase.status == FlagCaseStatus.RESOLVED,
-                FlagCase.outcome == FlagCaseOutcome.CONFIRMED,
-            )
-            .where(exists().where(FlagCaseUser.case_id == case_id, FlagCaseUser.user_id == user_id))
-            .where(
-                exists().where(
-                    DecisionNotice.case_id == case_id,
-                    DecisionNotice.user_id == user_id,
-                    DecisionNotice.final_at.is_not(None),
-                    ~overturned,
-                )
-            )
-        )
+        select(exists().where(FlagCaseUser.case_id == case_id, FlagCaseUser.user_id == user_id))
     )
     return bool(found)
+
+
+async def case_covers_month(session: AsyncSession, case_id: uuid.UUID, period_month: date) -> bool:
+    """Whether any deed of ``case_id`` was verified in the calendar month of ``period_month``
+    in the ``fraud`` config's time zone (IST), so a title of that month may be revoked for it
+    (SEC5-L4)."""
+    _, config = await load_fraud(session)
+    zone = config.zone
+    start = datetime(period_month.year, period_month.month, 1, tzinfo=zone)
+    end = (start + timedelta(days=32)).replace(day=1)
+    deed_ids = set(
+        await session.scalars(select(FlagCaseDeed.deed_id).where(FlagCaseDeed.case_id == case_id))
+    )
+    for view in (await get_deeds(session, deed_ids)).values():
+        at = view.verified_at
+        if at is not None and start <= at.astimezone(zone) < end:
+            return True
+    return False
 
 
 async def open_case_user_ids(
@@ -147,41 +231,6 @@ async def concentration_rule(session: AsyncSession) -> ConcentrationRule:
         min_doer_points=config.concentration.min_doer_points,
         config_version=version,
     )
-
-
-CaseStanding = Literal["unknown", "not_confirmed", "not_final", "final"]
-
-
-async def case_standing(
-    session: AsyncSession, case_id: uuid.UUID, user_id: uuid.UUID
-) -> CaseStanding:
-    """Where ``case_id`` stands for ``user_id`` (D91, D92), so scoring can tell its errors apart:
-    ``unknown`` (no such case), ``not_confirmed`` (not resolved ``confirmed``, the user is not a
-    subject with an adverse outcome, or their appeal was overturned), ``not_final`` (confirmed,
-    but the appeal window is open or an appeal is pending, D100) or ``final`` (the same as
-    ``confirmed_case_for_user``)."""
-    case = await session.get(FlagCase, case_id)
-    if case is None:
-        return "unknown"
-    if case.status != FlagCaseStatus.RESOLVED or case.outcome != FlagCaseOutcome.CONFIRMED:
-        return "not_confirmed"
-    notice = await session.scalar(
-        select(DecisionNotice).where(
-            DecisionNotice.case_id == case_id, DecisionNotice.user_id == user_id
-        )
-    )
-    if notice is None:
-        return "not_confirmed"
-    overturned = await session.scalar(
-        select(
-            exists().where(
-                Appeal.notice_id == notice.id, Appeal.outcome == AppealOutcome.OVERTURNED
-            )
-        )
-    )
-    if overturned:
-        return "not_confirmed"
-    return "final" if notice.final_at is not None else "not_final"
 
 
 @dataclass(frozen=True)

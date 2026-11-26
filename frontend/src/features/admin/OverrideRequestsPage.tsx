@@ -92,7 +92,7 @@ export function OverrideRequestsPage() {
       </div>
       <p className="text-sm text-slate-600">
         {tab === 'pending'
-          ? 'Cuts to 0 and big cuts need a second admin. Nothing changes until one approves.'
+          ? 'Big changes to points, and cuts to 0, need a second admin. Nothing changes until one approves.'
           : 'Most recently decided first.'}
       </p>
       {notice && (
@@ -275,7 +275,7 @@ function DecideDialog({
   const busy = mutation.isPending
   return (
     <AdminDialog
-      title={approve ? 'Approve this cut?' : 'Decline this cut?'}
+      title={approve ? 'Approve this change?' : 'Decline this change?'}
       onDismiss={onCancel}
       busy={busy}
     >

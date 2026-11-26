@@ -85,6 +85,8 @@ class MemoryEdges:
                 for e in edges:
                     if since <= e.verified_at <= until:
                         found[e.deed_id] = e
+            if limit is not None and len(found) > limit:
+                break  # over the caller's limit already: stop collecting (SEC5-L7)
         result = sorted(found.values(), key=_order)
         return result if limit is None else result[:limit]
 

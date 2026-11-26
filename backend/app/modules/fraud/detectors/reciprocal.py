@@ -80,27 +80,34 @@ class ReciprocalDetector:
     async def sweep(
         self, session: AsyncSession, window: SweepWindow, config: FraudConfig
     ) -> SweepResult:
-        """Every deed verified in the window, checked as if just verified."""
+        """Every deed verified in the window, checked as if just verified. Reads the window's
+        deeds, then (one read) the out-edges of their people back to ``window_days`` before it:
+        everything ``check_pair`` needs, without loading the whole graph (SEC5-L7)."""
         rules = config.reciprocal
+        triggers = await verified_edges(session, since=window.since, until=window.until)
+        people = {u for e in triggers for u in (e.reporter_id, e.doer_id)}
         edges = await verified_edges(
-            session, since=window.since - timedelta(days=rules.window_days), until=window.until
+            session,
+            since=window.since - timedelta(days=rules.window_days),
+            until=window.until,
+            user_ids=people,
+            match="reporter",
         )
         directions: defaultdict[frozenset[uuid.UUID], set[uuid.UUID]] = defaultdict(set)
         for e in edges:
             directions[frozenset({e.reporter_id, e.doer_id})].add(e.reporter_id)
         source = MemoryEdges(edges)
         findings: list[Finding] = []
-        for e in edges:
+        for e in triggers:
             # Only pairs with deeds both ways can match; skip the rest without a lookup.
-            if (
-                e.verified_at < window.since
-                or len(directions[frozenset({e.reporter_id, e.doer_id})]) < 2
-            ):
+            if len(directions[frozenset({e.reporter_id, e.doer_id})]) < 2:
                 continue
             finding = await check_pair(source, e, rules)
             if finding is not None:
                 findings.append(finding)
-        return SweepResult(findings=merge_findings(findings), edges_scanned=len(edges))
+        return SweepResult(
+            findings=merge_findings(findings), edges_scanned=len(triggers) + len(edges)
+        )
 
     def sweep_days(self, config: FraudConfig) -> int:
         return config.reciprocal.window_days

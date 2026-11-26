@@ -132,6 +132,8 @@ class AppealOutcome(StrEnum):
 class DetectorRunTrigger(StrEnum):
     SWEEP = "sweep"
     CLI = "cli"
+    # A per-deed check that was truncated (SEC5-M6, migration 0029); only those are recorded.
+    EVENT = "event"
 
 
 class DetectorRunStatus(StrEnum):
@@ -438,8 +440,30 @@ class Appeal(Base):
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class FlagRejectionSent(Base):
+    """A ``reject`` outcome already sent to ``deeds`` in a ``FlagDecisionFinal`` event (SEC5-L6,
+    migration 0029): ``finalize_decisions`` reads only outcomes without one, so it never re-sends
+    a deed and doesn't depend on outbox rows being kept. Insert-only."""
+
+    __tablename__ = "flag_rejections_sent"
+    __table_args__ = (
+        PrimaryKeyConstraint("case_id", "deed_id", name="pk_flag_rejections_sent"),
+        ForeignKeyConstraint(
+            ["case_id", "deed_id"],
+            ["flag_case_deed_outcomes.case_id", "flag_case_deed_outcomes.deed_id"],
+            name="fk_flag_rejections_sent_outcome",
+            ondelete="RESTRICT",
+        ),
+    )
+
+    case_id: Mapped[uuid.UUID]
+    deed_id: Mapped[uuid.UUID]
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class FraudDetectorRun(Base):
-    """One sweep or CLI run of a detector (D82). Per-deed handler runs are not logged here.
+    """One sweep or CLI run of a detector (D82), or one truncated per-deed check (trigger
+    ``event``, SEC5-M6); other per-deed checks are not logged here.
     ``detector`` is a plain name, not an enum: detectors are plug-ins (D102), so adding one needs
     no migration."""
 
