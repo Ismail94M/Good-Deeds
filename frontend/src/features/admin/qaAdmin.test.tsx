@@ -46,7 +46,9 @@ describe('photo reports: chips (Q44)', () => {
       },
     })
     renderApp('/admin/photo-reports')
-    await screen.findByRole('tab', { name: 'Open · 1' })
+    // The first query waits for the auth refresh, `/users/me` and the admin route to mount,
+    // which can pass the 1 s default under full-suite load.
+    await screen.findByRole('tab', { name: 'Open · 1' }, { timeout: 5000 })
     // Wait for the report row itself (its reason text), not for whichever list item renders
     // first, so the check never runs against a half-rendered page.
     const reason = await screen.findByText('It’s inappropriate or harmful')

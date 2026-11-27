@@ -1,5 +1,6 @@
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router'
+import { Avatar } from '../media/avatar/Avatar'
 import { ErrorAlert, Loading } from '../../components/ui'
 import { formatAge } from './adminFormat'
 import { AdminMain, AdminTitle } from './adminUi'
@@ -151,8 +152,14 @@ function CaseQueueRow({ row, options }: { row: CaseRow; options: FraudOptions | 
         <span className="font-semibold break-words">{row.summary}</span>
       </div>
       <div className="min-w-0 text-sm text-slate-600">
-        <span className="block font-medium break-words text-slate-900">
-          {namesLine(row.users, row.user_count)}
+        <span className="flex items-center gap-2 font-medium break-words text-slate-900">
+          {/* M6 §6.2 (D124): the subjects' avatars, up to 3, overlapping. */}
+          <span aria-hidden className="flex shrink-0 -space-x-2">
+            {row.users.slice(0, 3).map((u) => (
+              <Avatar key={u.handle} user={u} size="xs" className="ring-2 ring-white" />
+            ))}
+          </span>
+          <span className="min-w-0">{namesLine(row.users, row.user_count)}</span>
         </span>
         {row.deed_count === 1 ? '1 deed' : `${row.deed_count} deeds`} · {row.held_count} held
         <span className="block">
