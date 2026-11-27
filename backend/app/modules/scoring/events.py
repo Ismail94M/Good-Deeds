@@ -2,8 +2,9 @@
 
 Payloads are IDs, codes and numbers only (no names, text or locations). Nothing subscribed in M4;
 M6 (notifications) will. From M5, ``fraud`` subscribes to ``ReporterConcentrationExceeded`` and
-``DeedNeedsReview`` (docs/M5-DESIGN.md §5, D78) and ``PointsOverridden`` (D100), which it imports
-through ``scoring.service``. ``HeroTitleRevoked`` and ``BadgeRevoked`` have no subscriber yet (M6).
+``DeedNeedsReview`` (docs/M5-DESIGN.md §5, D78), ``PointsOverridden`` (D100) and
+``OverrideAppealApplied`` (D100), which it imports through ``scoring.service``.
+``HeroTitleRevoked`` and ``BadgeRevoked`` have no subscriber yet (M6).
 """
 
 import uuid
@@ -101,6 +102,24 @@ class PointsOverridden(DomainEvent):
     # The admin who asked for a big cut that a second admin approved (Q77); None for a direct
     # override. Neither of them may decide an appeal against it.
     requested_by_id: uuid.UUID | None = None
+    # The case the override cites, if any (added after M5 review N3, with a default so older
+    # events still load). ``fraud`` copies it into the notice's audit row, so admins conflicted
+    # with the case don't see it in the audit view (Q82).
+    case_id: uuid.UUID | None = None
+
+
+class OverrideAppealApplied(DomainEvent):
+    """Scoring handled an overturned appeal against an override notice (D100, review N1):
+    ``restored`` is true only when the clearing override really gave points back. It is false
+    when a later decision had already changed the points (nothing cleared, SEC5-L2) or the
+    clear changed nothing. ``fraud`` records it so the member's notice says which happened."""
+
+    event_type = "scoring.override_appeal_applied"
+    appeal_id: uuid.UUID
+    override_id: uuid.UUID
+    deed_id: uuid.UUID | None
+    restored: bool
+    case_id: uuid.UUID | None = None
 
 
 class HeroTitleRevoked(DomainEvent):

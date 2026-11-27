@@ -12,6 +12,8 @@ case per (type, subjects), so a repeated event changes nothing. Opening a case h
 
 ``PointsOverridden`` (scoring lowered someone's points with an override, D91) becomes a decision
 notice the person can appeal (D100); one per (override, person), so a retry adds nothing.
+``OverrideAppealApplied`` (scoring handled an overturned override appeal) is kept as an audit
+row, so the notice says whether points came back (review N1).
 """
 
 from datetime import UTC, datetime
@@ -23,11 +25,12 @@ from app.modules.deeds.service import DeedVerified
 from app.modules.fraud._cases import raise_flag
 from app.modules.fraud._detect import run_on_event
 from app.modules.fraud._limits import load_fraud
-from app.modules.fraud._notices import create_override_notice
+from app.modules.fraud._notices import create_override_notice, record_override_appeal
 from app.modules.fraud.detectors.base import Finding
 from app.modules.fraud.models import FlagCaseType
 from app.modules.scoring.service import (
     DeedNeedsReview,
+    OverrideAppealApplied,
     PointsOverridden,
     ReporterConcentrationExceeded,
 )
@@ -96,6 +99,20 @@ async def notify_points_overridden(session: AsyncSession, event: PointsOverridde
         reason_code=event.reason_code,
         actor_id=event.actor_id,
         requested_by_id=event.requested_by_id,
+        case_id=event.case_id,
         config=config,
         now=datetime.now(UTC),
+    )
+
+
+@subscribe(OverrideAppealApplied)
+async def note_override_appeal(session: AsyncSession, event: OverrideAppealApplied) -> None:
+    """Whether the overturn gave the points back (review N1)."""
+    await record_override_appeal(
+        session,
+        appeal_id=event.appeal_id,
+        override_id=event.override_id,
+        deed_id=event.deed_id,
+        restored=event.restored,
+        case_id=event.case_id,
     )

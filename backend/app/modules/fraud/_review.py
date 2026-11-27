@@ -127,6 +127,15 @@ def _ref(people: Mapping[uuid.UUID, _Named], user_id: uuid.UUID | None) -> UserR
     return UserRef(handle=summary.handle, display_name=summary.display_name)
 
 
+def _count(n: int, word: str) -> str:
+    """``1 day``, ``3 days``."""
+    return f"{n} {word}" if n == 1 else f"{n} {word}s"
+
+
+def _times(n: int) -> str:
+    return "once" if n == 1 else f"{n} times"
+
+
 def _names(names: Sequence[str]) -> str:
     if len(names) <= 1:
         return "".join(names)
@@ -274,16 +283,19 @@ def _summary(
         return _ref(people, user_id).display_name or "Someone"
 
     names = sorted(name(u) for u in subjects)
+    # Without any subject's name, a sentence would start with "between" or a lowercase word.
+    named = any(_ref(people, u).display_name for u in subjects)
     signal = case.signal or {}
     times = [v.verified_at for v in views if v.verified_at is not None]
     n = case.deed_count
-    if case.type == FlagCaseType.RECIPROCAL:
+    neutral = f"Unusual pattern: {_count(n, 'deed')}"
+    if case.type == FlagCaseType.RECIPROCAL and named:
         days = max(1, math.ceil((max(times) - min(times)) / (24 * _HOUR))) if times else 1
-        return f"{_names(names)} recognised each other {n} times in {days} days"
-    if case.type == FlagCaseType.RING:
+        return f"{_names(names)} recognised each other {_times(n)} in {_count(days, 'day')}"
+    if case.type == FlagCaseType.RING and named:
         share = signal.get("internal_share_pct")
         tail = f", {share}% of what they received came from each other" if share else ""
-        return f"{_names(names)} recognised each other in a ring ({n} deeds){tail}"
+        return f"{_names(names)} recognised each other in a ring ({_count(n, 'deed')}){tail}"
     if case.type == FlagCaseType.CONCENTRATION and views:
         doer = views[0].doer_id
         reporters = [u for u in subjects if u != doer]
@@ -295,7 +307,9 @@ def _summary(
         return f"{share} of {name(doer)}'s leaderboard points{when} came from {reporter}"
     if case.type == FlagCaseType.CONTENT and views:
         return f"A report about {name(views[0].doer_id)} may be spam or empty"
-    return f"Unusual pattern between {_names(names)} ({n} deeds)"
+    if not named:
+        return neutral
+    return f"Unusual pattern between {_names(names)} ({_count(n, 'deed')})"
 
 
 async def _rows(session: AsyncSession, cases: Sequence[FlagCase]) -> list[CaseRow]:

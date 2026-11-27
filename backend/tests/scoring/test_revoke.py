@@ -33,6 +33,7 @@ from app.modules.scoring._limits import load_leaderboard
 from app.modules.scoring.models import HeroTitle, UserBadge
 from app.modules.scoring.service import badges_for, final_snapshot, titles_for
 from tests.deeds.helpers import Member, members, scan_and_report
+from tests.fraud.helpers import days_ago, deed
 from tests.fraud.review_helpers import admin, with_role
 from tests.scoring.board_helpers import counted, ist, month, ward
 from tests.scoring.override_helpers import audits, events
@@ -339,5 +340,25 @@ async def test_admin_related_to_another_subject_gets_404(
     assert (status, body["code"]) == (404, "badge_not_found")
 
     # A non-conflicted admin may revoke with the same case.
+    status, body = await _revoke(client, decider, title.id, case_id)
+    assert status == 200, body
+
+
+async def test_admin_who_reported_an_old_case_deed_gets_404(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """Review N5: the admin reported one of the case's deeds 200 days ago (outside the
+    lookback, so not related to the owner now). The case queue hides the case from them
+    (``fraud.service.case_visible_to``), so revoking with it is 404 as for an unknown title."""
+    a, _, _, title = await _hero(session)
+    decider = await admin(session)
+    (person,) = await members(session, 1)
+    who = await with_role(session, person, Role.ADMIN)
+    await deed(session, who, a, days_ago(200))
+    await session.commit()
+    case_id, _ = await _case(session, a, decider)
+
+    status, body = await _revoke(client, who, title.id, case_id)
+    assert (status, body["code"]) == (404, "title_not_found")
     status, body = await _revoke(client, decider, title.id, case_id)
     assert status == 200, body

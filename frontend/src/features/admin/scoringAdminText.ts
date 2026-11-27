@@ -90,6 +90,8 @@ export function revokeError(error: unknown): string {
       return NEEDS_CONFIRMED_CASE
     case 'already_revoked':
       return 'This has already been revoked. The page has been reloaded.'
+    case 'case_not_for_this_month':
+      return 'This case is about a different month. Choose a case about the month of this title.'
   }
   if (isNotFound(error)) return 'We couldn’t find that any more. The page has been reloaded.'
   return decisionError(error)

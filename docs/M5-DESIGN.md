@@ -566,6 +566,7 @@ Agents: **DB**, **BE**, **FE**, **QA**, **SEC**, **AD**, **DOC** (main session).
 | Q82 | A. The audit view leaves out rows about cases an admin is conflicted on, like the case queue (SEC5-M1) | D90, D96 |
 | Q83 | A. A deed rejected after review stays visible to its doer in My deeds (owner-only, "Removed after review" linking to its notice); changes the M2 Q18 rule for this one status | D101 |
 | Q84 | A. The member wording written during the build is approved as written | D101, §6.2 |
+| Q85 (N4) | **Deferred.** M5 adds no further two-admin approvals. One admin may clear or undo an override that a second admin approved; it stays covered by the M5 authorization and conflict-of-interest rules and is fully audited. Multiple admins stay supported. A two-admin step for undoing approved overrides is a future enhancement for a later milestone (asked 2026-11-27 after the final review) | D91, D96, D102 |
 
 The original questions follow for the record. Q73–Q82 were asked on 2026-11-26 (Q79–Q82 after the SEC5 security review) in the multiple-choice format the PO now prefers.
 

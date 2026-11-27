@@ -64,7 +64,7 @@ from app.modules.identity import service as identity
 
 type AppealQueue = Literal["open", "decided"]
 
-AUDIT_ENTITY = "appeal"
+AUDIT_ENTITY = _notices.APPEAL_AUDIT_ENTITY
 _GONE = UserRef(handle="", display_name="")
 
 
@@ -460,6 +460,11 @@ async def decide_appeal(
         )
         await session.flush()
         released = sorted(before - await _held(session, deed_ids))
+    # An override notice names its case only in its audit row (review N3): copy it here so
+    # the audit view hides this row from admins conflicted with the case.
+    case_id = notice.case_id
+    if case_id is None and notice.kind == NoticeKind.OVERRIDE:
+        case_id = (await _notices.override_cases(session, [notice])).get(notice.id)
 
     appeal.outcome = outcome
     appeal.reviewer_id = admin_id
@@ -478,7 +483,7 @@ async def decide_appeal(
             "outcome": outcome.value,
             "notice_id": str(notice.id),
             "kind": notice.kind.value,
-            "case_id": str(notice.case_id) if notice.case_id else None,
+            "case_id": str(case_id) if case_id else None,
             "override_id": str(notice.override_id) if notice.override_id else None,
             "user_id": str(appeal.user_id),
             "released_deed_ids": [str(d) for d in released],

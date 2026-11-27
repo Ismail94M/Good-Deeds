@@ -10,9 +10,9 @@ is not passed to the next person and the final board is not recomputed (Q67): th
 shows as "Unavailable account" (Q72, ``_reads``). Admins can't see or revoke their own, or a
 related person's (D90: 404).
 
-SEC5-L4: the admin must also not be conflicted with the case: no subject of it may be the admin
-or related to them (``deeds.service.related_users`` inside the lookback, checked per person with
-``fraud.service.case_has_subject``), else 404 as for an unknown title or badge. A title also
+SEC5-L4: the admin must also be able to see the case in the case queue
+(``fraud.service.case_visible_to``, the queue's own conflict rule, review N5), else 404 as for an
+unknown title or badge. A title also
 needs the case to cover its month (``fraud.service.case_covers_month``), else 409
 ``case_not_for_this_month``.
 """
@@ -31,13 +31,14 @@ from app.modules.fraud.service import (
     OverrideRules,
     case_covers_month,
     case_standing,
+    case_visible_to,
     confirmed_case_for_user,
     override_rules,
 )
 from app.modules.identity import service as identity
 from app.modules.scoring import _coi, _labels
 from app.modules.scoring._limits import load_leaderboard
-from app.modules.scoring._overrides import case_conflicted, clean_note
+from app.modules.scoring._overrides import clean_note
 from app.modules.scoring._reads import _TitleLabels
 from app.modules.scoring.events import BadgeRevoked, HeroTitleRevoked
 from app.modules.scoring.models import HeroTitle, LedgerRole, PointsLedger, UserBadge
@@ -154,6 +155,20 @@ async def _check_case(session: AsyncSession, case_id: uuid.UUID, user_id: uuid.U
     raise Conflict("Revoking needs a confirmed case about this person.", code="case_not_confirmed")
 
 
+async def _case_hidden(
+    session: AsyncSession,
+    admin_id: uuid.UUID,
+    case_id: uuid.UUID,
+    user_id: uuid.UUID,
+    now: datetime,
+) -> bool:
+    """SEC5-L4, review N5: an existing case the admin can't see in the queue. An unknown case
+    is left to ``_check_case`` (409 ``case_not_confirmed``)."""
+    if await case_visible_to(session, admin_id, case_id, now=now):
+        return False
+    return await case_standing(session, case_id, user_id) != "unknown"
+
+
 def _already_revoked() -> Conflict:
     return Conflict("This has already been revoked.", code="already_revoked")
 
@@ -177,7 +192,7 @@ async def revoke_title(
     await _check_person(session, admin_id, title.user_id, rules, now, not_found)
     if title.revoked_at is not None:
         raise _already_revoked()
-    if await case_conflicted(session, admin_id, body.case_id, rules, now):
+    if await _case_hidden(session, admin_id, body.case_id, title.user_id, now):
         raise not_found
     await _check_case(session, body.case_id, title.user_id)
     if not await case_covers_month(session, body.case_id, title.period_month):
@@ -235,7 +250,7 @@ async def revoke_badge(
     await _check_person(session, admin_id, badge.user_id, rules, now, not_found)
     if badge.revoked_at is not None:
         raise _already_revoked()
-    if await case_conflicted(session, admin_id, body.case_id, rules, now):
+    if await _case_hidden(session, admin_id, body.case_id, badge.user_id, now):
         raise not_found
     await _check_case(session, body.case_id, badge.user_id)
     badge.revoked_at, badge.revoked_reason, badge.revoked_by = now, note, admin_id

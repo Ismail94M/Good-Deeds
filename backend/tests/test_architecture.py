@@ -327,7 +327,12 @@ FRAUD_SERVICE = FRAUD + ".service"
 SCORING_SERVICE = "app.modules.scoring.service"
 # fraud reads scoring only for the event classes it subscribes to; fraud/service.py never.
 FRAUD_FROM_SCORING = frozenset(
-    {"ReporterConcentrationExceeded", "DeedNeedsReview", "PointsOverridden"}
+    {
+        "ReporterConcentrationExceeded",
+        "DeedNeedsReview",
+        "PointsOverridden",
+        "OverrideAppealApplied",
+    }
 )
 # fraud may also read these modules' service.py (anything in it).
 FRAUD_SERVICE_DEPS = frozenset({"deeds", "identity"})
@@ -348,6 +353,7 @@ SCORING_FROM_FRAUD = frozenset(
         "OverrideRules",
         "case_has_subject",
         "case_covers_month",
+        "case_visible_to",
     }
 )
 # deeds imports only the event it subscribes to, and only in deeds/handlers.py.
@@ -467,7 +473,7 @@ def test_only_scoring_and_deeds_import_fraud_and_only_their_names() -> None:
 def test_fraud_imports_only_core_deeds_identity_and_scoring_events() -> None:
     problems = _fraud_imports_violations(APP)
     assert problems == [], (
-        "fraud may import only app.core, deeds.service, identity.service and three scoring "
+        "fraud may import only app.core, deeds.service, identity.service and the named scoring "
         "event classes; fraud/service.py nothing from scoring (D78):\n" + "\n".join(problems)
     )
 

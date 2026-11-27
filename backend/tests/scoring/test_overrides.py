@@ -96,6 +96,7 @@ async def test_lowering_override_rewrites_the_ledger_audits_and_tells_the_person
         "reason_code": "fake_photo",
         "actor_id": str(a.user_id),
         "requested_by_id": None,
+        "case_id": None,
     }
 
     # A later re-score keeps the override.

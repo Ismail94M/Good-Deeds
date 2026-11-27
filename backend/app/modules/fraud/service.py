@@ -3,8 +3,8 @@
 Other modules may import only this file from fraud, and only what D78 lists:
 ``scoring`` -> ``DeedHoldChanged``, ``AppealDecided``, ``held_deed_ids``, ``is_held``,
 ``confirmed_case_for_user`` (and ``concentration_rule``, D97; ``override_rules`` and
-``case_standing``, ``case_has_subject`` and ``case_covers_month`` for overrides and revocations,
-D91, D92, SEC5-L3, L4); ``deeds`` -> ``FlagDecisionFinal``.
+``case_standing``, ``case_has_subject``, ``case_covers_month`` and ``case_visible_to`` for
+overrides and revocations, D91, D92, SEC5-L3, L4, review N5); ``deeds`` -> ``FlagDecisionFinal``.
 ``tests/test_architecture.py`` enforces the lists. This file imports nothing from ``scoring``.
 
 Nothing here may reach a public or member response: flags are private (D95).
@@ -13,13 +13,14 @@ Nothing here may reach a public or member response: flags are private (D95).
 import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Literal
 
 from sqlalchemy import exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.deeds.service import get_deeds
+from app.modules.fraud import _coi
 from app.modules.fraud._limits import load_fraud
 from app.modules.fraud.events import (
     AppealDecided,
@@ -55,6 +56,7 @@ __all__ = [
     "case_covers_month",
     "case_has_subject",
     "case_standing",
+    "case_visible_to",
     "concentration_rule",
     "confirmed_case_for_user",
     "held_deed_ids",
@@ -170,6 +172,25 @@ async def case_has_subject(session: AsyncSession, case_id: uuid.UUID, user_id: u
     """Whether ``user_id`` is a subject of ``case_id`` (false for an unknown case)."""
     found = await session.scalar(
         select(exists().where(FlagCaseUser.case_id == case_id, FlagCaseUser.user_id == user_id))
+    )
+    return bool(found)
+
+
+async def case_visible_to(
+    session: AsyncSession,
+    admin_id: uuid.UUID,
+    case_id: uuid.UUID,
+    *,
+    now: datetime | None = None,
+) -> bool:
+    """Whether ``case_id`` exists and the admin may see it in the case queue (D90): the same
+    rule as the queue (``_coi.visibility``), so a case with a subject related to the admin
+    inside the lookback, or with a deed the admin reported or did (at any time), is not
+    visible. False for an unknown case."""
+    _, config = await load_fraud(session)
+    visibility = await _coi.visibility(session, admin_id, config, now or datetime.now(UTC))
+    found = await session.scalar(
+        select(exists().where(FlagCase.id == case_id, visibility.condition()))
     )
     return bool(found)
 

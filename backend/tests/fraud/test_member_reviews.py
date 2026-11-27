@@ -36,6 +36,7 @@ FORBIDDEN = re.compile(
     re.IGNORECASE,
 )
 NO_CHANGES = "We've finished looking. No changes."
+SEE_DECISION = "We've finished looking. See the decision below."
 
 
 async def _reviews(client: AsyncClient, person: Member) -> dict[str, Any]:
@@ -179,7 +180,9 @@ async def test_confirmed_with_nothing_for_this_person_reads_no_changes(
     assert c_view["explanations"][0]["outcome_text"] == NO_CHANGES
     assert c_view["notices"] == []
     a_view = await _reviews(client, a)
-    assert a_view["explanations"][0]["outcome_text"] is None
+    # The look is finished and a has a decision: closed, pointing at the notice.
+    assert a_view["explanations"][0]["status"] == "closed"
+    assert a_view["explanations"][0]["outcome_text"] == SEE_DECISION
     (notice,) = a_view["notices"]
     assert [i["deed"]["deed_id"] for i in notice["items"]] == [str(ab)]
     assert notice["items"][0]["effect_text"] == "Not counted for leaderboards"

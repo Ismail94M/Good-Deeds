@@ -523,6 +523,10 @@ describe('user scoring admin page', () => {
     ],
     ['case_not_confirmed', 'Revoking needs a confirmed fraud case about this person.'],
     ['already_revoked', 'This has already been revoked.'],
+    [
+      'case_not_for_this_month',
+      'This case is about a different month. Choose a case about the month of this title.',
+    ],
   ])('shows copy for %s', async (code, text) => {
     base({
       'GET /admin/scoring/users/ahmedk': { body: makeUser() },

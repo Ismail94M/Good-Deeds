@@ -6,9 +6,14 @@ says "fraud". Reasons come from ``member_reason_labels``; each deed is one of th
 shown with the other person on that deed only.
 
 - An explanation request is ``waiting`` (no reply, due date ahead, look not finished),
-  ``replied`` or ``closed`` (due date passed with no reply, or the look finished first). Once the
-  look ended with nothing for this person (case dismissed, or confirmed with no adverse deed of
-  theirs) it reads "We've finished looking. No changes."
+  ``replied`` (look not finished) or ``closed`` (due date passed with no reply, or the look
+  finished, replied or not). Once the look ended with nothing for this person (case dismissed,
+  or confirmed with no adverse deed of theirs) it reads "We've finished looking. No changes.";
+  when they got a decision notice, "We've finished looking. See the decision below."
+- An upheld appeal whose deeds were all (or some) restored by another person's overturned
+  appeal on the same deeds says so, so the notice doesn't contradict its items.
+- An overturned appeal against a score change reads "Points restored after another review"
+  only when scoring really gave points back (``_notices.override_appeal_restored``, review N1).
 - A notice lists the person's affected deeds with an effect text (§6.2), the reason text, and
   the one appeal they may make before ``appeal_until`` (``_appeals.create_appeal``).
 - ``unread`` counts requests and notices new or changed (a finished look, a decided appeal)
@@ -60,12 +65,22 @@ NOT_COUNTED = "Not counted for leaderboards"
 REMOVED = "Removed after review"
 RESTORED = "Restored after another review"
 POINTS_RESTORED = "Points restored after another review"
+# An overturned override appeal that gave nothing back: a later decision had already changed
+# the points (review N1).
+POINTS_ALREADY_CHANGED = "We looked again. Your points were already changed by a later decision."
 WAITING_FOR_REVIEW = "Waiting for another review"
 WILL_BE_REMOVED = "Will be removed after review"
 APPEAL_OUTCOME_TEXT: dict[AppealOutcome, str] = {
     AppealOutcome.OVERTURNED: "We looked again and restored your deeds",
     AppealOutcome.UPHELD: "We looked again and the decision stays",
 }
+# An upheld appeal whose deeds were restored anyway, by another person's overturned appeal on
+# the same deeds: the outcome follows the deeds, so the notice doesn't contradict itself.
+UPHELD_ALL_RESTORED = "We looked again. Your deeds were restored after another review."
+UPHELD_SOME_RESTORED = (
+    "We looked again. Some of your deeds were restored; the rest of the decision stays."
+)
+SEE_DECISION = "We've finished looking. See the decision below."
 _GONE = UserRef(handle="", display_name="")
 
 
@@ -104,6 +119,9 @@ class _Context:
     people: Mapping[uuid.UUID, _Named]
     # (case, user) pairs whose appeal was overturned.
     overturned: set[tuple[uuid.UUID, uuid.UUID]]
+    # Overturned override appeal -> whether scoring gave the points back (review N1); an
+    # appeal scoring hasn't answered yet is missing.
+    override_restored: Mapping[uuid.UUID, bool]
 
 
 def _ref(people: Mapping[uuid.UUID, _Named], user_id: uuid.UUID | None) -> UserRef:
@@ -143,6 +161,8 @@ def _effect_text(
     view = ctx.views.get(deed_id)
     if effect == _notices.POINTS_CHANGED:
         if appeal is not None and appeal.outcome == AppealOutcome.OVERTURNED:
+            if ctx.override_restored.get(appeal.id) is False:
+                return POINTS_ALREADY_CHANGED
             return POINTS_RESTORED
         return f"Points changed from {item.get('old_points')} to {item.get('new_points')}"
     # A case item: restored when anyone on the deed won their appeal (that releases the deed).
@@ -165,14 +185,28 @@ def _effect_text(
     )
 
 
-def _my_appeal(appeal: Appeal | None) -> MyAppeal | None:
+def _outcome_text(appeal: Appeal, effects: list[str]) -> str | None:
+    """The appeal's outcome text. An upheld appeal on a case notice whose deeds were restored
+    by someone else's overturned appeal says so (all, or some of them)."""
+    if appeal.outcome is None:
+        return None
+    if appeal.outcome == AppealOutcome.UPHELD and effects:
+        restored = sum(1 for e in effects if e == RESTORED)
+        if restored == len(effects):
+            return UPHELD_ALL_RESTORED
+        if restored:
+            return UPHELD_SOME_RESTORED
+    return APPEAL_OUTCOME_TEXT[appeal.outcome]
+
+
+def _my_appeal(appeal: Appeal | None, effects: list[str]) -> MyAppeal | None:
     if appeal is None:
         return None
     return MyAppeal(
         created_at=appeal.created_at,
         reason=appeal.reason,
         outcome=appeal.outcome.value if appeal.outcome else None,
-        outcome_text=APPEAL_OUTCOME_TEXT[appeal.outcome] if appeal.outcome else None,
+        outcome_text=_outcome_text(appeal, effects),
         decided_at=appeal.decided_at,
     )
 
@@ -205,17 +239,28 @@ def notice_out(
         items=items,
         appeal_until=notice.appeal_until,
         can_appeal=can_appeal(notice, appeal, now),
-        appeal=_my_appeal(appeal),
+        appeal=_my_appeal(appeal, [i.effect_text for i in items]),
         final=notice.final_at is not None,
     )
 
 
 def _explanation_status(request: ExplanationRequest, case: FlagCase, now: datetime) -> str:
+    """``closed`` once the case is decided (replied or not), else ``replied``, else ``closed``
+    after the due date, else ``waiting``."""
+    if case.status == FlagCaseStatus.RESOLVED:
+        return "closed"
     if request.replied_at is not None:
         return "replied"
-    if case.status == FlagCaseStatus.RESOLVED or request.reply_due_at <= now:
+    if request.reply_due_at <= now:
         return "closed"
     return "waiting"
+
+
+def _explanation_outcome(case: FlagCase, noticed: bool) -> str | None:
+    """Once the look is finished: no changes for this person, or a decision notice to see."""
+    if case.status != FlagCaseStatus.RESOLVED:
+        return None
+    return NO_CHANGES if _no_changes(case, noticed) else SEE_DECISION
 
 
 def _no_changes(case: FlagCase, noticed: bool) -> bool:
@@ -245,7 +290,7 @@ def explanation_out(
         replied_at=request.replied_at,
         reply=request.reply,
         status=_explanation_status(request, case, now),
-        outcome_text=NO_CHANGES if _no_changes(case, noticed) else None,
+        outcome_text=_explanation_outcome(case, noticed),
         deeds=[_my_deed(ctx, me, d, config) for d in mine],
     )
 
@@ -254,6 +299,7 @@ async def _context(
     session: AsyncSession,
     deed_ids: Iterable[uuid.UUID],
     case_ids: Iterable[uuid.UUID],
+    override_appeal_ids: Iterable[uuid.UUID] = (),
 ) -> _Context:
     views = await deeds.get_deeds(session, set(deed_ids))
     people = await identity.public_summaries(
@@ -275,6 +321,7 @@ async def _context(
         labels=await deeds.category_labels(session),
         people=people,
         overturned=overturned,
+        override_restored=await _notices.override_appeal_restored(session, override_appeal_ids),
     )
 
 
@@ -344,7 +391,12 @@ async def _build(
     notice_cases = {n.case_id for n, _ in notices if n.case_id is not None}
     deed_ids = {d for ds in case_deeds.values() for d in ds}
     deed_ids |= {d for n, _ in notices for d in _notices.item_deed_ids(n)}
-    ctx = await _context(session, deed_ids, notice_cases)
+    override_appeals = {
+        a.id
+        for n, a in notices
+        if a is not None and n.kind == NoticeKind.OVERRIDE and a.outcome == AppealOutcome.OVERTURNED
+    }
+    ctx = await _context(session, deed_ids, notice_cases, override_appeals)
     noticed = await _noticed_cases(session, user_id) if requests else set()
     explanations = [
         explanation_out(

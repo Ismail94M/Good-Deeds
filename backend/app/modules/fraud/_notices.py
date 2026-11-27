@@ -9,12 +9,19 @@ from ``member_reason_labels[reason_key]`` when the notice is read (``_member.py`
 A score override that lowers someone's points (scoring's ``PointsOverridden``) gets a notice of
 kind ``override`` with one ``points_changed`` item (``create_override_notice``). Its decider is
 recorded in an ``audit_log`` row (``decision_notice.created``), because ``fraud`` can't read
-scoring's overrides (D78) and an appeal must go to a different admin (D100).
+scoring's overrides (D78) and an appeal must go to a different admin (D100). The row also
+names the override's case (``case_id``, when it cites one), so the audit view hides it from
+admins conflicted with that case (Q82, review N3).
+
+When an appeal against an override notice is overturned, scoring answers with
+``OverrideAppealApplied``; ``record_override_appeal`` keeps its ``restored`` flag in an
+``audit_log`` row (``appeal.override_applied`` on the appeal), which the member page reads to
+say whether points came back (review N1).
 """
 
 import uuid
 from collections import defaultdict
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -37,6 +44,8 @@ EFFECTS: dict[DeedOutcome, str] = {
 }
 NOTICE_AUDIT_ENTITY = "decision_notice"
 NOTICE_CREATED = "decision_notice.created"
+APPEAL_AUDIT_ENTITY = "appeal"
+OVERRIDE_APPEAL_APPLIED = "appeal.override_applied"
 
 
 def adverse_people(
@@ -108,6 +117,7 @@ async def create_override_notice(
     config: FraudConfig,
     now: datetime,
     requested_by_id: uuid.UUID | None = None,
+    case_id: uuid.UUID | None = None,
 ) -> uuid.UUID | None:
     """The notice for a lowering override (D91, D100), once per (override, person). Returns its
     id, or None when the points didn't go down or the notice already exists."""
@@ -152,6 +162,7 @@ async def create_override_notice(
             "new_points": new_points,
             "reason_code": reason_code,
             "requested_by": str(requested_by_id) if requested_by_id else None,
+            "case_id": str(case_id) if case_id else None,
         },
         reason=reason_code,
     )
@@ -187,11 +198,11 @@ async def deciders(
     return out
 
 
-async def override_requesters(
-    session: AsyncSession, notices: list[DecisionNotice]
+async def _override_notice_ids(
+    session: AsyncSession, notices: list[DecisionNotice], key: str
 ) -> dict[uuid.UUID, uuid.UUID]:
-    """Override notice id -> the admin who asked for a second-admin-approved cut (Q77). They
-    took part in the decision, so they may not decide its appeal either."""
+    """Override notice id -> the id stored under ``key`` in its ``decision_notice.created``
+    audit row (notices without one are left out)."""
     ids = [str(n.id) for n in notices if n.kind == NoticeKind.OVERRIDE]
     if not ids:
         return {}
@@ -203,9 +214,72 @@ async def override_requesters(
             AuditLog.entity_id.in_(ids),
         )
     ):
-        requested_by = (new_value or {}).get("requested_by")
-        if requested_by:
-            out[uuid.UUID(entity_id)] = uuid.UUID(str(requested_by))
+        value = (new_value or {}).get(key)
+        if value:
+            out[uuid.UUID(entity_id)] = uuid.UUID(str(value))
+    return out
+
+
+async def override_requesters(
+    session: AsyncSession, notices: list[DecisionNotice]
+) -> dict[uuid.UUID, uuid.UUID]:
+    """Override notice id -> the admin who asked for a second-admin-approved cut (Q77). They
+    took part in the decision, so they may not decide its appeal either."""
+    return await _override_notice_ids(session, notices, "requested_by")
+
+
+async def override_cases(
+    session: AsyncSession, notices: list[DecisionNotice]
+) -> dict[uuid.UUID, uuid.UUID]:
+    """Override notice id -> the case its override cites (review N3)."""
+    return await _override_notice_ids(session, notices, "case_id")
+
+
+async def record_override_appeal(
+    session: AsyncSession,
+    *,
+    appeal_id: uuid.UUID,
+    override_id: uuid.UUID,
+    deed_id: uuid.UUID | None,
+    restored: bool,
+    case_id: uuid.UUID | None,
+) -> None:
+    """Keep scoring's answer to an overturned override appeal (review N1), once per appeal
+    (the handler runs once per event)."""
+    record_audit(
+        session,
+        entity_type=APPEAL_AUDIT_ENTITY,
+        entity_id=str(appeal_id),
+        action=OVERRIDE_APPEAL_APPLIED,
+        actor_id=None,
+        new_value={
+            "override_id": str(override_id),
+            "deed_id": str(deed_id) if deed_id else None,
+            "restored": restored,
+            "case_id": str(case_id) if case_id else None,
+        },
+        reason="Appeal overturned",
+    )
+    await session.flush()
+
+
+async def override_appeal_restored(
+    session: AsyncSession, appeal_ids: Iterable[uuid.UUID]
+) -> dict[uuid.UUID, bool]:
+    """Appeal id -> whether scoring gave points back when it was overturned. Appeals scoring
+    hasn't answered yet are left out."""
+    ids = [str(a) for a in appeal_ids]
+    if not ids:
+        return {}
+    out: dict[uuid.UUID, bool] = {}
+    for entity_id, new_value in await session.execute(
+        select(AuditLog.entity_id, AuditLog.new_value).where(
+            AuditLog.entity_type == APPEAL_AUDIT_ENTITY,
+            AuditLog.action == OVERRIDE_APPEAL_APPLIED,
+            AuditLog.entity_id.in_(ids),
+        )
+    ):
+        out[uuid.UUID(entity_id)] = bool((new_value or {}).get("restored"))
     return out
 
 
