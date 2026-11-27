@@ -12,7 +12,7 @@ import { retryUnlessClientError } from '../feed/feedQueries'
 
 const seg = encodeURIComponent
 
-export type ReviewPerson = { handle: string; display_name: string }
+export type ReviewPerson = { handle: string; display_name: string; avatar?: string | null }
 
 /** One of my own deeds, with the other person on that deed. */
 export type MyDeedRef = {

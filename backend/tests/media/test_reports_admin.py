@@ -315,7 +315,11 @@ async def test_queue_order_counts_and_pages(
     assert item["status"] == "open" and item["report_count"] == 1
     assert item["photo_thumb_url"].startswith("memory://")
     assert item["deed"] == {
-        "doer": {"handle": world["doer"].handle, "display_name": world["doer"].display_name},
+        "doer": {
+            "handle": world["doer"].handle,
+            "display_name": world["doer"].display_name,
+            "avatar": None,
+        },
         "category": "animals",
         "area_name": item["deed"]["area_name"],
     }

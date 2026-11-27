@@ -113,6 +113,7 @@ async def test_a_replied_request_is_closed_once_the_case_is_decided(
 class _Person:
     handle: str
     display_name: str
+    avatar_ref: str | None = None
 
 
 def _case(case_type: FlagCaseType, deed_count: int, signal: dict[str, Any] | None = None) -> Any:

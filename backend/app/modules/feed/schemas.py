@@ -1,21 +1,42 @@
 """Request and response shapes of the feed API (docs/M3-DESIGN.md §3.2, §3.4, §3.4b).
 
-``UserRef = {handle, display_name}`` is the only user information in any response: no user IDs,
-phones or emails. No response contains coordinates; the area is a name only.
+``UserRef = {handle, display_name, avatar}`` is the only user information in any response: no
+user IDs, phones or emails (``avatar`` is an opaque picture reference, null on public pages).
+No response contains coordinates; the area is a name only.
 """
 
 import uuid
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Protocol
 
 from pydantic import BaseModel, Field
 
 TopPeriodId = Literal["week", "month", "year"]
 
 
+class _Summary(Protocol):
+    """identity's ``UserSummary`` (read through ``identity.service``)."""
+
+    @property
+    def handle(self) -> str: ...
+    @property
+    def display_name(self) -> str: ...
+    @property
+    def avatar_ref(self) -> str | None: ...
+
+
 class UserRef(BaseModel):
     handle: str
     display_name: str
+    # Opaque profile-picture reference (M6A D117), never a URL; null for no picture, an
+    # unavailable account, or a public (signed-out) response.
+    avatar: str | None = None
+
+    @classmethod
+    def of(cls, summary: _Summary) -> "UserRef":
+        return cls(
+            handle=summary.handle, display_name=summary.display_name, avatar=summary.avatar_ref
+        )
 
 
 class PhotoOut(BaseModel):

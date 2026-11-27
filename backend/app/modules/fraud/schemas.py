@@ -20,6 +20,9 @@ _MAX_DEEDS = 1_000
 class UserRef(BaseModel):
     handle: str
     display_name: str
+    # Opaque profile-picture reference (M6A D117, D124), never a URL; null for no picture or an
+    # unavailable account (``_GONE``).
+    avatar: str | None = None
 
 
 # --------------------------------------------------- #1 options

@@ -216,7 +216,7 @@ async def test_revoked_title_is_not_passed_on_and_the_final_board_is_frozen(
     first = board["items"][0]
     assert (first["rank"], first["user"]) == (
         1,
-        {"handle": None, "display_name": "Unavailable account"},
+        {"handle": None, "display_name": "Unavailable account", "avatar": None},
     )
     assert board["items"][1]["user"]["handle"] == b.handle
     assert all(a.handle not in {u["handle"] for u in t["users"]} for t in board["titles"])

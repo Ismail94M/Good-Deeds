@@ -65,8 +65,16 @@ async def test_qr_deed_is_verified_instantly(client: AsyncClient, session: Async
     assert body["verification_method"] == "qr_scan"
     assert body["category"] == "animals"
     assert body["beneficiaries_count"] == 1
-    assert body["reporter"] == {"handle": witness.handle, "display_name": witness.display_name}
-    assert body["doer"] == {"handle": doer.handle, "display_name": doer.display_name}
+    assert body["reporter"] == {
+        "handle": witness.handle,
+        "display_name": witness.display_name,
+        "avatar": None,
+    }
+    assert body["doer"] == {
+        "handle": doer.handle,
+        "display_name": doer.display_name,
+        "avatar": None,
+    }
     assert body["same_act"] == {"report_count": 1, "counts_for_points": True}
     assert body["prize_rank_eligible"] is True
     assert body["has_location"] is True

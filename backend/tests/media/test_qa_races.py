@@ -134,7 +134,7 @@ async def test_report_racing_a_removal_never_leaves_an_open_case(
     async def report(s: Any) -> None:
         _, limits = await load_limits(s)
         try:
-            _, uploader_id = await _reports.reportable_photo(s, photo_id)
+            uploader_id = (await _reports.reportable_photo(s, photo_id)).uploader_id
             await _reports.file_report(
                 s,
                 photo_id,

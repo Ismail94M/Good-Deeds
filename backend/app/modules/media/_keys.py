@@ -4,6 +4,7 @@ Every key is chosen by the server from the photo's random ID; clients never choo
 Variant keys carry a version suffix, so an object never changes under the same key.
 """
 
+import re
 import uuid
 from collections.abc import Mapping
 from typing import Any
@@ -13,6 +14,9 @@ PHOTOS_PREFIX = "photos/"
 HELD_PREFIX = "held/"
 # Variants are private and immutable under their key (§4.2).
 CACHE_CONTROL = "private, max-age=3600"
+# Profile pictures (D118): URLs live 24 h, so browsers may keep the image as long. Safe because
+# every removal moves or deletes the objects.
+AVATAR_CACHE_CONTROL = "private, max-age=86400"
 VARIANT_CONTENT_TYPE = "image/webp"
 FIRST_VERSION = 1
 
@@ -49,3 +53,32 @@ def all_object_keys(staging: str, variants: Mapping[str, Any] | None) -> list[st
         if key.startswith(PHOTOS_PREFIX):
             keys.append(held_key(key))
     return keys
+
+
+_VERSION = re.compile(r"-(\d+)\.webp$")
+# ``{photo_id}-{version}``: the canonical uuid text (36 characters), a dash, a version number.
+_AVATAR_REF = re.compile(
+    r"^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-([1-9][0-9]{0,8})$"
+)
+
+
+def key_version(key: str) -> int:
+    """The version suffix of a variant key (``photos/{id}/avatar_md-2.webp`` -> 2)."""
+    match = _VERSION.search(key)
+    if match is None:
+        raise ValueError("not a versioned variant key")
+    return int(match.group(1))
+
+
+def avatar_ref(photo_id: uuid.UUID, version: int) -> str:
+    """The opaque profile-picture reference clients hold (D117). A restore moves the variants
+    to a new version, so it also makes a new reference: old ones never resolve again."""
+    return f"{photo_id}-{version}"
+
+
+def parse_avatar_ref(ref: str) -> tuple[uuid.UUID, int] | None:
+    """``(photo_id, version)``, or None for anything that isn't a well-formed reference."""
+    match = _AVATAR_REF.match(ref)
+    if match is None:
+        return None
+    return uuid.UUID(match.group(1)), int(match.group(2))

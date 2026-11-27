@@ -27,10 +27,13 @@ class Location(BaseModel):
 
 
 class UserRef(BaseModel):
-    """The public name of another user (same shape as identity's ``UserSummary``)."""
+    """The public name of another user (from identity's ``UserSummary``)."""
 
     handle: str
     display_name: str
+    # Opaque profile-picture reference (M6A D117), never a URL; null for no picture, an
+    # unavailable account, or a public (signed-out) response.
+    avatar: str | None = None
 
 
 # --------------------------------------------------- scans (§3.2 #1, #2)

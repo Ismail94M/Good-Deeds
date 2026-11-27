@@ -348,7 +348,11 @@ async def _outcomes(
                 decision=decision,
                 removal_reason=why,
                 removed_by=(
-                    UserRef(handle=summary.handle, display_name=summary.display_name)
+                    UserRef(
+                        handle=summary.handle,
+                        display_name=summary.display_name,
+                        avatar=summary.avatar_ref,
+                    )
                     if summary is not None
                     else None
                 ),
@@ -443,7 +447,13 @@ async def remove_photo(
     """
     now = now or utcnow()
     photo = await session.scalar(select(Photo).where(Photo.id == photo_id).with_for_update())
-    if photo is None or photo.status not in _REMOVABLE or photo.takedown != PhotoTakedown.NONE:
+    if (
+        photo is None
+        or photo.status not in _REMOVABLE
+        or photo.takedown != PhotoTakedown.NONE
+        # A profile picture is removed with DELETE /media/me/avatar, which tells identity.
+        or photo.purpose == PhotoPurpose.AVATAR
+    ):
         raise photo_not_found()
 
     by_doer = False

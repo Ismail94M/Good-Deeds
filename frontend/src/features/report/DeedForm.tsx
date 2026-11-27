@@ -4,7 +4,8 @@ import type { DeedOptions, ScanDetail } from '../deeds/deedsApi'
 import { DescriptionField } from '../deeds/DescriptionField'
 import { descriptionHint } from '../deeds/formValues'
 import { PeopleStepper } from '../deeds/PeopleStepper'
-import { firstName, formatMinutes, initials } from './format'
+import { Avatar } from '../media/avatar/Avatar'
+import { firstName, formatMinutes } from './format'
 import { pairLimitNotice } from './limits'
 import {
   Banner,
@@ -71,12 +72,7 @@ export function DeedForm({
         aria-label="Who you’re recognising"
         className="flex items-center gap-3.5 rounded-2xl border border-slate-200 bg-white p-4"
       >
-        <span
-          aria-hidden
-          className="flex size-13 shrink-0 items-center justify-center rounded-full bg-brand-100 text-lg font-bold text-brand-900"
-        >
-          {initials(doer.display_name)}
-        </span>
+        <Avatar user={doer} size="card" />
         <div className="min-w-0 grow">
           <p className="text-[13px] font-semibold tracking-[0.04em] text-slate-600 uppercase">
             Recognising

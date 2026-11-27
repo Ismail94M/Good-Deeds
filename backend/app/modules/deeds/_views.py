@@ -8,7 +8,6 @@ import uuid
 from collections.abc import Mapping
 from datetime import datetime, timedelta
 
-from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.deeds._areas import area_names, display_name
@@ -43,7 +42,7 @@ async def deed_out(
     *,
     group: SameActGroup | None = None,
     invite: InviteOut | None = None,
-    summaries: Mapping[uuid.UUID, BaseModel] | None = None,
+    summaries: Mapping[uuid.UUID, identity.UserSummary] | None = None,
     areas: dict[int, str] | None = None,
     window_hours: int | None = None,
     now: datetime | None = None,
@@ -60,7 +59,13 @@ async def deed_out(
 
     def ref(user_id: uuid.UUID | None) -> UserRef | None:
         summary = summaries.get(user_id) if user_id is not None else None
-        return None if summary is None else UserRef(**summary.model_dump())
+        if summary is None:
+            return None
+        return UserRef(
+            handle=summary.handle,
+            display_name=summary.display_name,
+            avatar=summary.avatar_ref,
+        )
 
     reporter = ref(deed.reporter_user_id)
     assert reporter is not None

@@ -116,7 +116,7 @@ async def rings(
     names = await identity.public_summaries(session, [r[0] for r in rows])
     items = [
         StoryRing(
-            user=UserRef(**names[owner].model_dump()),
+            user=UserRef.of(names[owner]),
             is_me=owner == viewer_id,
             reported_count=int(reported),
             verified_count=int(verified),
@@ -178,7 +178,7 @@ async def person(
     composed = await _compose.compose(session, posts, viewer_id, storage)
     names = await identity.public_summaries(session, [owner])
     return StoryPerson(
-        user=UserRef(**names[owner].model_dump()),
+        user=UserRef.of(names[owner]),
         is_me=owner == viewer_id,
         seconds_per_story=limits.story_seconds,
         items=[

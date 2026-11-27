@@ -409,7 +409,8 @@ async def requests_out(
     ids |= {r.requested_by for r in rows} | {r.decided_by for r in rows if r.decided_by}
     found = await identity.public_summaries(session, ids)
     people = {
-        uid: UserSummary(handle=s.handle, display_name=s.display_name) for uid, s in found.items()
+        uid: UserSummary(handle=s.handle, display_name=s.display_name, avatar=s.avatar_ref)
+        for uid, s in found.items()
     }
 
     def person(uid: uuid.UUID | None) -> UserSummary | None:

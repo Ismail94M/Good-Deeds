@@ -166,7 +166,7 @@ async def comment_notices(
             CommentNotice(
                 comment_id=comment.id,
                 deed_id=comment.deed_id,
-                doer=UserRef(**doer.model_dump()),
+                doer=UserRef.of(doer),
                 excerpt=excerpt(comment.body),
                 removed_at=comment.deleted_at,
             )

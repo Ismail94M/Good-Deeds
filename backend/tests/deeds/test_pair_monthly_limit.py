@@ -94,7 +94,9 @@ async def test_14th_and_15th_succeed_and_16th_is_refused_at_scan(session: AsyncS
     error = await _expect(scan(session, witness, ahmed, at=OCT_20 + 2 * DAY), "pair_monthly_limit")
     # The pre-check records no scan, so the pair's IST day is not used up.
     assert await _scans_of(session, witness, ahmed) == scans_before
-    assert error.extra == {"doer": {"handle": ahmed.handle, "display_name": ahmed.display_name}}
+    assert error.extra == {
+        "doer": {"handle": ahmed.handle, "display_name": ahmed.display_name, "avatar": None}
+    }
 
 
 async def test_16th_is_refused_on_deed_create_and_leaves_its_scan_unused(
@@ -276,7 +278,11 @@ async def test_api_scan_at_pair_limit_names_the_doer_and_records_nothing(
     body = response.json()
     assert set(body) == {"detail", "code", "doer"}
     assert body["code"] == "pair_monthly_limit"
-    assert body["doer"] == {"handle": ahmed.handle, "display_name": ahmed.display_name}
+    assert body["doer"] == {
+        "handle": ahmed.handle,
+        "display_name": ahmed.display_name,
+        "avatar": None,
+    }
     assert ahmed.display_name not in body["detail"] and ahmed.handle not in body["detail"]
     assert await _scans_of(session, witness, ahmed) == 0
 
@@ -305,7 +311,11 @@ async def test_api_already_recognized_today_names_the_doer(
     body = response.json()
     assert set(body) == {"detail", "code", "doer"}
     assert body["code"] == "already_recognized_today"
-    assert body["doer"] == {"handle": ahmed.handle, "display_name": ahmed.display_name}
+    assert body["doer"] == {
+        "handle": ahmed.handle,
+        "display_name": ahmed.display_name,
+        "avatar": None,
+    }
 
 
 async def test_api_errors_before_the_pair_check_never_name_the_doer(

@@ -87,7 +87,11 @@ async def test_reporter_and_doer_can_read_a_deed(
     as_reporter = await client.get(f"/api/deeds/{deed.id}", headers=witness.headers)
     assert as_reporter.status_code == 200, as_reporter.text
     body = as_reporter.json()
-    assert body["doer"] == {"handle": doer.handle, "display_name": doer.display_name}
+    assert body["doer"] == {
+        "handle": doer.handle,
+        "display_name": doer.display_name,
+        "avatar": None,
+    }
     assert body["can_edit"] is True and body["can_withdraw"] is True
     assert body["same_act"] == {"report_count": 1, "counts_for_points": True}
     _no_coordinates(as_reporter.text)

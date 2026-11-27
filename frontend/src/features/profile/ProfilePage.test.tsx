@@ -48,8 +48,9 @@ describe('ProfilePage', () => {
     renderApp('/profile')
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Asha Rao' })).toBeVisible()
-    expect(screen.getByText('AR')).toBeInTheDocument()
     const main = screen.getByRole('main')
+    // M6: the initials avatar in the profile header (the nav shows a small one too).
+    expect(within(main).getByText('AR')).toBeInTheDocument()
     expect(within(main).getAllByText('@asha')[0]).toBeVisible()
     expect(screen.queryByText(/Bangalore/)).not.toBeInTheDocument()
 

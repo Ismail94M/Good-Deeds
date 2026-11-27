@@ -134,7 +134,9 @@ async def audit_page(
         person = people.get(actor_id) if actor_id is not None else None
         if person is None:
             return None
-        return UserRef(handle=person.handle, display_name=person.display_name)
+        return UserRef(
+            handle=person.handle, display_name=person.display_name, avatar=person.avatar_ref
+        )
 
     items = [
         AuditItem(

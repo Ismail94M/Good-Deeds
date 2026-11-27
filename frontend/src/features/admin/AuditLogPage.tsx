@@ -1,3 +1,4 @@
+import { Avatar } from '../media/avatar/Avatar'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { useId, useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router'
@@ -188,8 +189,11 @@ function AuditRow({ item }: { item: AuditItem }) {
         <span className="min-w-0 break-words text-slate-700">
           {item.entity_type} · {item.entity_id}
         </span>
-        <span className="min-w-0 break-words text-slate-700 lg:text-right">
-          {item.actor ? `${item.actor.display_name} @${item.actor.handle}` : 'System'}
+        <span className="flex min-w-0 items-center gap-2 break-words text-slate-700 lg:justify-end lg:text-right">
+          {item.actor && <Avatar user={item.actor} size="xs" />}
+          <span className="min-w-0">
+            {item.actor ? `${item.actor.display_name} @${item.actor.handle}` : 'System'}
+          </span>
         </span>
       </div>
       {item.reason && (

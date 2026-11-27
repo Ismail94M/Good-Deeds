@@ -1,21 +1,31 @@
 """Public interface of the feed module (docs/M3-DESIGN.md §3.4, D30, D36).
 
 Other modules read feed visibility here: ``media/router.py`` (photo reports and the admin review
-page). Scoring, points, rewards and leaderboard code must never call these (D30; enforced by
+page) and ``notifications`` (M6A D104: ``visible_deed_ids``, re-checked when a list is read).
+Scoring, points, rewards and leaderboard code must never call these (D30; enforced by
 ``tests/test_architecture.py``): visibility never reaches verification, counts or prizes.
 """
 
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.deeds import service as deeds
 from app.modules.feed import _access
 from app.modules.feed.models import FeedPost, PostState
 
-__all__ = ["PostState", "VisibilityView", "can_view", "is_public", "visibility"]
+__all__ = [
+    "PostState",
+    "VisibilityView",
+    "can_view",
+    "is_public",
+    "visibility",
+    "visible_deed_ids",
+]
 
 
 @dataclass(frozen=True)
@@ -41,6 +51,33 @@ async def can_view(session: AsyncSession, deed_id: uuid.UUID, user_id: uuid.UUID
     is published but hidden."""
     found = await _access.access(session, deed_id, user_id)
     return found is not None and found.viewable
+
+
+async def visible_deed_ids(
+    session: AsyncSession, viewer_id: uuid.UUID, deed_ids: Iterable[uuid.UUID]
+) -> set[uuid.UUID]:
+    """The deeds among ``deed_ids`` that ``viewer_id`` may see (the ``can_view`` rule), in two
+    queries: the posts, then the live deeds."""
+    ids = set(deed_ids)
+    if not ids:
+        return set()
+    posts = list(
+        await session.scalars(
+            select(FeedPost)
+            .where(FeedPost.deed_id.in_(ids))
+            .execution_options(populate_existing=True)
+        )
+    )
+    live = await deeds.get_deeds(session, [p.deed_id for p in posts])
+    visible: set[uuid.UUID] = set()
+    for post in posts:
+        deed = live.get(post.deed_id)
+        if deed is None or deed.status != deeds.DeedStatus.VERIFIED:
+            continue
+        found = _access.Access(post=post, deed=deed, role=_access.role_of(post, viewer_id))
+        if found.viewable:
+            visible.add(post.deed_id)
+    return visible
 
 
 async def visibility(session: AsyncSession, deed_id: uuid.UUID) -> VisibilityView | None:

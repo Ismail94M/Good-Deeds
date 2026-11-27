@@ -1,3 +1,4 @@
+import { Avatar } from '../media/avatar/Avatar'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
@@ -117,7 +118,10 @@ function Review({ appeal, onReload }: { appeal: AppealDetail; onReload: () => vo
         />
       )}
       <header className="flex flex-col gap-2">
-        <AdminTitle>Appeal from {name}</AdminTitle>
+        <div className="flex items-center gap-3">
+          <Avatar user={appeal.user} size="lg" />
+          <AdminTitle>Appeal from {name}</AdminTitle>
+        </div>
         <div className="flex flex-wrap items-center gap-1.5 text-sm text-slate-600">
           <Chip tone="blue">{KIND_LABELS[appeal.kind]}</Chip>
           <span>

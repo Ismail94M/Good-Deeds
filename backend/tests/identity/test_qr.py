@@ -538,5 +538,5 @@ async def test_public_summaries_batches_handles_and_names(
         a.user_id: UserSummary(handle=user_a.handle, display_name=user_a.display_name),
         b.user_id: UserSummary(handle=user_b.handle, display_name=user_b.display_name),
     }
-    assert set(UserSummary.model_fields) == {"handle", "display_name"}
+    assert set(UserSummary.model_fields) == {"handle", "display_name", "avatar_ref"}
     assert await service.public_summaries(session, []) == {}

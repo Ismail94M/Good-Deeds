@@ -11,6 +11,8 @@ export type { Location } from '../../lib/geolocation'
 export type UserSummary = {
   handle: string
   display_name: string
+  /** Opaque profile-picture ref (M6 D117), never a URL; null or absent: the default avatar. */
+  avatar?: string | null
 }
 
 export type Page<T> = {

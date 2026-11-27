@@ -6,9 +6,10 @@ imports ``feed``, D30) and passed in.
 """
 
 import uuid
+from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import advisory_xact_lock
@@ -47,27 +48,41 @@ async def enforce_visitor_limits(limiter: RateLimiter, limits: MediaLimits, ip: 
     await limiter.hit(f"report:ipd:{ip}", limits.rate_report_ip_daily)
 
 
-def _live_photo(photo_id: uuid.UUID) -> Select[uuid.UUID | None, uuid.UUID]:
-    return select(Photo.deed_id, Photo.uploader_user_id).where(
+def _live_photo(
+    photo_id: uuid.UUID,
+) -> Select[uuid.UUID | None, uuid.UUID, PhotoPurpose]:
+    """A deed photo or a live profile picture (M6A D121), ready and not taken down."""
+    return select(Photo.deed_id, Photo.uploader_user_id, Photo.purpose).where(
         Photo.id == photo_id,
         Photo.status == PhotoStatus.READY,
         Photo.takedown == PhotoTakedown.NONE,
-        Photo.purpose == PhotoPurpose.DEED,
         Photo.object_move.is_(None),
-        Photo.deed_id.is_not(None),
+        or_(
+            and_(Photo.purpose == PhotoPurpose.DEED, Photo.deed_id.is_not(None)),
+            Photo.purpose == PhotoPurpose.AVATAR,
+        ),
     )
 
 
-async def reportable_photo(
-    session: AsyncSession, photo_id: uuid.UUID
-) -> tuple[uuid.UUID, uuid.UUID]:
-    """``(deed_id, uploader_id)`` of a photo that may be reported: ready, not taken down, on a
-    deed. Anything else (including every self-log photo) is 404. An unlocked first read (for
+@dataclass(frozen=True)
+class Reportable:
+    # None for a profile picture.
+    deed_id: uuid.UUID | None
+    uploader_id: uuid.UUID
+    purpose: PhotoPurpose
+
+
+async def reportable_photo(session: AsyncSession, photo_id: uuid.UUID) -> Reportable:
+    """A photo that may be reported: ready, not taken down, on a deed, or a live profile
+    picture. Anything else (including every self-log photo) is 404. An unlocked first read (for
     the router's visibility check); ``file_report`` checks again under the locks."""
     row = (await session.execute(_live_photo(photo_id))).first()
-    if row is None or row.deed_id is None:
+    if row is None:
         raise photo_not_found()
-    return row.deed_id, row.uploader_user_id
+    purpose = PhotoPurpose(row.purpose)
+    if purpose == PhotoPurpose.DEED and row.deed_id is None:
+        raise photo_not_found()
+    return Reportable(deed_id=row.deed_id, uploader_id=row.uploader_user_id, purpose=purpose)
 
 
 async def file_report(
@@ -79,6 +94,7 @@ async def file_report(
     uploader_id: uuid.UUID,
     ip: str,
     limits: MediaLimits,
+    avatar: bool = False,
     now: datetime | None = None,
 ) -> None:
     """Open or join the photo's open case. A duplicate (same member, or same visitor IP in this
@@ -86,6 +102,8 @@ async def file_report(
     now = now or utcnow()
     if reporter_id is not None and reporter_id == uploader_id:
         raise OwnPhoto("You can't report your own photo.", code="own_photo")
+    if data.reason == PhotoReportReason.IMPERSONATION.value and not avatar:
+        raise Invalid("Choose a reason from the list.", code="invalid_reason")
     details = (data.details or "").strip() or None
     if details is not None and len(details) > limits.report_details_max:
         raise Invalid("The details are too long.", code="details_too_long")

@@ -23,18 +23,34 @@ from app.core.storage import ObjectStorage, get_storage
 from app.modules.feed import service as feed
 from app.modules.identity import service as identity
 from app.modules.identity.service import CurrentUser, OnboardedUser, ReviewerUser
-from app.modules.media import _admin, _cursor, _moves, _owners, _rates, _reports, _uploads
+from app.modules.media import (
+    _admin,
+    _avatars,
+    _cursor,
+    _moves,
+    _owners,
+    _rates,
+    _reports,
+    _uploads,
+)
+from app.modules.media import service as media
 from app.modules.media._common import ensure_clean, photo_not_found, utcnow
 from app.modules.media._limits import MediaLimits, load_limits
-from app.modules.media.models import PhotoReportCase
+from app.modules.media.models import PhotoPurpose, PhotoReportCase
 from app.modules.media.schemas import (
     AttachOut,
     AttachRequest,
+    AvatarAccepted,
+    AvatarReportTarget,
+    AvatarSet,
+    AvatarUrlsOut,
+    AvatarUrlsRequest,
     CaseDetail,
     CasePage,
     CompleteOut,
     DecisionCreate,
     DeedPhotosOut,
+    MyAvatarOut,
     OptionsOut,
     ReportCreate,
     ReportReceived,
@@ -227,12 +243,17 @@ async def report_photo(
     else:
         await _reports.enforce_visitor_limits(limiter, limits, ip)
     ensure_clean(data.details)
-    deed_id, uploader_id = await _reports.reportable_photo(session, photo_id)
-    viewable = (
-        await feed.can_view(session, deed_id, member_id)
-        if member_id is not None
-        else await feed.is_public(session, deed_id)
-    )
+    target = await _reports.reportable_photo(session, photo_id)
+    if target.purpose == PhotoPurpose.AVATAR:
+        # Profile pictures: signed-in, onboarded members only (D121), of active accounts.
+        viewable = member_id is not None and await identity.is_active(session, target.uploader_id)
+    else:
+        assert target.deed_id is not None
+        viewable = (
+            await feed.can_view(session, target.deed_id, member_id)
+            if member_id is not None
+            else await feed.is_public(session, target.deed_id)
+        )
     if not viewable:
         raise photo_not_found()
     await _reports.file_report(
@@ -240,9 +261,10 @@ async def report_photo(
         photo_id,
         data,
         reporter_id=member_id,
-        uploader_id=uploader_id,
+        uploader_id=target.uploader_id,
         ip=ip,
         limits=limits,
+        avatar=target.purpose == PhotoPurpose.AVATAR,
     )
     await session.commit()
     return ReportReceived()
@@ -262,7 +284,8 @@ async def _detail(
     actor_id: uuid.UUID,
 ) -> CaseDetail:
     deed_id = await _admin.case_deed_id(session, case_id)
-    vis = await feed.visibility(session, deed_id)  # "Shown in feed" (C6)
+    # "Shown in feed" (C6); a profile picture has no deed.
+    vis = await feed.visibility(session, deed_id) if deed_id is not None else None
     return await _admin.case_detail(
         session,
         storage,
@@ -282,6 +305,7 @@ async def list_photo_reports(
     status: Literal["open", "resolved"] = "open",
     cursor: str | None = None,
     limit: AdminPageSize = _cursor.DEFAULT_PAGE_SIZE,
+    purpose: Literal["deed", "avatar"] | None = None,
 ) -> CasePage:
     await _rates.admin_read(limiter, user.id)
     _, limits = await load_limits(session)
@@ -293,6 +317,7 @@ async def list_photo_reports(
         limits=limits,
         cursor=cursor,
         limit=limit,
+        purpose=purpose,
     )
 
 
@@ -348,3 +373,70 @@ async def restore_photo(
     await session.commit()
     await _moves.run_move(session, storage, photo_id)
     return await _detail(session, storage, case_id, limits, user.id)
+
+
+# --------------------------------------------------- profile pictures (M6A §3.3 P2 to P6)
+
+
+@router.put("/media/me/avatar", response_model=AvatarAccepted, status_code=status.HTTP_202_ACCEPTED)
+async def set_avatar(
+    data: AvatarSet, user: OnboardedUser, session: Session, storage: Storage, limiter: Limiter
+) -> AvatarAccepted:
+    _, limits = await load_limits(session)
+    await _avatars.enforce_change_limit(limiter, limits, user.id)
+    await _avatars.set_avatar(session, storage, user.id, data, limits=limits)
+    await session.commit()
+    return AvatarAccepted()
+
+
+@router.get("/media/me/avatar", response_model=MyAvatarOut)
+async def my_avatar(
+    user: CurrentUser, session: Session, storage: Storage, limiter: Limiter
+) -> MyAvatarOut:
+    await _rates.owner_read(limiter, user.id)
+    _, limits = await load_limits(session)
+    return await _avatars.my_avatar(session, storage, user.id, limits=limits)
+
+
+@router.delete("/media/me/avatar", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_avatar(
+    # CurrentUser (as SEC2 L2): an owner can always take their picture down.
+    user: CurrentUser,
+    session: Session,
+    storage: Storage,
+    limiter: Limiter,
+) -> Response:
+    _, limits = await load_limits(session)
+    await _uploads.enforce_write_limit(limiter, limits, user.id)
+    purge = await _avatars.remove_avatar(session, user.id)
+    await session.commit()
+    # Deleted at once, so every URL already issued stops working (D118).
+    await _avatars.purge_now(session, storage, purge, utcnow())
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/media/avatars/urls", response_model=AvatarUrlsOut)
+async def avatar_urls(
+    data: AvatarUrlsRequest, user: CurrentUser, session: Session, storage: Storage, limiter: Limiter
+) -> AvatarUrlsOut:
+    """Signed in only (D119): pictures are never shown to visitors."""
+    _, limits = await load_limits(session)
+    await _avatars.enforce_sign_limit(limiter, limits, user.id)
+    if len(set(data.refs)) > limits.avatar_sign_max_refs:
+        raise _avatars.Unprocessable(
+            f"Ask for at most {limits.avatar_sign_max_refs} pictures at once.",
+            code="too_many_refs",
+        )
+    items = await media.avatar_urls(session, data.refs, storage=storage, limits=limits)
+    return AvatarUrlsOut(items=items)
+
+
+@router.get(
+    "/users/{handle}/avatar-report-target", response_model=AvatarReportTarget, tags=["users"]
+)
+async def avatar_report_target(
+    handle: str, user: OnboardedUser, session: Session, limiter: Limiter
+) -> AvatarReportTarget:
+    """The photo id to report a person's profile picture with (P6); onboarded members only."""
+    await _rates.owner_read(limiter, user.id)
+    return await _avatars.report_target(session, handle, user.id)

@@ -7,6 +7,9 @@ export function decisionError(error: unknown): string {
     return 'Another admin needs to review this one: you’re part of this deed.'
   }
   if (code === 'case_not_open') return 'Someone already decided this report. It has been reloaded.'
+  if (code === 'avatar_replaced') {
+    return 'The owner has added a newer profile picture, so this one can’t be restored.'
+  }
   if (code === 'not_restorable') return 'This can’t be restored any more.'
   if (code === 'rate_limited') return 'You’re deciding very fast. Wait a minute, then try again.'
   if (error instanceof ApiError && error.status === 422) {

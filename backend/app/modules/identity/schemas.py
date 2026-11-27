@@ -96,6 +96,8 @@ class Me(BaseModel):
     short_id: str | None
     created_at: datetime
     onboarding: OnboardingStatus
+    # The opaque reference of my live profile picture (M6A D117), never a URL; null for none.
+    avatar: str | None = None
 
 
 class PublicProfile(BaseModel):
@@ -107,13 +109,18 @@ class PublicProfile(BaseModel):
     area: str | None
     bio: str | None
     joined_at: datetime
+    # Profile-picture reference: signed-in viewers only, null when signed out (D119).
+    avatar: str | None = None
 
 
 class UserSummary(BaseModel):
-    """The public name of a user, for showing a reporter or doer on a deed."""
+    """The public name of a user, for showing a reporter or doer on a deed, plus the opaque
+    reference of their live profile picture (M6A D117): never a URL, and None for no picture or
+    an account that isn't active (D122). Public (signed-out) responses must not pass it on."""
 
     handle: str
     display_name: str
+    avatar_ref: str | None = None
 
 
 class ProfileUpdate(BaseModel):

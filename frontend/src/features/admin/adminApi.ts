@@ -31,6 +31,8 @@ export type ReportQueue<T> = Page<T> & {
 export type ReportQueueParams = {
   status: ReportQueueStatus
   cursor?: string | null
+  /** Photo reports only (M6): `deed` or `avatar`; omit for both. */
+  purpose?: 'deed' | 'avatar' | null
 }
 
 /** One entry of a case's decision history (keep, remove, restore). */
@@ -43,15 +45,23 @@ export type DecisionRecord = {
 
 // ----------------------------------------------------------------- photo reports
 
+/** M6 D121: deed photos and profile pictures share one queue. */
+export type PhotoPurpose = 'deed' | 'avatar'
+
 export type PhotoReportItem = {
   case_id: string
+  /** Absent from a pre-M6 API: a deed photo. */
+  purpose?: PhotoPurpose
   priority: ReportPriority
   top_reason: PhotoReportReason
   report_count: number
   opened_at: string
   oldest_report_at: string
-  photo_thumb_url: string
-  deed: { doer: UserRef; category: string; area_name: string }
+  photo_thumb_url: string | null
+  /** Deed photos only (null for a profile picture). */
+  deed: { doer: UserRef; category: string; area_name: string } | null
+  /** Profile pictures only: whose picture it is. */
+  owner?: UserRef | null
 }
 
 /**
@@ -81,6 +91,9 @@ export type PhotoReportEntry = {
 
 export type PhotoReportDetail = {
   case: PhotoReportCase
+  purpose?: PhotoPurpose
+  /** Profile pictures only: the owner, shown instead of a deed (M6 §3.3). */
+  owner?: UserRef | null
   photo: {
     /** Needed for `POST /admin/photos/{photo_id}/restore` (§3.4b 4). */
     id: string
@@ -97,6 +110,7 @@ export type PhotoReportDetail = {
     /** Set once a removed photo's objects are deleted for good ("Deleted for good on…"). */
     purged_at: string | null
   }
+  /** Null for a profile picture. */
   deed: {
     doer: UserRef
     reporter: UserRef
@@ -104,7 +118,7 @@ export type PhotoReportDetail = {
     area_name: string
     status: string
     listed: boolean
-  }
+  } | null
   reports: PhotoReportEntry[]
   decisions: DecisionRecord[]
 }
@@ -202,8 +216,10 @@ export type AdminErrorCode =
 
 export const adminApi = {
   // photo reports (§3.3 #11–#14)
-  photoReports: ({ status, cursor }: ReportQueueParams) =>
-    apiGet<ReportQueue<PhotoReportItem>>(`/admin/photo-reports${queryString({ status, cursor })}`),
+  photoReports: ({ status, cursor, purpose }: ReportQueueParams) =>
+    apiGet<ReportQueue<PhotoReportItem>>(
+      `/admin/photo-reports${queryString({ status, cursor, purpose })}`,
+    ),
   photoReport: (caseId: string) => apiGet<PhotoReportDetail>(`/admin/photo-reports/${seg(caseId)}`),
   decidePhotoReport: (caseId: string, data: PhotoDecisionRequest) =>
     apiPost<PhotoReportDetail>(`/admin/photo-reports/${seg(caseId)}/decision`, data),
@@ -228,7 +244,10 @@ export const adminApi = {
 /** TanStack Query keys, all under `['admin', …]` (§6.4). */
 export const adminKeys = {
   all: ['admin'] as const,
-  photoReports: (status: ReportQueueStatus) => ['admin', 'photo-reports', status] as const,
+  photoReports: (status: ReportQueueStatus, purpose: string | null = null) =>
+    purpose
+      ? (['admin', 'photo-reports', status, purpose] as const)
+      : (['admin', 'photo-reports', status] as const),
   photoReport: (caseId: string) => ['admin', 'photo-report', caseId] as const,
   commentReports: (status: ReportQueueStatus) => ['admin', 'comment-reports', status] as const,
   commentReport: (caseId: string) => ['admin', 'comment-report', caseId] as const,

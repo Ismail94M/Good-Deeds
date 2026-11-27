@@ -17,7 +17,7 @@ from app.core.errors import AppError, Conflict, Forbidden, TooManyRequests
 from app.core.ratelimit import RateLimiter
 from app.core.security import keyed_hash
 from app.core.storage import ObjectStorage
-from app.modules.media import _keys
+from app.modules.media import _avatars, _keys
 from app.modules.media._common import photo_not_found, utcnow
 from app.modules.media._limits import MediaLimits
 from app.modules.media._pipeline import magic_matches
@@ -70,6 +70,7 @@ def options(limits: MediaLimits) -> OptionsOut:
             ReportReasonOut(id=reason.value, label=label, priority=PHOTO_REPORT_PRIORITY[reason])
             for reason, label in REPORT_REASON_LABELS.items()
         ],
+        avatar_report_reasons=_avatars.avatar_report_reasons(),
     )
 
 
@@ -104,7 +105,10 @@ async def create_upload(
     now: datetime | None = None,
 ) -> UploadOut:
     now = now or utcnow()
-    ensure_enabled(limits)
+    if data.purpose == PhotoPurpose.AVATAR.value:
+        _avatars.ensure_avatars_enabled(limits)
+    else:
+        ensure_enabled(limits)
     if data.content_type not in limits.upload_allowed_types:
         raise BadUpload("Choose a JPG, PNG or WebP photo.", code="unsupported_type")
     if data.size_bytes > limits.upload_max_bytes:

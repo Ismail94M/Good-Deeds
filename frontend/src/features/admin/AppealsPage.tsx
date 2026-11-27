@@ -1,3 +1,4 @@
+import { Avatar } from '../media/avatar/Avatar'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router'
 import { ErrorAlert, Loading } from '../../components/ui'
@@ -111,9 +112,12 @@ function AppealQueueRow({ row }: { row: AppealRow }) {
             </Chip>
           )}
         </div>
-        <span className="font-semibold break-words">
-          {row.user.display_name}{' '}
-          <span className="font-normal text-slate-600">@{row.user.handle}</span>
+        <span className="flex items-center gap-2 font-semibold break-words">
+          <Avatar user={row.user} size="sm" />
+          <span className="min-w-0">
+            {row.user.display_name}{' '}
+            <span className="font-normal text-slate-600">@{row.user.handle}</span>
+          </span>
         </span>
       </div>
       <div className="min-w-0 text-sm text-slate-600">

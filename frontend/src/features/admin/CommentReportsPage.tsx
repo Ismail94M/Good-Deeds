@@ -1,3 +1,4 @@
+import { Avatar } from '../media/avatar/Avatar'
 import { useDeedOptions } from '../deeds/deedQueries'
 import { categoryLabel } from '../deeds/deedText'
 import { adminApi, adminKeys, type CommentReportItem } from './adminApi'
@@ -30,6 +31,7 @@ function CommentRow({ item }: { item: CommentReportItem }) {
   const categories = useDeedOptions().data?.categories
   return (
     <QueueRow
+      thumb={<Avatar user={item.author} size="lg" />}
       priority={item.priority}
       kind="comment"
       reason={reasons.label(item.top_reason)}

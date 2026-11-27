@@ -112,7 +112,9 @@ async def user_view(session: AsyncSession, user_id: uuid.UUID) -> AdminUserScori
         .order_by(UserBadge.awarded_at, UserBadge.badge_slug)
     )
     return AdminUserScoring(
-        user=UserSummary(handle=summary.handle, display_name=summary.display_name),
+        user=UserSummary(
+            handle=summary.handle, display_name=summary.display_name, avatar=summary.avatar_ref
+        ),
         titles=title_rows,
         badges=[
             AdminBadge(

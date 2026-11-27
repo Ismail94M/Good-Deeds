@@ -301,7 +301,7 @@ async def test_remove_then_restore(client: AsyncClient, session: AsyncSession) -
         {
             "comment_id": str(comment_id),
             "deed_id": str(deed_id),
-            "doer": {"handle": doer.handle, "display_name": doer.display_name},
+            "doer": {"handle": doer.handle, "display_name": doer.display_name, "avatar": None},
             "excerpt": "Not a nice thing to say here",
             "removed_at": notices[0]["removed_at"],
         }

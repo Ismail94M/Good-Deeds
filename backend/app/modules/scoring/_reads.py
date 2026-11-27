@@ -114,7 +114,8 @@ async def _summaries(
 ) -> dict[uuid.UUID, UserSummary]:
     found = await identity.public_summaries(session, user_ids)
     return {
-        uid: UserSummary(handle=s.handle, display_name=s.display_name) for uid, s in found.items()
+        uid: UserSummary(handle=s.handle, display_name=s.display_name, avatar=s.avatar_ref)
+        for uid, s in found.items()
     }
 
 

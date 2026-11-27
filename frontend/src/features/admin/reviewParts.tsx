@@ -3,6 +3,7 @@
  * list, decision history, the Decide box, the done banner and the error copy (M3-DESIGN §6.3).
  */
 
+import { Avatar } from '../media/avatar/Avatar'
 import type { ReactNode } from 'react'
 import { useId } from 'react'
 import { Link } from 'react-router'
@@ -91,9 +92,12 @@ export function DecisionHistory({ decisions }: { decisions: DecisionRecord[] }) 
       <ul className="flex flex-col gap-2">
         {decisions.map((record, index) => (
           <li key={index} className="text-sm">
-            <p className="font-semibold text-slate-900">
-              {ACTION_LABELS[record.action]} by {record.actor.display_name} ·{' '}
-              {formatDateTime(record.created_at)}
+            <p className="flex items-center gap-2 font-semibold text-slate-900">
+              <Avatar user={record.actor} size="xs" />
+              <span className="min-w-0">
+                {ACTION_LABELS[record.action]} by {record.actor.display_name} ·{' '}
+                {formatDateTime(record.created_at)}
+              </span>
             </p>
             <p className="break-words text-slate-700">{record.note}</p>
           </li>

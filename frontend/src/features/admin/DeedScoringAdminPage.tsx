@@ -1,3 +1,4 @@
+import { Avatar } from '../media/avatar/Avatar'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useId, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router'
@@ -87,8 +88,9 @@ function PersonLink({ user }: { user: AdminUserRef | null }) {
   return (
     <Link
       to={`/admin/users/${encodeURIComponent(user.handle)}`}
-      className={`font-semibold text-brand-700 underline-offset-2 hover:underline ${focusRing}`}
+      className={`inline-flex items-center gap-1.5 font-semibold text-brand-700 underline-offset-2 hover:underline ${focusRing}`}
     >
+      <Avatar user={user} size="xs" />
       {user.display_name}
     </Link>
   )

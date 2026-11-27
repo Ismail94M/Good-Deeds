@@ -80,7 +80,7 @@ async def _gather(
     summaries = await identity.public_summaries(
         session, {p.doer_id for p in live} | {p.reporter_id for p in live}
     )
-    users = {uid: UserRef(**s.model_dump()) for uid, s in summaries.items()}
+    users = {uid: UserRef.of(s) for uid, s in summaries.items()}
     ids = [p.deed_id for p in live]
     photos = await _photos.public_photos(session, ids, storage)
     liked: set[uuid.UUID] = set()
@@ -188,10 +188,11 @@ async def public(session: AsyncSession, found: Access, storage: ObjectStorage) -
     base = _post_out(found.post, parts, None, None)
     if base is None:
         return None
+    # Public pages never show profile pictures (M6A D119): the default avatar only.
     return PublicDeed(
         deed_id=base.deed_id,
-        doer=base.doer,
-        reporter=base.reporter,
+        doer=base.doer.model_copy(update={"avatar": None}),
+        reporter=base.reporter.model_copy(update={"avatar": None}),
         category=base.category,
         category_label=base.category_label,
         area_name=base.area_name,

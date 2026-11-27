@@ -162,7 +162,12 @@ export type DeedPoints = {
  * A name on a board or title list. An account no longer active shows as `handle: null` and
  * `display_name: "Unavailable account"` (SEC3 L6): its place and title stay, with no link.
  */
-export type BoardUser = { handle: string | null; display_name: string }
+export type BoardUser = {
+  handle: string | null
+  display_name: string
+  /** Profile-picture ref (M6 D117); always null for an unavailable account. */
+  avatar?: string | null
+}
 
 /** One leaderboard row: rank, name, tier and verified-deed count; never points (D69). */
 export type LeaderboardRow = {

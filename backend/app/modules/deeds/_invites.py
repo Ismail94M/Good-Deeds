@@ -289,7 +289,11 @@ async def preview(
         raise _invite_invalid()
     return InvitePreview(
         status="pending",
-        reporter=UserRef(handle=reporter.handle, display_name=reporter.display_name),
+        reporter=UserRef(
+            handle=reporter.handle,
+            display_name=reporter.display_name,
+            avatar=reporter.avatar_ref,
+        ),
         category=deed.category,
         description=deed.description,
         occurred_at=deed.occurred_at,

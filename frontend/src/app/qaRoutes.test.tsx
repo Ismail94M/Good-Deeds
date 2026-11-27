@@ -100,7 +100,7 @@ describe('header on M2 pages (D25)', () => {
     )
     const others = within(nav)
       .getAllByRole('link')
-      .filter((link) => link.textContent !== name)
+      .filter((link) => !link.textContent?.endsWith(name))
     for (const link of others) expect(link).not.toHaveAttribute('aria-current')
   })
 

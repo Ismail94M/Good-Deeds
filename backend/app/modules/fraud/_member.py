@@ -89,6 +89,8 @@ class _Named(Protocol):
     def handle(self) -> str: ...
     @property
     def display_name(self) -> str: ...
+    @property
+    def avatar_ref(self) -> str | None: ...
 
 
 def explanation_not_found() -> NotFound:
@@ -128,7 +130,9 @@ def _ref(people: Mapping[uuid.UUID, _Named], user_id: uuid.UUID | None) -> UserR
     summary = people.get(user_id) if user_id is not None else None
     if summary is None:
         return _GONE
-    return UserRef(handle=summary.handle, display_name=summary.display_name)
+    return UserRef(
+        handle=summary.handle, display_name=summary.display_name, avatar=summary.avatar_ref
+    )
 
 
 def _my_deed(ctx: _Context, me: uuid.UUID, deed_id: uuid.UUID, config: FraudConfig) -> MyDeedRef:

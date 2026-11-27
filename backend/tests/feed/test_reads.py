@@ -162,8 +162,16 @@ async def test_post_shape_and_viewer_fields(
     body = await _get(client, "/api/feed?tab=nearby", viewer)
     item = next(i for i in body["items"] if i["deed_id"] == str(deed_id))
     assert set(item) == POST_KEYS
-    assert item["doer"] == {"handle": doer.handle, "display_name": doer.display_name}
-    assert item["reporter"] == {"handle": reporter.handle, "display_name": reporter.display_name}
+    assert item["doer"] == {
+        "handle": doer.handle,
+        "display_name": doer.display_name,
+        "avatar": None,
+    }
+    assert item["reporter"] == {
+        "handle": reporter.handle,
+        "display_name": reporter.display_name,
+        "avatar": None,
+    }
     assert item["category"] == "animals"
     labels = {c.slug: c.label for c in (await load_limits(session))[1].categories}
     assert item["category_label"] == labels["animals"] != "animals"

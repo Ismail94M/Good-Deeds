@@ -242,7 +242,11 @@ async def test_preview_of_pending_invite(client: AsyncClient, session: AsyncSess
     body = response.json()
     assert body == {
         "status": "pending",
-        "reporter": {"handle": reporter.handle, "display_name": reporter.display_name},
+        "reporter": {
+            "handle": reporter.handle,
+            "display_name": reporter.display_name,
+            "avatar": None,
+        },
         "category": "animals",
         "description": "Helped a stray dog across the road",
         "occurred_at": body["occurred_at"],
@@ -314,7 +318,11 @@ async def test_accept_verifies_and_groups_the_deed(
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["status"] == "verified"
-    assert body["doer"] == {"handle": doer.handle, "display_name": doer.display_name}
+    assert body["doer"] == {
+        "handle": doer.handle,
+        "display_name": doer.display_name,
+        "avatar": None,
+    }
     assert body["prize_rank_eligible"] is False
     assert body["same_act"] == {"report_count": 1, "counts_for_points": True}
     # The doer isn't the reporter: no edit, no invite details.

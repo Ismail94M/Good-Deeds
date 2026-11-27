@@ -1,12 +1,13 @@
 """Request and response shapes of the media API (docs/M3-DESIGN.md §3.2, §3.3, §3.4b).
 
 Responses carry storage information only as signed URLs, and user information only as
-``UserRef`` (handle and display name). No coordinates, IDs of people, hashes or keys.
+``UserRef`` (handle, display name and the opaque profile-picture reference ``avatar``, M6A
+D117). No coordinates, IDs of people, hashes or keys.
 """
 
 import uuid
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -18,6 +19,8 @@ class _Out(BaseModel):
 class UserRef(_Out):
     handle: str
     display_name: str
+    # Opaque profile-picture reference (never a URL); null for no picture or an inactive account.
+    avatar: str | None = None
 
 
 class PhotoOut(_Out):
@@ -67,6 +70,8 @@ class OptionsOut(_Out):
     blur_min_region: float
     decision_note_max: int
     report_reasons: list[ReportReasonOut]
+    # Reasons offered when reporting a profile picture (D121), in the order shown.
+    avatar_report_reasons: list[ReportReasonOut]
 
 
 # --------------------------------------------------- uploads
@@ -75,7 +80,7 @@ class OptionsOut(_Out):
 class UploadCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    purpose: Literal["deed", "self_log"]
+    purpose: Literal["deed", "self_log", "avatar"] = "deed"
     content_type: str = Field(max_length=100)
     size_bytes: int = Field(gt=0)
 
@@ -144,14 +149,86 @@ class SelfLogPhotosOut(_Out):
     photos: list[OwnerPhoto]
 
 
+# --------------------------------------------------- profile pictures (M6A §3.3 P2 to P6)
+
+
+class AvatarCropIn(BaseModel):
+    """The square to keep, on the upright image: ``x`` a fraction of the width, ``y`` of the
+    height (top-left corner), ``size`` the side as a fraction of the shorter side. Pixel checks
+    (inside the image, at least ``avatar_min_side_px``) run in the service."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    x: float = Field(ge=0, le=1, allow_inf_nan=False)
+    y: float = Field(ge=0, le=1, allow_inf_nan=False)
+    size: float = Field(gt=0, le=1, allow_inf_nan=False)
+
+
+class AvatarSet(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    photo_id: uuid.UUID
+    crop: AvatarCropIn
+
+
+class AvatarAccepted(_Out):
+    status: Literal["processing"] = "processing"
+
+
+class AvatarUrls(_Out):
+    sm_url: str
+    md_url: str
+    lg_url: str
+    expires_at: datetime
+
+
+class AvatarPending(_Out):
+    status: Literal["processing", "rejected", "failed"]
+    reject_reason: str | None = None
+
+
+class AvatarRemovedNotice(_Out):
+    removed_at: datetime
+    reason_label: str
+    # When a new picture may be uploaded (Q95: 24 h after an admin removal).
+    upload_after: datetime
+
+
+class MyAvatarOut(_Out):
+    current: AvatarUrls | None
+    pending: AvatarPending | None
+    removed_notice: AvatarRemovedNotice | None
+
+
+class AvatarUrlsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # The product cap is config (``avatar_sign_max_refs``), checked in the service.
+    refs: list[Annotated[str, Field(max_length=80)]] = Field(max_length=1000)
+
+
+class AvatarUrlsOut(_Out):
+    items: dict[str, AvatarUrls | None]
+
+
+class AvatarReportTarget(_Out):
+    photo_id: uuid.UUID
+
+
 # --------------------------------------------------- photo reports (#10)
 
 
 class ReportCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    # ``impersonation`` applies to profile pictures only (D121).
     reason: Literal[
-        "not_consented", "child_no_guardian_consent", "private_details", "inappropriate", "other"
+        "not_consented",
+        "child_no_guardian_consent",
+        "private_details",
+        "inappropriate",
+        "other",
+        "impersonation",
     ]
     # The product limit (``report_details_max``) is checked in the service; 500 is the column.
     details: str | None = Field(default=None, max_length=2000)
@@ -183,9 +260,13 @@ class AdminDeedRef(_Out):
 
 
 class CaseListItem(CaseOut):
+    purpose: Literal["deed", "avatar"]
     oldest_report_at: datetime
     photo_thumb_url: str | None
-    deed: AdminDeedRef
+    # Deed photos only (null for a profile picture).
+    deed: AdminDeedRef | None
+    # Profile pictures only: whose picture it is (null for a deed photo).
+    owner: UserRef | None
 
 
 class CasePage(_Out):
@@ -238,8 +319,12 @@ class AdminDecision(_Out):
 
 class CaseDetail(_Out):
     case: CaseOut
+    purpose: Literal["deed", "avatar"]
     photo: AdminPhoto
-    deed: AdminDeed
+    # Deed photos only (null for a profile picture).
+    deed: AdminDeed | None
+    # Profile pictures only: the owner, shown instead of a deed (M6A §3.3).
+    owner: UserRef | None
     reports: list[AdminReport]
     decisions: list[AdminDecision]
 
@@ -257,6 +342,7 @@ class DecisionCreate(BaseModel):
             "private_details",
             "inappropriate",
             "other",
+            "impersonation",
         ]
         | None
     ) = None
