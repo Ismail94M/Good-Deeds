@@ -154,6 +154,7 @@ async def assign_group(
 PRIZE_GRANTED_REASON = "second_independent_report"
 PRIZE_REVOKED_REASON = "second_report_withdrawn"
 PROMOTED_REASON = "promoted_after_withdrawal"
+PRIZE_REVOKED_REJECTED_REASON = "second_report_rejected"
 
 
 async def _verified_invite_deeds(
@@ -242,6 +243,18 @@ async def withdraw_from_group(session: AsyncSession, deed: Deed) -> SameActGroup
     """Release a withdrawn deed's place in its group (§3.4b). The caller holds the per-doer
     ``same_act`` lock (taken before the deed's row lock, see ``_edits``) and has already set the
     deed's status to ``withdrawn``; its ``counts_for_points`` is kept for history."""
+    return await leave_group(session, deed, promote=True, revoked_reason=PRIZE_REVOKED_REASON)
+
+
+async def leave_group(
+    session: AsyncSession, deed: Deed, *, promote: bool, revoked_reason: str
+) -> SameActGroup:
+    """Take a deed that is no longer verified out of its group's counters (§3.4b): a withdrawal
+    (``promote=True``, D13) or a fraud rejection (``promote=False``, M5 D89). The caller holds
+    the per-doer ``same_act`` lock and has already changed the deed's status; its
+    ``counts_for_points`` is kept for history. When fewer than two distinct reporters remain,
+    the group's verified invite deeds lose prize-rank eligibility, audited with
+    ``revoked_reason``."""
     assert deed.doer_user_id is not None and deed.same_act_group_id is not None
     await session.flush()
     group = (
@@ -268,7 +281,7 @@ async def withdraw_from_group(session: AsyncSession, deed: Deed) -> SameActGroup
     await session.flush()
 
     # D13: at most one promotion, and only into the slot this deed gave up.
-    if deed.counts_for_points and group.counted_count < group.cap:
+    if promote and deed.counts_for_points and group.counted_count < group.cap:
         promoted = await _promotion_candidate(session, group.id)
         if promoted is not None:
             assert promoted.doer_user_id is not None
@@ -299,6 +312,6 @@ async def withdraw_from_group(session: AsyncSession, deed: Deed) -> SameActGroup
     # In M2 an invite deed's eligibility only ever comes from the second-report rule.
     if group.distinct_reporters < 2:
         for revoked in await _verified_invite_deeds(session, group.id, eligible=True):
-            _flip_prize_rank(session, revoked, False, PRIZE_REVOKED_REASON)
+            _flip_prize_rank(session, revoked, False, revoked_reason)
     await session.flush()
     return group

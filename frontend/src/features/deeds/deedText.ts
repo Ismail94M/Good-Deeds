@@ -15,7 +15,8 @@ export const STATUS_LABELS: Record<DeedStatus, string> = {
   withdrawn: 'Withdrawn',
   pending: 'Pending',
   unverified: 'Unverified',
-  rejected: 'Rejected',
+  // M5 D101: only a review decision rejects a deed; members see it in these words.
+  rejected: 'Removed after review',
   removed: 'Removed',
 }
 

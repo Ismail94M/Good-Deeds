@@ -1,9 +1,11 @@
-"""D24 / Q18 (PO, 2026-11-17): the doer sees only ``verified`` deeds about them.
+"""D24 / Q18 (PO, 2026-11-17): the doer sees only ``verified`` deeds about them, plus (M5 D101)
+deeds ``rejected`` after review.
 
-``GET /api/me/deeds?role=doer`` lists only verified deeds (counted or not), and
-``GET /api/deeds/{id}`` is 404 ``deed_not_found`` to the doer unless the deed is verified. A
-withdrawn, rejected, removed or unverified report disappears from the doer's view; the reporter
-still sees it. Pending deeds have no doer, so they never reach the doer's view anyway.
+``GET /api/me/deeds?role=doer`` lists verified deeds (counted or not) and rejected ones, and
+``GET /api/deeds/{id}`` is 404 ``deed_not_found`` to the doer for every other status. A
+withdrawn, removed or unverified report disappears from the doer's view; the reporter still sees
+it. A rejected deed stays, so My deeds can show "Removed after review" linked to its notice; it is
+owner-only and never public. Pending deeds have no doer, so they never reach the doer's view.
 """
 
 from datetime import UTC, datetime, timedelta
@@ -55,7 +57,7 @@ async def _force(session: AsyncSession, deed: DeedOut, status: DeedStatus) -> No
     )
 
 
-async def test_doer_sees_only_verified_deeds_in_list_and_detail(
+async def test_doer_sees_only_verified_and_rejected_deeds_in_list_and_detail(
     client: AsyncClient, session: AsyncSession
 ) -> None:
     doer = await make_member(session)
@@ -67,13 +69,15 @@ async def test_doer_sees_only_verified_deeds_in_list_and_detail(
     await _force(session, deeds[2], DeedStatus.REMOVED)
     await _force(session, deeds[3], DeedStatus.UNVERIFIED)
     await session.commit()
-    hidden, visible = deeds[:4], deeds[4:]
+    hidden, visible = [deeds[0], deeds[2], deeds[3]], [deeds[1], *deeds[4:]]
 
     listed = await _pages(client, doer, "doer")
-    # Newest first; includes report 7, which is verified but not counted.
+    # Newest first; includes report 7, which is verified but not counted, and the rejected one.
     assert [d["id"] for d in listed] == [str(d.id) for d in reversed(visible)]
-    assert all(d["status"] == "verified" for d in listed)
+    assert [d["status"] for d in listed] == ["verified"] * 3 + ["rejected"]
     assert listed[0]["same_act"]["counts_for_points"] is False
+    # Nothing to change on a rejected deed, and the doer never gets edit or withdraw anyway.
+    assert listed[-1]["can_edit"] is False and listed[-1]["can_withdraw"] is False
     for item in listed:
         assert set(item["reporter"]) == {"handle", "display_name"}
 
@@ -100,7 +104,29 @@ async def test_reporter_still_sees_every_status(client: AsyncClient, session: As
         assert detail.status_code == 200 and detail.json()["status"] == status
         own = await _pages(client, witness, "reporter")
         assert [(d["id"], d["status"]) for d in own] == [(str(deed.id), status)]
-    assert await _pages(client, doer, "doer") == []
+    # The doer keeps only the rejected one (D101); the withdrawn one is gone (Q18).
+    assert [(d["id"], d["status"]) for d in await _pages(client, doer, "doer")] == [
+        (str(deeds[1].id), "rejected")
+    ]
+
+
+async def test_a_rejected_deed_stays_private_to_its_doer_and_reporter(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """D101 shows a rejected deed to its owner only: a stranger gets the same 404 as for any
+    deed, it doesn't count on the doer's public profile, and the stranger's own list is empty."""
+    doer, stranger = await make_member(session), await make_member(session)
+    _, deeds = await _one_act(session, doer, 1)
+    await _force(session, deeds[0], DeedStatus.REJECTED)
+    await session.commit()
+    as_doer = await client.get(f"/api/deeds/{deeds[0].id}", headers=doer.headers)
+    assert as_doer.status_code == 200 and as_doer.json()["status"] == "rejected"
+    as_stranger = await client.get(f"/api/deeds/{deeds[0].id}", headers=stranger.headers)
+    assert as_stranger.status_code == 404
+    assert as_stranger.json()["code"] == "deed_not_found"
+    assert await _pages(client, stranger, "doer") == []
+    counts = await client.get(f"/api/users/{doer.handle}/deed-counts", headers=stranger.headers)
+    assert counts.status_code == 200 and counts.json() == {"verified": 0}
 
 
 async def test_a_doers_hidden_deed_looks_like_a_strangers(

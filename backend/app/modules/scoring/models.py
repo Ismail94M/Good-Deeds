@@ -15,6 +15,10 @@ by constraint name, so names here are part of the contract.
 - Final ``leaderboard_snapshots`` and their entries never change (D64).
 - ``hero_titles`` and ``user_badges`` are permanent: the only allowed change is a revocation
   (``revoked_*`` set once, M5); rows are never deleted (D70).
+- M5 (docs/M5-DESIGN.md §2.2, migration 0027): ``score_overrides`` (append-only; the latest row
+  per (deed, role) is in force, D91), ``override_requests`` (a big cut waiting for a second
+  admin, decided once from ``pending``, Q77) and ``concentration_signals`` (insert-only, one per
+  doer, reporter and month, D85).
 
 Points are only ever summed from ``points_ledger``; no table here stores a description,
 coordinates or a phone number. Foreign keys to ``users``, ``deeds`` and ``regions`` use RESTRICT
@@ -133,6 +137,9 @@ class LedgerReason(StrEnum):
     REJECTED = "rejected"
     REMOVED = "removed"
     COUNTS_FOR_POINTS_LOST = "counts_for_points_lost"
+    # award or decision (M5, D91): an admin's score override replaces the rule result; a re-score
+    # of an overridden entry reverses it with this reason too. ``breakdown.override_id`` names it.
+    ADMIN_OVERRIDE = "admin_override"
 
 
 class TitleLevel(StrEnum):
@@ -482,3 +489,146 @@ class UserBadge(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_reason: Mapped[str | None] = mapped_column(Text)
     revoked_by: Mapped[uuid.UUID | None] = mapped_column(_users_fk())
+
+
+class OverrideRequestStatus(StrEnum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    DECLINED = "declined"
+    EXPIRED = "expired"
+
+
+# Shared CHECK fragments for overrides (the service enforces config bounds and lengths).
+_NOTE_MIN = "length(btrim(note)) >= 5"
+_REASON_CODE = "reason_code ~ '^[a-z][a-z0-9_]{0,29}$'"
+
+
+class ScoreOverride(Base):
+    """An admin's points for one deed and role (D91). Append-only: the latest row per (deed, role)
+    is in force; ``points`` null clears it (back to the rules). ``case_id`` has no foreign key
+    (``fraud`` owns cases, D78). ``request_id`` is set when a second admin approved a big cut."""
+
+    __tablename__ = "score_overrides"
+    __table_args__ = (
+        CheckConstraint("points IS NULL OR points >= 0", name="points_non_negative"),
+        CheckConstraint("previous_points >= 0", name="previous_points_non_negative"),
+        CheckConstraint(_REASON_CODE, name="reason_code_format"),
+        CheckConstraint(_NOTE_MIN, name="note_required"),
+        UniqueConstraint("request_id", name="uq_score_overrides_request_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    deed_id: Mapped[uuid.UUID] = mapped_column(_deeds_fk())
+    role: Mapped[LedgerRole] = mapped_column(_enum(LedgerRole, "ledger_role"))
+    points: Mapped[int | None] = mapped_column(Integer)
+    # The active entry's points when written.
+    previous_points: Mapped[int] = mapped_column(Integer)
+    # One of ``fraud.override_reason_codes``.
+    reason_code: Mapped[str] = mapped_column(String(30))
+    note: Mapped[str] = mapped_column(Text)
+    case_id: Mapped[uuid.UUID | None]
+    request_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("override_requests.id", ondelete="RESTRICT")
+    )
+    actor_id: Mapped[uuid.UUID] = mapped_column(_users_fk())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# The override in force for a (deed, role).
+Index(
+    "ix_score_overrides_deed_role_created_at",
+    ScoreOverride.deed_id,
+    ScoreOverride.role,
+    ScoreOverride.created_at.desc(),
+)
+
+
+class OverrideRequest(Base):
+    """A big change (to 0, or more than ``override_second_admin.max_cut_points`` below or above
+    the rule points) waiting for a different admin (Q77, Q79, Q80). No effect until approved;
+    decided once, from ``pending`` only. One pending request per (deed, role). A request may
+    lower or raise the points (migration 0028)."""
+
+    __tablename__ = "override_requests"
+    __table_args__ = (
+        CheckConstraint("points >= 0 AND points <> previous_points", name="points_changed"),
+        CheckConstraint(_REASON_CODE, name="reason_code_format"),
+        CheckConstraint(_NOTE_MIN, name="note_required"),
+        CheckConstraint("expires_at > created_at", name="expires_after_created"),
+        CheckConstraint("decided_by <> requested_by", name="second_admin"),
+        CheckConstraint(
+            "(status = 'pending' AND decided_by IS NULL AND decided_at IS NULL "
+            "AND decision_note IS NULL AND override_id IS NULL) "
+            "OR (status = 'approved' AND decided_by IS NOT NULL AND decided_at IS NOT NULL "
+            "AND decision_note IS NOT NULL AND override_id IS NOT NULL) "
+            "OR (status = 'declined' AND decided_by IS NOT NULL AND decided_at IS NOT NULL "
+            "AND decision_note IS NOT NULL AND override_id IS NULL) "
+            "OR (status = 'expired' AND decided_by IS NULL AND decided_at IS NOT NULL "
+            "AND decision_note IS NULL AND override_id IS NULL)",
+            name="status_fields",
+        ),
+        CheckConstraint(
+            "decision_note IS NULL OR length(btrim(decision_note)) >= 5",
+            name="decision_note_required",
+        ),
+        CheckConstraint("decided_at IS NULL OR decided_at >= created_at", name="decided_after"),
+        UniqueConstraint("override_id", name="uq_override_requests_override_id"),
+        Index(
+            "uq_override_requests_pending",
+            "deed_id",
+            "role",
+            unique=True,
+            postgresql_where=text("status = 'pending'"),
+        ),
+        # The queue (pending / decided) and the expiry job.
+        Index("ix_override_requests_status_created_at", "status", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    deed_id: Mapped[uuid.UUID] = mapped_column(_deeds_fk())
+    role: Mapped[LedgerRole] = mapped_column(_enum(LedgerRole, "ledger_role"))
+    points: Mapped[int] = mapped_column(Integer)
+    previous_points: Mapped[int] = mapped_column(Integer)
+    reason_code: Mapped[str] = mapped_column(String(30))
+    note: Mapped[str] = mapped_column(Text)
+    case_id: Mapped[uuid.UUID | None]
+    requested_by: Mapped[uuid.UUID] = mapped_column(_users_fk())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    status: Mapped[OverrideRequestStatus] = mapped_column(
+        _enum(OverrideRequestStatus, "override_request_status"),
+        server_default=OverrideRequestStatus.PENDING.value,
+    )
+    decided_by: Mapped[uuid.UUID | None] = mapped_column(_users_fk())
+    decision_note: Mapped[str | None] = mapped_column(Text)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Set on approval. use_alter: score_overrides.request_id points back here.
+    override_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("score_overrides.id", ondelete="RESTRICT", use_alter=True)
+    )
+
+
+class ConcentrationSignal(Base):
+    """One reporter's share of a doer's prize-rank points over the limit in a month (D85).
+    Insert-only; the primary key makes ``ReporterConcentrationExceeded`` fire once."""
+
+    __tablename__ = "concentration_signals"
+    __table_args__ = (
+        PrimaryKeyConstraint(
+            "doer_id", "reporter_id", "period_month", name="pk_concentration_signals"
+        ),
+        CheckConstraint(_FIRST_OF_MONTH, name="first_of_month"),
+        CheckConstraint("share_bp BETWEEN 0 AND 10000", name="share_bp_range"),
+        CheckConstraint("doer_points >= 0", name="doer_points_non_negative"),
+        CheckConstraint("doer_id <> reporter_id", name="not_self"),
+    )
+
+    doer_id: Mapped[uuid.UUID] = mapped_column(_users_fk())
+    reporter_id: Mapped[uuid.UUID] = mapped_column(_users_fk())
+    period_month: Mapped[date] = mapped_column(Date)
+    # The reporter's share in basis points at detection.
+    share_bp: Mapped[int] = mapped_column(Integer)
+    doer_points: Mapped[int] = mapped_column(Integer)
+    detected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

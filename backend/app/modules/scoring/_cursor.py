@@ -55,3 +55,19 @@ def decode_board(cursor: str) -> tuple[uuid.UUID, int, uuid.UUID]:
         return uuid.UUID(snapshot_text), rank, uuid.UUID(user_text)
     except (ValueError, binascii.Error, UnicodeDecodeError) as exc:
         raise invalid_cursor() from exc
+
+
+def encode_request(at: datetime, request_id: uuid.UUID) -> str:
+    """Override requests (M5 #17): ``(created_at, id)`` of the last row, newest first."""
+    return _b64(f"request|{at.isoformat()}|{request_id}")
+
+
+def decode_request(cursor: str) -> tuple[datetime, uuid.UUID]:
+    try:
+        kind, at_text, id_text = _unb64(cursor).split("|")
+        at = datetime.fromisoformat(at_text)
+        if kind != "request" or at.tzinfo is None:
+            raise ValueError("not a request cursor")
+        return at, uuid.UUID(id_text)
+    except (ValueError, binascii.Error, UnicodeDecodeError) as exc:
+        raise invalid_cursor() from exc

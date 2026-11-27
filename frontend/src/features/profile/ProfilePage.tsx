@@ -19,6 +19,7 @@ import { useMyScoring } from '../scoring/scoringQueries'
 import { OwnBadges } from '../scoring/OwnBadges'
 import { TierChip } from '../scoring/TierChip'
 import { RankingsButton } from '../scoring/Rankings'
+import { useReviewsUnread } from '../reviews/reviewsApi'
 import { DeedCounts } from './DeedCounts'
 
 const BIO_MAX = 280
@@ -202,7 +203,25 @@ function ActivitySection() {
   const items = [
     { to: '/me/deeds', title: 'My deeds', body: 'Reports about you and reports you made' },
     { to: '/me/self-logs', title: 'Self-logs', body: 'Your private diary of good deeds' },
+    // M5 §6.2: explanation requests and decision notices about your deeds.
+    { to: '/me/reviews', title: 'Reviews', body: 'Questions and decisions about your deeds' },
   ]
+  // The only way into the admin area: shown to moderators and admins, never to members.
+  const role = useAuth().user?.role
+  if (role === 'admin') {
+    items.push({
+      to: '/admin/fraud',
+      title: 'Admin',
+      body: 'Fraud cases, appeals, points changes and reports',
+    })
+  } else if (role === 'moderator') {
+    items.push({
+      to: '/admin/photo-reports',
+      title: 'Moderation',
+      body: 'Photo and comment reports',
+    })
+  }
+  const unread = useReviewsUnread()
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-2">
       <SectionHeading id={headingId}>Your activity</SectionHeading>
@@ -214,7 +233,15 @@ function ActivitySection() {
               className={`flex items-center gap-3 px-4 py-3.5 text-slate-900 hover:bg-slate-50 ${focusRing}`}
             >
               <span className="grow">
-                <span className="block font-semibold">{item.title}</span>{' '}
+                <span className="flex items-center gap-2 font-semibold">
+                  {item.title}
+                  {item.to === '/me/reviews' && unread && (
+                    <>
+                      <span aria-hidden className="size-2 rounded-full bg-red-600" />
+                      <span className="sr-only">(new update)</span>
+                    </>
+                  )}
+                </span>{' '}
                 <span className="block text-sm text-slate-600">{item.body}</span>
               </span>
               <svg

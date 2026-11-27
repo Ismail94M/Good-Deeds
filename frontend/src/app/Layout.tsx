@@ -1,6 +1,7 @@
 import { Link, NavLink, Outlet, ScrollRestoration, useLocation } from 'react-router'
 import { LinkButton, LogoMark } from '../components/ui'
 import { useAuth } from '../features/auth/authContext'
+import { useReviewsUnread } from '../features/reviews/reviewsApi'
 
 const focusRing =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700'
@@ -33,6 +34,18 @@ function PlusIcon() {
     >
       <path d="M12 5v14M5 12h14" />
     </svg>
+  )
+}
+
+/** M5 §6.2: a dot on Profile while the person has unseen review items (`GET /reviews` unread). */
+function ReviewsDot() {
+  const unread = useReviewsUnread()
+  if (!unread) return null
+  return (
+    <>
+      <span aria-hidden className="ml-1.5 size-2 shrink-0 rounded-full bg-red-600" />
+      <span className="sr-only"> (new review update)</span>
+    </>
   )
 }
 
@@ -94,6 +107,7 @@ export function Layout() {
                 <li>
                   <NavLink to="/profile" className={navClass}>
                     Profile
+                    <ReviewsDot />
                   </NavLink>
                 </li>
               </ul>
@@ -147,10 +161,16 @@ export function Layout() {
       <footer className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-6 text-sm text-slate-500 lg:px-6">
         <p>© {YEAR} Good Deeds. All rights reserved.</p>
         <div className="flex gap-5">
-          <Link to="/privacy" className={`hover:text-slate-800 ${focusRing}`}>
+          <Link
+            to="/privacy"
+            className={`inline-flex min-h-11 items-center hover:text-slate-800 ${focusRing}`}
+          >
             Privacy
           </Link>
-          <Link to="/terms" className={`hover:text-slate-800 ${focusRing}`}>
+          <Link
+            to="/terms"
+            className={`inline-flex min-h-11 items-center hover:text-slate-800 ${focusRing}`}
+          >
             Terms
           </Link>
         </div>

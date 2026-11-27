@@ -2,10 +2,14 @@
 
 Privacy: only the reporter or the doer may read a deed; anyone else gets 404 (not 403), so the
 response never confirms that a deed exists. The doer sees only ``verified`` deeds about them (D24,
-Q18): a withdrawn, rejected, removed or unverified report disappears from their list and is 404
-by ID, while the reporter still sees every status. ``deed_out`` never includes coordinates and never
-reveals the doer of a pending deed. The invite (without its raw link) is shown to the reporter
-only.
+Q18): a withdrawn, removed or unverified report disappears from their list and is 404 by ID, while
+the reporter still sees every status. The one exception is ``rejected`` (M5 D101): a deed rejected
+after a confirmed review stays in the doer's own list and is readable by ID, so My deeds can show
+"Removed after review" linked to its decision notice. Q18 hid reports the *reporter* took back;
+a rejection is a decision about the doer, who must be able to see and appeal it. This is
+owner-only: public reads (feed, profiles, boards) never show a rejected deed. ``deed_out``
+never includes coordinates and never reveals the doer of a pending deed. The invite (without its
+raw link) is shown to the reporter only.
 """
 
 import uuid
@@ -35,6 +39,10 @@ from app.modules.identity import service as identity
 
 Role = Literal["doer", "reporter"]
 InviteFilter = Literal["pending", "accepted", "expired"]
+
+
+# Statuses the doer sees about themselves (D24 + M5 D101).
+_DOER_VISIBLE = (DeedStatus.VERIFIED, DeedStatus.REJECTED)
 
 
 def _deed_not_found() -> NotFound:
@@ -89,7 +97,7 @@ async def get_deed(session: AsyncSession, viewer_id: uuid.UUID, deed_id: uuid.UU
     if deed is None:
         raise _deed_not_found()
     is_reporter = viewer_id == deed.reporter_user_id
-    is_doer = viewer_id == deed.doer_user_id and deed.status == DeedStatus.VERIFIED  # D24
+    is_doer = viewer_id == deed.doer_user_id and deed.status in _DOER_VISIBLE  # D24, D101
     if not (is_reporter or is_doer):
         raise _deed_not_found()
     return (await _deed_outs(session, [deed], viewer_id))[0]
@@ -103,14 +111,12 @@ async def my_deeds(
     cursor: str | None = None,
     limit: int = _cursor.DEFAULT_PAGE_SIZE,
 ) -> DeedPage:
-    """The viewer's deeds as reporter (every status), or as doer (``verified`` only, D24; a
-    pending deed has no doer yet anyway)."""
+    """The viewer's deeds as reporter (every status), or as doer (``verified`` and, from M5,
+    ``rejected``: D24, D101; a pending deed has no doer yet anyway)."""
     if role == "reporter":
         stmt = select(Deed).where(Deed.reporter_user_id == viewer_id)
     else:
-        stmt = select(Deed).where(
-            Deed.doer_user_id == viewer_id, Deed.status == DeedStatus.VERIFIED
-        )
+        stmt = select(Deed).where(Deed.doer_user_id == viewer_id, Deed.status.in_(_DOER_VISIBLE))
     if cursor is not None:
         at, last_id = _cursor.decode(cursor)
         stmt = stmt.where(tuple_(Deed.reported_at, Deed.id) < tuple_(at, last_id))

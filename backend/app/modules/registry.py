@@ -20,6 +20,7 @@ MODULES: list[str] = [
     "media",  # M3: photo uploads, pipeline, photo reports and decisions
     "feed",  # M3: feed projection, likes, comments, saves, shares, follows, Top
     "scoring",  # M4: points ledger, leaderboards, Kindness Hero titles, badges, tier
+    "fraud",  # M5: detectors, flag cases, prize holds, review, notices and appeals
 ]
 
 _OPTIONAL_PARTS = ("models", "handlers", "jobs")

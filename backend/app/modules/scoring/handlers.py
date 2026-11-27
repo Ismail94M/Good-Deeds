@@ -6,6 +6,14 @@ Deliberately **not** subscribed: any photo removal or moderation event (Q29, D51
 photo never changes points) and every ``feed`` event (visibility never reaches scoring, D47).
 ``DeedPhotoReady`` is the only ``media`` import scoring has, through ``media.service``: the event
 class only, never photo state (D47).
+
+M5: ``DeedHoldChanged`` (``fraud.service``) re-scores a deed whose prize hold was placed or
+released (docs/M5-DESIGN.md D79); ``reconcile_deed`` reads the hold itself, so the event's
+``held`` flag is never trusted and a late or repeated event changes nothing.
+``AppealDecided`` (``fraud.service``): an overturned appeal against an override notice clears
+that override (D100, ``_overrides.clear_for_appeal``). When it is no longer the one in force
+nothing is cleared and no event is emitted; only an audit row
+``deed_points.appeal_overturn_noop`` records it (SEC5-L2).
 """
 
 from datetime import UTC, datetime, timedelta
@@ -24,9 +32,11 @@ from app.modules.deeds.service import (
     scoring_inputs,
     withdraw_window_hours,
 )
+from app.modules.fraud.service import AppealDecided, DeedHoldChanged
 from app.modules.media.service import DeedPhotoReady
 from app.modules.scoring._evidence import record_photo_ready
 from app.modules.scoring._ledger import reconcile_deed
+from app.modules.scoring._overrides import clear_for_appeal
 from app.modules.scoring.models import LedgerReason
 
 # Edits to other fields (people helped) never change points.
@@ -48,6 +58,20 @@ async def rescore_counts_for_points(
 @subscribe(DeedPrizeRankChanged)
 async def rescore_prize_rank(session: AsyncSession, event: DeedPrizeRankChanged) -> None:
     await reconcile_deed(session, event.deed_id)
+
+
+@subscribe(DeedHoldChanged)
+async def rescore_held_deed(session: AsyncSession, event: DeedHoldChanged) -> None:
+    await reconcile_deed(session, event.deed_id)
+
+
+@subscribe(AppealDecided)
+async def clear_overturned_override(session: AsyncSession, event: AppealDecided) -> None:
+    if event.outcome != "overturned" or event.notice_kind != "override":
+        return
+    if event.override_id is None:
+        return
+    await clear_for_appeal(session, event.override_id, event.reviewer_id, appeal_id=event.appeal_id)
 
 
 @subscribe(DeedEdited)
