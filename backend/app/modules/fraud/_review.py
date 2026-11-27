@@ -327,7 +327,9 @@ async def _rows(session: AsyncSession, cases: Sequence[FlagCase]) -> list[CaseRo
                 .where(PrizeHold.case_id.in_(ids), PrizeHold.released_at.is_(None))
                 .group_by(PrizeHold.case_id)
             )
-        ).tuples().all()
+        )
+        .tuples()
+        .all()
     )
     rows: list[CaseRow] = []
     for case in cases:
