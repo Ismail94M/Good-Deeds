@@ -115,7 +115,7 @@ Each milestone is built, tested and reviewed by the product owner before the nex
 
 **M6 is split into two phases (PO 2026-11-27).** Design: `docs/M6-DESIGN.md`.
 
-**M6A Profile Pictures & In-app Notifications** (next; existing local infrastructure only, no cloud services)
+**M6A Profile Pictures & In-app Notifications** — **Built**, awaiting PO review (2026-11-28; branch `m6-notifications`; design `docs/M6-DESIGN.md` rev 2, D103–D125, PO answers Q86–Q97; security review `docs/M6-SEC6.md`, 0 high, 1 medium, 7 low, all fixed; migrations 0030–0034). Existing local infrastructure only, no cloud services.
 - Profile pictures: upload, crop, preview, replace and remove on mobile and desktop; default avatars; shown consistently on profiles, leaderboards, deeds, recognition activity, reviews and comments; secure validation and storage through the existing media pipeline.
 - Social-style in-app notifications: bell, unread count, history, tap-through navigation, read/unread, preferences. Covers recognitions of my deeds, recognitions by people I follow, new followers, deed activity, replies, review decisions and appeal outcomes. Limits against too many notifications; no confidential moderation details (M5 D101).
 
