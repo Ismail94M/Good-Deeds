@@ -12,9 +12,10 @@ notified (PO Q93): the earlier recognition row reads "This deed is no longer ava
 """
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
-from sqlalchemy import func, update
+from sqlalchemy import cast, func, select, update
+from sqlalchemy.dialects.postgresql import JSONB, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import subscribe
@@ -36,8 +37,8 @@ from app.modules.media.service import (
 from app.modules.notifications._fanout import start_fanout
 from app.modules.notifications._limits import NotificationsConfig, load_notifications
 from app.modules.notifications._write import Notice, notify
-from app.modules.notifications.models import Notification, NotificationKind
-from app.modules.scoring.service import BadgeAwarded, HeroTitleAwarded
+from app.modules.notifications.models import Notification, NotificationDedupe, NotificationKind
+from app.modules.scoring.service import AwardWithdrawn, BadgeAwarded, HeroTitleAwarded
 
 K = NotificationKind
 
@@ -132,7 +133,9 @@ async def on_deed_liked(session: AsyncSession, event: DeedLiked) -> None:
 @subscribe(CommentPosted)
 async def on_comment_posted(session: AsyncSession, event: CommentPosted) -> None:
     """``comment`` to the doer and reporter; ``reply`` ("also commented", D111, Q90) to people
-    who commented on the deed earlier, in the last ``replies.lookback_days``."""
+    who commented on the deed earlier, in the last ``replies.lookback_days``: at most
+    ``replies.max_recipients_per_comment`` of them, those who commented most recently first,
+    so one popular deed can't make a handler run thousands of writes (SEC6-M1)."""
     config, now = await _config(session), _now()
     parties = await _to_parties(
         session,
@@ -150,6 +153,8 @@ async def on_comment_posted(session: AsyncSession, event: CommentPosted) -> None
         event.deed_id,
         before=event.comment_id,
         since=now - timedelta(days=config.replies.lookback_days),
+        exclude=parties | {event.author_id},
+        limit=config.replies.max_recipients_per_comment,
     )
     for recipient in sorted(earlier - parties - {event.author_id}):
         await notify(
@@ -265,9 +270,35 @@ async def on_avatar_moderation(session: AsyncSession, event: AvatarModerationDec
 # --------------------------------------------------- scoring
 
 
+def _badge_key(slug: str) -> str:
+    return f"badge:{slug}"
+
+
+def _title_key(month: date, level_kind: str, region_id: int, title_key: str) -> str:
+    return f"title:{month.isoformat()}:{level_kind}:{region_id}:{title_key}"
+
+
+_WITHDRAWN = "withdrawn"
+
+
+async def _was_withdrawn(session: AsyncSession, user_id: uuid.UUID, key: str) -> bool:
+    """The award was withdrawn before its award event was handled (handlers may run out of
+    order): don't write the award row at all."""
+    found = await session.scalar(
+        select(NotificationDedupe.key).where(
+            NotificationDedupe.user_id == user_id,
+            NotificationDedupe.key == f"{_WITHDRAWN}:{key}",
+        )
+    )
+    return found is not None
+
+
 @subscribe(BadgeAwarded)
 async def on_badge_awarded(session: AsyncSession, event: BadgeAwarded) -> None:
     config, now = await _config(session), _now()
+    key = _badge_key(event.badge_slug)
+    if await _was_withdrawn(session, event.user_id, key):
+        return
     data: dict[str, str] = {"badge_slug": event.badge_slug}
     if event.badge_label:
         data["badge_label"] = event.badge_label
@@ -277,16 +308,57 @@ async def on_badge_awarded(session: AsyncSession, event: BadgeAwarded) -> None:
             kind=K.BADGE_AWARDED,
             recipient_id=event.user_id,
             data=data,
-            dedupe_key=f"badge:{event.badge_slug}",
+            dedupe_key=key,
         ),
         config=config,
         now=now,
     )
 
 
+@subscribe(AwardWithdrawn)
+async def on_award_withdrawn(session: AsyncSession, event: AwardWithdrawn) -> None:
+    """A title or badge the person no longer holds (revoked after a final review decision):
+    its award row reads "This is no longer available", without the title or badge (D109's rule
+    for deeds, applied to awards). No new notification is sent. ``AwardWithdrawn`` is scoring's
+    member-safe event (no case or reason); ``HeroTitleRevoked`` stays unheard (D112)."""
+    if event.award == "badge" and event.badge_slug:
+        key = _badge_key(event.badge_slug)
+    elif (
+        event.award == "title"
+        and event.period_month is not None
+        and event.level_kind is not None
+        and event.region_id is not None
+        and event.title_key is not None
+    ):
+        key = _title_key(event.period_month, event.level_kind, event.region_id, event.title_key)
+    else:
+        return
+    await session.execute(
+        insert(NotificationDedupe)
+        .values(user_id=event.user_id, key=f"{_WITHDRAWN}:{key}", created_at=_now())
+        .on_conflict_do_nothing()
+    )
+    await session.execute(
+        update(Notification)
+        .where(
+            Notification.user_id == event.user_id,
+            Notification.kind.in_([K.BADGE_AWARDED, K.TITLE_AWARDED]),
+            Notification.dedupe_key == key,
+        )
+        .values(data=Notification.data.op("||")(cast({_WITHDRAWN: True}, JSONB)))
+        .execution_options(synchronize_session=False)
+    )
+
+
 @subscribe(HeroTitleAwarded)
 async def on_title_awarded(session: AsyncSession, event: HeroTitleAwarded) -> None:
     config, now = await _config(session), _now()
+    if await _was_withdrawn(
+        session,
+        event.user_id,
+        _title_key(event.period_month, event.level_kind, event.region_id, event.title_key),
+    ):
+        return
     data: dict[str, str | int] = {
         "period_month": event.period_month.isoformat(),
         "region_id": event.region_id,
@@ -302,9 +374,8 @@ async def on_title_awarded(session: AsyncSession, event: HeroTitleAwarded) -> No
             kind=K.TITLE_AWARDED,
             recipient_id=event.user_id,
             data=data,
-            dedupe_key=(
-                f"title:{event.period_month.isoformat()}:{event.level_kind}:"
-                f"{event.region_id}:{event.title_key}"
+            dedupe_key=_title_key(
+                event.period_month, event.level_kind, event.region_id, event.title_key
             ),
         ),
         config=config,

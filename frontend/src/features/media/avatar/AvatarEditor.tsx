@@ -46,6 +46,8 @@ export const COPY = {
   tooSmall: `This photo is too small: pick one at least ${AVATAR_MIN_SIDE} × ${AVATAR_MIN_SIDE}.`,
   tooMany: 'You’ve changed your photo a lot today; try tomorrow.',
   failed: 'Your photo didn’t upload. Check your connection and try again.',
+  /** The upload arrived with the wrong size: not a connection problem (SEC6 follow-up). */
+  mismatch: 'That upload didn’t finish correctly. Please try again.',
   disabled: 'Profile photos are switched off for now.',
 }
 
@@ -55,6 +57,7 @@ const REJECT_COPY: Partial<Record<AvatarRejectReason, string>> = {
   too_many_pixels: COPY.tooLarge,
   animated: 'Moving pictures can’t be used. Choose a still photo.',
   corrupt: 'We couldn’t read this photo. Try another one.',
+  size_mismatch: COPY.mismatch,
 }
 
 /** The message for an error from any step of saving (P1, P2, PUT, complete). */
@@ -71,6 +74,8 @@ export function avatarErrorCopy(error: unknown): string {
       return 'The crop doesn’t fit the photo. Please try again.'
     case 'avatars_disabled':
       return COPY.disabled
+    case 'size_mismatch':
+      return COPY.mismatch
     case 'cooldown': {
       const at = error.extra.available_at
       return `You can add a new photo after ${typeof at === 'string' ? formatWhen(at) : 'a little while'}.`
@@ -174,7 +179,11 @@ export function AvatarEditor({ onClose }: { onClose: () => void }) {
       if (!pending) return finish()
       if (pending.status !== 'processing') {
         const reason = pending.reject_reason as AvatarRejectReason | null | undefined
-        throw new ApiError(422, (reason && REJECT_COPY[reason]) || COPY.failed, reason ?? null)
+        // Finished during the wait after an admin removal (Q95, SEC6-L3): say when to retry.
+        const extra =
+          reason === 'cooldown' ? { available_at: state.removed_notice?.upload_after } : {}
+        const text = (reason && REJECT_COPY[reason]) || COPY.failed
+        throw new ApiError(422, text, reason ?? null, {}, extra)
       }
     }
     // Still working: it will appear by itself once ready.

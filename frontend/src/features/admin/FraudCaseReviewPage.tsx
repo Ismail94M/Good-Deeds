@@ -1,4 +1,6 @@
 import { Avatar } from '../media/avatar/Avatar'
+// Q97 (PO 2026-11-28): fraud case and appeal screens show initials only, never a profile
+// picture (appearance bias); the API sends `avatar: null` here too.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useId, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
@@ -416,7 +418,7 @@ function AskDialog({
                     setChosen(next)
                   }}
                 />
-                <Avatar user={p} size="xs" />
+                <Avatar avatar={null} user={p} size="xs" />
                 <span>
                   {p.display_name} <span className="text-slate-600">@{p.handle}</span>
                 </span>
@@ -756,7 +758,7 @@ function PeopleCard({ detail, confirmed }: { detail: CaseDetail; confirmed: bool
             className={`flex flex-col gap-1 ${index > 0 ? 'mt-2.5 border-t border-slate-200 pt-2.5' : ''}`}
           >
             <p className="flex items-center gap-2 break-words">
-              <Avatar user={person.user} size="sm" />
+              <Avatar avatar={null} user={person.user} size="sm" />
               <span className="min-w-0">
                 <span className="font-semibold text-slate-900">{person.user.display_name}</span>{' '}
                 <span className="text-sm text-slate-600">@{person.user.handle}</span>
@@ -805,7 +807,7 @@ function ExplanationsCard({ detail, now }: { detail: CaseDetail; now: number }) 
                 className={`flex flex-col gap-1 ${index > 0 ? 'mt-2.5 border-t border-slate-200 pt-2.5' : ''}`}
               >
                 <p className="flex items-center gap-2 font-semibold text-slate-900">
-                  <Avatar user={e.user} size="xs" />
+                  <Avatar avatar={null} user={e.user} size="xs" />
                   {e.user.display_name}
                 </p>
                 <p className="text-sm text-slate-600">

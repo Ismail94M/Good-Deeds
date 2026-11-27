@@ -180,6 +180,16 @@ async def cooldown_until(
     return removed_at + timedelta(hours=limits.avatar_reupload_cooldown_hours)
 
 
+async def in_cooldown(
+    session: AsyncSession, user_id: uuid.UUID, limits: MediaLimits, now: datetime
+) -> bool:
+    """Whether ``now`` falls in the wait after the owner's latest admin removal. Checked when a
+    picture is queued (``set_avatar``) and again when it would go live (the worker), so an
+    upload queued before the removal can't skip the wait (SEC6-L3)."""
+    until = await cooldown_until(session, user_id, limits)
+    return until is not None and now < until
+
+
 # --------------------------------------------------- P2: set a new picture
 
 

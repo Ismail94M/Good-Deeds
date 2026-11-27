@@ -272,7 +272,8 @@ describe('processing states', () => {
     ['too_large', COPY.tooLarge],
     ['too_many_pixels', COPY.tooLarge],
     ['corrupt', 'We couldn’t read this photo. Try another one.'],
-    ['size_mismatch', COPY.failed],
+    // Not a connection problem: a neutral retry message (SEC6 follow-up).
+    ['size_mismatch', COPY.mismatch],
   ])('a worker rejection "%s" is explained', async (reason, text) => {
     setup({
       'GET /media/me/avatar': [
@@ -285,6 +286,49 @@ describe('processing states', () => {
     await user.click(await screen.findByRole('button', { name: 'Save' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(text)
     expect(screen.queryByText('Your profile photo is updated.')).toBeNull()
+  })
+
+  it('an upload finished during the wait after a removal says when to try again', async () => {
+    // SEC6-L3: queued before an admin removal, rejected by the worker with `cooldown`.
+    const until = '2026-11-28T10:30:00Z'
+    setup({
+      'GET /media/me/avatar': [
+        { body: NONE },
+        {
+          body: {
+            ...NONE,
+            pending: { status: 'rejected', reject_reason: 'cooldown' },
+            removed_notice: {
+              removed_at: '2026-11-27T10:30:00Z',
+              reason_label: 'Not this person / impersonation',
+              upload_after: until,
+            },
+          },
+        },
+      ],
+    })
+    const { user } = await openEditor()
+    pick()
+    await user.click(await screen.findByRole('button', { name: 'Save' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      `You can add a new photo after ${formatWhen(until)}.`,
+    )
+    expect(screen.queryByText('Your profile photo is updated.')).toBeNull()
+  })
+
+  it('a storage size mismatch never blames the connection', async () => {
+    setup({
+      'POST /media/uploads/av1/complete': {
+        status: 400,
+        body: { detail: 'The photo didn’t upload completely. Try again.', code: 'size_mismatch' },
+      },
+    })
+    const { user } = await openEditor()
+    pick()
+    await user.click(await screen.findByRole('button', { name: 'Save' }))
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(COPY.mismatch)
+    expect(alert).not.toHaveTextContent(/connection/i)
   })
 
   it('a failed job with no reason says it didn’t upload', async () => {

@@ -161,7 +161,7 @@ async def _target(
         person = await identity.get_user_by_handle(session, body.target)
         if person is None:
             raise _person_not_found()
-        # Muting needs an active account; unmuting works for any account still muted.
+        # Muting needs an active account (``unmute`` removes an existing mute first).
         if must_be_visible and not await identity.is_active(session, person.id):
             raise _person_not_found()
         return MuteTarget.PERSON, person.id
@@ -219,11 +219,20 @@ async def unmute(session: AsyncSession, user_id: uuid.UUID, body: MuteIn) -> Non
         if removed.first() is None:
             await _target(session, user_id, body, must_be_visible=True)
         return
-    target_type, target_id = await _target(session, user_id, body, must_be_visible=False)
-    await session.execute(
-        delete(NotificationMute).where(
-            NotificationMute.user_id == user_id,
-            NotificationMute.target_type == target_type,
-            NotificationMute.target_id == target_id,
+    # A person: 204 when a mute of that handle was removed, whatever the account's state now;
+    # otherwise the same answer as muting (404 unless the account is active), so unknown and
+    # suspended handles can't be told apart (SEC6-L4).
+    person = await identity.get_user_by_handle(session, body.target)
+    if person is not None:
+        removed = await session.execute(
+            delete(NotificationMute)
+            .where(
+                NotificationMute.user_id == user_id,
+                NotificationMute.target_type == MuteTarget.PERSON,
+                NotificationMute.target_id == person.id,
+            )
+            .returning(NotificationMute.target_id)
         )
-    )
+        if removed.first() is not None:
+            return
+    await _target(session, user_id, body, must_be_visible=True)

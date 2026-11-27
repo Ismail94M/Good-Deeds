@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.deeds import service as deeds
@@ -182,11 +182,19 @@ async def follower_ids_page(
 
 
 async def earlier_commenter_ids(
-    session: AsyncSession, deed_id: uuid.UUID, *, before: uuid.UUID, since: datetime
+    session: AsyncSession,
+    deed_id: uuid.UUID,
+    *,
+    before: uuid.UUID,
+    since: datetime,
+    exclude: Collection[uuid.UUID] = (),
+    limit: int | None = None,
 ) -> set[uuid.UUID]:
     """Authors of the deed's live (not deleted) comments written at or after ``since`` and
-    before the comment ``before`` (M6A D111 "also commented"). The author of ``before`` is
-    left out. Empty when ``before`` isn't a comment on this deed."""
+    before the comment ``before`` (M6A D111 "also commented"). The author of ``before`` and
+    anyone in ``exclude`` are left out. With ``limit``, at most that many authors, those who
+    commented most recently first (SEC6-M1). Empty when ``before`` isn't a comment on this
+    deed."""
     new = await session.execute(
         select(FeedComment.created_at, FeedComment.author_id).where(
             FeedComment.id == before, FeedComment.deed_id == deed_id
@@ -196,7 +204,7 @@ async def earlier_commenter_ids(
     if found is None:
         return set()
     created_at, author_id = found
-    rows = await session.scalars(
+    query = (
         select(FeedComment.author_id)
         .where(
             FeedComment.deed_id == deed_id,
@@ -206,6 +214,11 @@ async def earlier_commenter_ids(
             FeedComment.created_at <= created_at,
             FeedComment.author_id != author_id,
         )
-        .distinct()
+        .group_by(FeedComment.author_id)
+        .order_by(func.max(FeedComment.created_at).desc(), FeedComment.author_id)
     )
-    return set(rows)
+    if exclude:
+        query = query.where(FeedComment.author_id.not_in(list(exclude)))
+    if limit is not None:
+        query = query.limit(limit)
+    return set(await session.scalars(query))

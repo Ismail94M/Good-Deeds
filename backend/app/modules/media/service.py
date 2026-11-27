@@ -233,7 +233,11 @@ async def avatar_urls(
     """Signed URLs for each reference, in one query (plus one for account states). A reference
     gets None when it is malformed, isn't its owner's live picture any more (replaced, removed,
     restored under a new version) or its owner's account isn't active (D117, D122). Every
-    requested reference is in the result. The caller checks the viewer is signed in (D119)."""
+    requested reference is in the result. The caller checks the viewer is signed in (D119).
+
+    While ``avatars_enabled`` is off nothing is signed (every reference gets None), so the
+    switch hides every picture at once; URLs already issued live up to
+    ``avatar_url_ttl_minutes`` (SEC6-L6)."""
     wanted = list(dict.fromkeys(refs))
     result: dict[str, AvatarUrls | None] = dict.fromkeys(wanted)
     parsed = {ref: p for ref in wanted if (p := _keys.parse_avatar_ref(ref)) is not None}
@@ -241,6 +245,8 @@ async def avatar_urls(
         return result
     if limits is None:
         _, limits = await load_limits(session)
+    if not limits.avatars_enabled:
+        return result
     store = storage if storage is not None else get_storage()
     rows = {
         photo.id: photo

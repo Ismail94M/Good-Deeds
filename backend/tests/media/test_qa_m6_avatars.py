@@ -21,7 +21,8 @@ from app.modules.media.models import (
     PhotoStatus,
     PhotoTakedown,
 )
-from tests.deeds.helpers import Member, make_member, scan_and_report
+from tests.deeds.helpers import Member, make_member, publish_limits, scan_and_report
+from tests.deeds.invite_helpers import create_invite
 from tests.media import images
 from tests.media.helpers import fetch, limits, process_all, publish_media, uploaded_photo
 from tests.media.test_avatars import (
@@ -107,6 +108,15 @@ async def test_public_pages_never_carry_a_picture_signed_in_pages_do(
         profile = await client.get(f"/api/users/{person.handle}")
         assert profile.status_code == 200 and profile.json()["avatar"] is None
         assert "avatar_" not in profile.text
+    # The signed-out invite preview names the reporter, but never with a picture (SEC6-L2).
+    await publish_limits(session, invites_enabled=True)
+    _, token = await create_invite(session, reporter)
+    await session.commit()
+    preview = await client.get(f"/api/invites/by-token/{token}")
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["reporter"]["handle"] == reporter.handle
+    assert preview.json()["reporter"]["avatar"] is None
+    assert str(r_live.id) not in preview.text
     # Visitors can't sign a reference either.
     resp = await client.post("/api/media/avatars/urls", json={"refs": [r_ref]})
     assert resp.status_code == 401
@@ -265,6 +275,38 @@ async def test_cooldown_ends_exactly_24_hours_after_the_removal(
     # The removed one stays held (not deleted by the new picture).
     held = await fetch(session, removed_id)
     assert held.takedown == PhotoTakedown.ADMIN_REMOVED and held.status == PhotoStatus.READY
+
+
+async def test_an_upload_queued_before_an_admin_removal_never_goes_live_in_the_wait(
+    client: AsyncClient, session: AsyncSession, storage: MemoryStorage
+) -> None:
+    """SEC6-L3: the 24 h wait is checked again when the worker would make a picture live, so an
+    upload queued just before the removal is rejected (``cooldown``) and the owner is told."""
+    owner, reporter = await make_member(session), await make_member(session)
+    admin = await _with_role(session, Role.ADMIN)
+    live = await _live_avatar(client, session, storage, owner)
+    case = await _report(client, session, live.id, reporter)
+    queued = await _upload(session, storage, owner)
+    assert (await _set(client, owner, queued.id)).status_code == 202  # before the removal
+    assert await _decide(client, admin, case.id) == 200
+    await process_all(session, storage)
+
+    row = await fetch(session, queued.id)
+    assert (row.status, row.reject_reason) == (PhotoStatus.REJECTED, PhotoRejectReason.COOLDOWN)
+    assert not any(k.startswith(f"photos/{queued.id}/") for k in storage.objects)
+    assert row.staging_key not in storage.objects
+    ready = [
+        e
+        for e in await _events(session, owner.user_id, AvatarChanged.event_type)
+        if e["reason"] == "ready"
+    ]
+    assert [e["avatar_ref"] for e in ready] == [_keys.avatar_ref(live.id, 1)]
+    await _apply_changes(session, owner.user_id)
+    assert await _ref(session, owner.user_id) is None
+    mine = (await client.get("/api/media/me/avatar", headers=owner.headers)).json()
+    assert mine["current"] is None
+    assert mine["pending"] == {"status": "rejected", "reject_reason": "cooldown"}
+    assert mine["removed_notice"] is not None
 
 
 async def test_held_for_90_days_then_purged_and_not_restorable(

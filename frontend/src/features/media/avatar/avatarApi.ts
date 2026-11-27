@@ -23,9 +23,18 @@ export type AvatarUrlsOut = { items: Record<string, AvatarUrls | null> }
 /** A normalised square on the oriented image (§2.2 `photos.avatar_crop`). */
 export type AvatarCrop = { x: number; y: number; size: number }
 
-/** Why the worker refused a picture (`photos.reject_reason`). */
+/**
+ * Why the worker refused a picture (`photos.reject_reason`). `cooldown`: it would have gone live
+ * during the 24 h wait after an admin removal (Q95, SEC6-L3).
+ */
 export type AvatarRejectReason =
-  'unsupported_type' | 'too_large' | 'too_many_pixels' | 'animated' | 'corrupt' | 'size_mismatch'
+  | 'unsupported_type'
+  | 'too_large'
+  | 'too_many_pixels'
+  | 'animated'
+  | 'corrupt'
+  | 'size_mismatch'
+  | 'cooldown'
 
 /** P3 `GET /media/me/avatar`. */
 export type MyAvatar = {

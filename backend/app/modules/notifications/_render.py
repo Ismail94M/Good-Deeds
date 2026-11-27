@@ -8,7 +8,11 @@ batched queries per page:
 - A row about a deed (recognitions, network, likes, comments, replies) is shown only while the
   viewer can still see the deed in the feed (``feed.service.visible_deed_ids``). Otherwise it
   reads "This deed is no longer available", with no link and no names, so it never says who
-  withdrew or hid it (PO Q93).
+  withdrew or hid it (PO Q93). A network row holds no deed id but its deeds per actor
+  (``data["deeds"]``): it names only actors with a deed still visible to the viewer, and with
+  none left it reads "This deed is no longer available" (SEC6-L1).
+- A title or badge row whose award was later withdrawn (``data["withdrawn"]``, set by the
+  ``AwardWithdrawn`` handler) reads "This is no longer available", without the title.
 - Review updates use neutral words only (M5 D101): never a case, a type, a detector, another
   person or an admin.
 """
@@ -42,6 +46,7 @@ from app.modules.notifications.schemas import (
 K = NotificationKind
 UNAVAILABLE_NAME = "Unavailable account"
 UNAVAILABLE_DEED = "This deed is no longer available"
+UNAVAILABLE_AWARD = "This is no longer available"
 UNAVAILABLE = UserRef(handle=None, display_name=UNAVAILABLE_NAME, avatar=None)
 REVIEW_UPDATE = "There's an update for you in Reviews."
 PASSWORD_CHANGED = "Your password was changed. If this wasn't you, contact support."
@@ -195,6 +200,29 @@ def _badge_text(data: dict[str, Any]) -> str:
     return "You earned a new badge."
 
 
+def network_deeds(row: Notification) -> dict[uuid.UUID, set[uuid.UUID]]:
+    """``data["deeds"]`` of a network row: the deeds behind each named actor (SEC6-L1).
+    Anything malformed is left out (so the actor isn't named)."""
+    raw = row.data.get("deeds") if isinstance(row.data, dict) else None
+    found: dict[uuid.UUID, set[uuid.UUID]] = {}
+    if not isinstance(raw, dict):
+        return found
+    for actor, deed_ids in raw.items():
+        if not isinstance(actor, str) or not isinstance(deed_ids, list):
+            continue
+        try:
+            found[uuid.UUID(actor)] = {uuid.UUID(d) for d in deed_ids if isinstance(d, str)}
+        except ValueError:
+            continue
+    return found
+
+
+def network_actor_ids(row: Notification, visible: set[uuid.UUID]) -> list[uuid.UUID]:
+    """The row's actors (newest first) with at least one deed in ``visible``."""
+    by_actor = network_deeds(row)
+    return [a for a in row.actor_ids if by_actor.get(a, set()) & visible]
+
+
 def _render_one(row: Notification, ctx: _Context) -> NotificationItem:
     kind = row.kind
     actors = [ctx.people[a] for a in row.actor_ids if a in ctx.people]
@@ -206,6 +234,14 @@ def _render_one(row: Notification, ctx: _Context) -> NotificationItem:
 
     if kind in FEED_DEED_KINDS and row.deed_id is not None and row.deed_id not in ctx.visible:
         return _item(row, UNAVAILABLE_DEED, [], 0, None, CanMute())
+    if kind == K.NETWORK and row.deed_id is None:
+        # SEC6-L1: only actors with a deed the viewer can still see are named; the count
+        # drops the kept actors who have none. With nobody left the row names no one.
+        shown = network_actor_ids(row, ctx.visible)
+        actors = [ctx.people[a] for a in shown if a in ctx.people]
+        count = row.actor_count - (len(row.actor_ids) - len(shown))
+        if not actors:
+            return _item(row, UNAVAILABLE_DEED, [], 0, None, CanMute())
 
     who = names(actors, count)
     if kind == K.RECOGNISED:
@@ -237,6 +273,9 @@ def _render_one(row: Notification, ctx: _Context) -> NotificationItem:
     elif kind == K.FOLLOW:
         text = f"{who} started following you."
         link = _link("connections", "followers")
+    elif kind in (K.BADGE_AWARDED, K.TITLE_AWARDED) and data.get("withdrawn") is True:
+        # Revoked later (``AwardWithdrawn``): neutral, without the title or badge.
+        text = UNAVAILABLE_AWARD
     elif kind == K.BADGE_AWARDED:
         text = _badge_text(data)
         link = _link("badges", ctx.viewer_handle)
@@ -309,6 +348,10 @@ async def render(
     feed_deed_ids = {
         row.deed_id for row in rows if row.deed_id is not None and row.kind in FEED_DEED_KINDS
     }
+    for row in rows:
+        if row.kind == K.NETWORK and row.deed_id is None:
+            for ids in network_deeds(row).values():
+                feed_deed_ids |= ids
     region_ids = {
         row.data["region_id"]
         for row in rows

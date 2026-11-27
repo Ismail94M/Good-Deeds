@@ -91,6 +91,9 @@ class PhotoRejectReason(StrEnum):
     SIZE_MISMATCH = "size_mismatch"
     # The same file as a photo the doer removed from this deed (Q29).
     REMOVED_BY_DOER = "removed_by_doer"
+    # A profile picture that would have gone live during the wait after an admin removal
+    # (Q95, SEC6-L3; migration 0034).
+    COOLDOWN = "cooldown"
 
 
 class ObjectMove(StrEnum):

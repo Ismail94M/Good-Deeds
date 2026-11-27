@@ -292,7 +292,8 @@ async def preview(
         reporter=UserRef(
             handle=reporter.handle,
             display_name=reporter.display_name,
-            avatar=reporter.avatar_ref,
+            # Public (no login): never a profile picture ref (Q86, D119, SEC6-L2).
+            avatar=None,
         ),
         category=deed.category,
         description=deed.description,

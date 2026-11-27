@@ -22,8 +22,8 @@ from app.modules.notifications.models import (
     NotificationPreference,
 )
 from tests.deeds.helpers import Member, members
-from tests.feed.helpers import follow, set_post, verified_deed
-from tests.notifications.helpers import publish_notifications, rows_for
+from tests.feed.helpers import follow, set_post, verified_deed, withdraw_directly
+from tests.notifications.helpers import publish_notifications, rename, rows_for
 from tests.notifications.test_handlers import items_for, verified_event
 
 K = NotificationKind
@@ -141,14 +141,41 @@ async def test_visibility_mutes_and_preferences_are_checked_before_writing(
     assert await rows_for(session, off) == []
 
 
-async def test_a_row_written_stays_after_one_deed_is_hidden(session: AsyncSession) -> None:
-    reporter, doer, fan = await members(session, 3)
-    await follow(session, fan, reporter)
-    deed_id = await verify(session, reporter, doer)
+async def test_a_row_names_only_actors_with_a_deed_still_visible(session: AsyncSession) -> None:
+    """SEC6-L1 (D109, Q93): the row holds no deed id, so one hidden deed doesn't turn it into
+    "no longer available"; but an actor none of whose deeds the viewer can still see is no
+    longer named, and with nobody left the row names no one."""
+    ravi, priya, doer, fan = await members(session, 4)
+    ravi, priya = await rename(session, ravi, "Ravi"), await rename(session, priya, "Priya")
+    await follow(session, fan, ravi)
+    await follow(session, fan, priya)
+    ravi_first = await verify(session, ravi, doer)
+    priya_deed = await verify(session, priya, doer)
+    ravi_second = await verify(session, ravi, doer)
     await run_all(session)
-    await set_post(session, deed_id, hidden_by_reporter_at=datetime.now(UTC))
+    [row] = await network_rows(session, fan)
+    assert row.deed_id is None and row.actor_count == 2
+    assert {k: sorted(v) for k, v in row.data["deeds"].items()} == {
+        str(ravi.user_id): sorted([str(ravi_first), str(ravi_second)]),
+        str(priya.user_id): [str(priya_deed)],
+    }
+
+    # One of Ravi's deeds hidden: he still has one, so nothing changes.
+    await set_post(session, ravi_first, hidden_by_reporter_at=datetime.now(UTC))
     [item] = await items_for(session, fan)
-    assert item.text != "This deed is no longer available" and item.link is not None
+    assert item.actor_count == 2 and item.link is not None and item.link.kind == "home"
+    # Both of Ravi's deeds gone (hidden, withdrawn): only Priya is named.
+    await withdraw_directly(session, ravi_second)
+    [item] = await items_for(session, fan)
+    assert item.text == f"{priya.display_name}, who you follow, shared a good deed today."
+    assert [a.handle for a in item.actors] == [priya.handle] and item.actor_count == 1
+    assert ravi.display_name not in item.text and item.can_mute.person == priya.handle
+    # Priya's deed hidden by its doer too: no names left.
+    await set_post(session, priya_deed, hidden_by_doer_at=datetime.now(UTC))
+    [item] = await items_for(session, fan)
+    assert item.text == "This deed is no longer available"
+    assert item.actors == [] and item.actor_count == 0 and item.link is None
+    assert item.can_mute.person is None
 
 
 async def test_an_actor_starts_at_most_three_fanouts_a_day(session: AsyncSession) -> None:

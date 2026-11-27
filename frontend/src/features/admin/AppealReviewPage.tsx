@@ -1,4 +1,6 @@
 import { Avatar } from '../media/avatar/Avatar'
+// Q97 (PO 2026-11-28): fraud case and appeal screens show initials only, never a profile
+// picture (appearance bias); the API sends `avatar: null` here too.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
@@ -119,7 +121,7 @@ function Review({ appeal, onReload }: { appeal: AppealDetail; onReload: () => vo
       )}
       <header className="flex flex-col gap-2">
         <div className="flex items-center gap-3">
-          <Avatar user={appeal.user} size="lg" />
+          <Avatar avatar={null} user={appeal.user} size="lg" />
           <AdminTitle>Appeal from {name}</AdminTitle>
         </div>
         <div className="flex flex-wrap items-center gap-1.5 text-sm text-slate-600">

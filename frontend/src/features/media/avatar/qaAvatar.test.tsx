@@ -294,6 +294,29 @@ describe('§6.2 call sites', () => {
     expect(source).toMatch(/<Avatar(Link)?\b/)
   })
 
+  /** Q97 (PO 2026-11-28): initials only, never a picture, where fraud decisions are made. */
+  const FRAUD_SCREENS = [
+    'features/admin/FraudCasesPage.tsx',
+    'features/admin/FraudCaseReviewPage.tsx',
+    'features/admin/AppealsPage.tsx',
+    'features/admin/AppealReviewPage.tsx',
+  ]
+
+  it.each(FRAUD_SCREENS)('%s renders every Avatar without a picture (Q97)', (file) => {
+    const source = sources[`/src/${file}`]
+    const tags = source.match(/<Avatar(Link)?\b[^>]*>/g) ?? []
+    expect(tags.length).toBeGreaterThan(0)
+    for (const tag of tags) expect(tag).toMatch(/\bavatar=\{null\}/)
+  })
+
+  it('other admin screens keep pictures (no forced null)', () => {
+    const others = SCREENS.filter(
+      (f) => f.startsWith('features/admin/') && !FRAUD_SCREENS.includes(f),
+    )
+    expect(others.length).toBeGreaterThan(0)
+    for (const file of others) expect(sources[`/src/${file}`]).not.toMatch(/avatar=\{null\}/)
+  })
+
   it('no screen computes initials itself (only DefaultAvatar does)', () => {
     const offenders = Object.entries(sources)
       .filter(([path, src]) => !path.endsWith('/DefaultAvatar.tsx') && /\binitials\(/.test(src))

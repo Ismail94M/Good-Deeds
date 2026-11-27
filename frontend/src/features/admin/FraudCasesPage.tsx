@@ -1,6 +1,8 @@
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router'
 import { Avatar } from '../media/avatar/Avatar'
+// Q97 (PO 2026-11-28): fraud case and appeal screens show initials only, never a profile
+// picture (appearance bias); the API sends `avatar: null` here too.
 import { ErrorAlert, Loading } from '../../components/ui'
 import { formatAge } from './adminFormat'
 import { AdminMain, AdminTitle } from './adminUi'
@@ -156,7 +158,13 @@ function CaseQueueRow({ row, options }: { row: CaseRow; options: FraudOptions | 
           {/* M6 §6.2 (D124): the subjects' avatars, up to 3, overlapping. */}
           <span aria-hidden className="flex shrink-0 -space-x-2">
             {row.users.slice(0, 3).map((u) => (
-              <Avatar key={u.handle} user={u} size="xs" className="ring-2 ring-white" />
+              <Avatar
+                avatar={null}
+                key={u.handle}
+                user={u}
+                size="xs"
+                className="ring-2 ring-white"
+              />
             ))}
           </span>
           <span className="min-w-0">{namesLine(row.users, row.user_count)}</span>

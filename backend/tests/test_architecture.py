@@ -577,7 +577,8 @@ NOTIFICATIONS_SERVICE_DEPS = frozenset({"deeds", "identity"})
 # notify about is added here on purpose.
 NOTIFICATIONS_NAMED: dict[str, frozenset[str]] = {
     "media": frozenset({"PhotoModerationDecided", "PhotoRemovedByDoer", "AvatarModerationDecided"}),
-    "scoring": frozenset({"BadgeAwarded", "HeroTitleAwarded"}),
+    # AwardWithdrawn: the member-safe twin of HeroTitleRevoked/BadgeRevoked (no case data).
+    "scoring": frozenset({"BadgeAwarded", "HeroTitleAwarded", "AwardWithdrawn"}),
     "feed": frozenset(
         {
             "DeedLiked",
@@ -603,6 +604,7 @@ NOTIFICATIONS_NEVER_HEARS = frozenset(
         "fraud.deed_hold_changed",
         "fraud.flag_decision_final",
         "scoring.hero_title_revoked",
+        "scoring.badge_revoked",
         "scoring.points_changed",
     }
 )
@@ -759,6 +761,8 @@ def test_notifications_rules_catch_violations(tmp_path: Path) -> None:
     _write(app_dir, f"{n}/_f3.py", "from app.modules.fraud import service\n")
     _write(app_dir, f"{n}/_s1.py", "from app.modules.scoring.service import PointsChanged\n")
     _write(app_dir, f"{n}/_s2.py", "from app.modules.scoring.service import doer_points\n")
+    _write(app_dir, f"{n}/_s3.py", "from app.modules.scoring.service import BadgeRevoked\n")
+    _write(app_dir, f"{n}/_ok7.py", "from app.modules.scoring.service import AwardWithdrawn\n")
     _write(app_dir, f"{n}/_m1.py", "from app.modules.media.service import sign_variants\n")
     _write(app_dir, f"{n}/_d1.py", "import app.modules.deeds.models\n")
     _write(app_dir, f"{n}/_fe.py", "from app.modules.feed.service import can_view\n")
@@ -780,6 +784,7 @@ def test_notifications_rules_catch_violations(tmp_path: Path) -> None:
         f"{n}/_m1.py imports app.modules.media.service (sign_variants)",
         f"{n}/_s1.py imports app.modules.scoring.service (PointsChanged)",
         f"{n}/_s2.py imports app.modules.scoring.service (doer_points)",
+        f"{n}/_s3.py imports app.modules.scoring.service (BadgeRevoked)",
     ]
     assert _who_imports_notifications_violations(app_dir) == [
         "modules/feed/_n.py imports app.modules.notifications (service)",
@@ -798,12 +803,15 @@ def test_notifications_rules_catch_violations(tmp_path: Path) -> None:
             "fraud.appeal_decided": [ours],
             "scoring.points_changed": [ours],
             "scoring.hero_title_revoked": [ours],
+            "scoring.badge_revoked": [ours],
+            "scoring.award_withdrawn": [ours],
             "scoring.badge_awarded": [ours],
             "fraud.flag_case_resolved": ["app.modules.scoring.handlers.on_case"],
         }
     ) == [
         f"fraud.appeal_decided -> {ours}",
         f"fraud.flag_raised -> {ours}",
+        f"scoring.badge_revoked -> {ours}",
         f"scoring.hero_title_revoked -> {ours}",
         f"scoring.points_changed -> {ours}",
     ]

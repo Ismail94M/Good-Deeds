@@ -34,7 +34,7 @@ from app.modules.notifications._limits import load_notifications
 from app.modules.notifications._write import Outcome
 from app.modules.notifications.models import Notification, NotificationKind
 from app.modules.registry import load_modules
-from app.modules.scoring.service import BadgeAwarded, HeroTitleAwarded
+from app.modules.scoring.service import AwardWithdrawn, BadgeAwarded, HeroTitleAwarded
 from tests.deeds.helpers import Member, make_member, members
 from tests.feed.helpers import verified_deed, withdraw_directly
 from tests.fraud.appeal_helpers import appeal, appeal_of, confirm, decide_appeal, notice_of, pair
@@ -94,6 +94,8 @@ def test_notifications_hears_exactly_the_catalogue_events() -> None:
         AvatarModerationDecided.event_type,
         BadgeAwarded.event_type,
         HeroTitleAwarded.event_type,
+        # Member-safe twin of the revocations (no case data): award rows read neutrally.
+        AwardWithdrawn.event_type,
         PasswordChanged.event_type,
         MemberReviewUpdate.event_type,
         "fraud.reviews_seen",

@@ -303,7 +303,8 @@ async def _finish_ready(
     keys: dict[str, str],
     sha: str,
     now: datetime,
-) -> None:
+    limits: MediaLimits,
+) -> PhotoStatus:
     avatar = claimed.purpose == PhotoPurpose.AVATAR
     if avatar:
         # The owner's lock before the row lock (_avatars lock order).
@@ -331,7 +332,19 @@ async def _finish_ready(
                 .execution_options(synchronize_session=False)
             )
             await session.commit()
-        return
+        return PhotoStatus.READY
+    if avatar and await _avatars.in_cooldown(session, photo.uploader_user_id, limits, now):
+        # Q95, SEC6-L3: an upload queued before an admin removal must not go live during the
+        # wait. Rejected with a reason the owner sees (P3 ``pending.reject_reason``).
+        photo.status = PhotoStatus.REJECTED
+        photo.reject_reason = PhotoRejectReason.COOLDOWN
+        photo.content_sha256 = sha
+        photo.processed_at = now
+        await session.commit()
+        log.info("photo %s rejected: %s", claimed.id, PhotoRejectReason.COOLDOWN.value)
+        await _delete_staging(session, storage, claimed, now)
+        await _delete_keys(storage, claimed.id, list(keys.values()))
+        return PhotoStatus.REJECTED
     superseded = False
     purge: list[tuple[uuid.UUID, list[str]]] = []
     if avatar:
@@ -368,6 +381,7 @@ async def _finish_ready(
     await _delete_staging(session, storage, claimed, now)
     if purge:
         await _avatars.purge_now(session, storage, purge, now)
+    return PhotoStatus.READY
 
 
 async def process_one(
@@ -443,8 +457,7 @@ async def process_one(
         await _retry_or_fail(session, storage, claimed, limits, clock())
         return None
 
-    await _finish_ready(session, storage, claimed, variants, keys, sha, clock())
-    return PhotoStatus.READY
+    return await _finish_ready(session, storage, claimed, variants, keys, sha, clock(), limits)
 
 
 async def process_batch(

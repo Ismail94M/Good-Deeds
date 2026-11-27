@@ -34,7 +34,7 @@ from app.modules.notifications.models import (
     NotificationMute,
 )
 from app.modules.notifications.schemas import NotificationItem
-from app.modules.scoring.service import BadgeAwarded, HeroTitleAwarded
+from app.modules.scoring.service import AwardWithdrawn, BadgeAwarded, HeroTitleAwarded
 from tests.deeds.helpers import Member, members
 from tests.feed.helpers import verified_deed, withdraw_directly
 from tests.notifications.helpers import publish_notifications, rows_for
@@ -236,6 +236,36 @@ async def test_replies_skip_old_and_deleted_comments_and_can_be_switched_off(
     assert await rows_for(session, late) == []
 
 
+async def test_also_commented_reaches_at_most_the_configured_recent_commenters(
+    session: AsyncSession,
+) -> None:
+    """SEC6-M1: per new comment, at most ``replies.max_recipients_per_comment`` earlier
+    commenters hear about it, those who commented most recently first. The doer and reporter
+    (who get their own comment rows) don't use up the cap; mutes still apply."""
+    doer, reporter, author, *earlier = await members(session, 8)
+    deed_id = await verified_deed(session, reporter, doer)
+    _, config = await load_notifications(session)
+    assert config.replies.max_recipients_per_comment == 200
+    await publish_notifications(session, replies={"max_recipients_per_comment": 2})
+    start = datetime.now(UTC) - timedelta(hours=2)
+    for i, person in enumerate(earlier):  # earlier[-1] commented last
+        await comment(session, deed_id, person, at=start + timedelta(minutes=i))
+    await comment(session, deed_id, doer, at=start + timedelta(minutes=30))
+    # The most recent commenter muted the deed: they still take a place, and hear nothing.
+    session.add(
+        NotificationMute(
+            user_id=earlier[-1].user_id, target_type=MuteTarget.DEED, target_id=deed_id
+        )
+    )
+    await posted(session, deed_id, author)
+
+    told = [p for p in earlier if [r.kind for r in await rows_for(session, p)] == [K.REPLY]]
+    assert told == [earlier[-2]]
+    for person in earlier[:-2]:
+        assert await rows_for(session, person) == []
+    assert [r.kind for r in await rows_for(session, doer)] == [K.COMMENT]
+
+
 async def test_new_followers_group_per_day(session: AsyncSession) -> None:
     target, a, b = await members(session, 3)
     for follower in (a, b, a):
@@ -376,6 +406,68 @@ async def test_titles_read_with_region_and_month(session: AsyncSession) -> None:
         f"You earned the title {city.name} City Kindness Hero · October 2026!",
         f"You're Kindness Hero of {city.name} for October 2026!",
     ]
+
+
+async def test_a_withdrawn_title_or_badge_reads_no_longer_available(
+    session: AsyncSession,
+) -> None:
+    """A title or badge revoked later (scoring's member-safe ``AwardWithdrawn``): the award row
+    reads "This is no longer available", without the title, the badge or a link. Other awards
+    are untouched; an award heard after its withdrawal writes nothing."""
+    owner, other = await members(session, 2)
+    city = await deeds.default_region(session)
+    month = date(2026, 10, 1)
+    title = HeroTitleAwarded(
+        user_id=owner.user_id,
+        period_month=month,
+        region_id=city.id,
+        level_kind="ward",
+        place=1,
+        title_key="hero",
+        title_label="Kindness Hero · {region} · {month}",
+    )
+    await handlers.on_title_awarded(session, title)
+    await handlers.on_title_awarded(session, title.model_copy(update={"user_id": other.user_id}))
+    for slug in ("kind_5", "kind_25"):
+        await handlers.on_badge_awarded(
+            session, BadgeAwarded(user_id=owner.user_id, badge_slug=slug, badge_label=slug)
+        )
+    await session.flush()
+
+    await handlers.on_award_withdrawn(
+        session,
+        AwardWithdrawn(
+            user_id=owner.user_id,
+            award="title",
+            period_month=month,
+            level_kind="ward",
+            region_id=city.id,
+            title_key="hero",
+        ),
+    )
+    await handlers.on_award_withdrawn(
+        session, AwardWithdrawn(user_id=owner.user_id, award="badge", badge_slug="kind_5")
+    )
+    await session.flush()
+    items = {i.text: i for i in await items_for(session, owner)}
+    assert set(items) == {"This is no longer available", "You earned the kind_25 badge."}
+    gone = items["This is no longer available"]
+    assert gone.link is None and gone.actors == []
+    assert len(await rows_for(session, owner)) == 3  # rows stay; two read neutrally
+    assert city.name not in " ".join(items)
+    # Someone else's same title is theirs, still shown.
+    [theirs] = await items_for(session, other)
+    assert theirs.text == f"You're Kindness Hero of {city.name} for October 2026!"
+
+    # Heard out of order: the withdrawal first, then the award: no row at all.
+    await handlers.on_award_withdrawn(
+        session, AwardWithdrawn(user_id=other.user_id, award="badge", badge_slug="kind_100")
+    )
+    await handlers.on_badge_awarded(
+        session, BadgeAwarded(user_id=other.user_id, badge_slug="kind_100", badge_label="100")
+    )
+    await session.flush()
+    assert [r.kind for r in await rows_for(session, other)] == [K.TITLE_AWARDED]
 
 
 # --------------------------------------------------- identity

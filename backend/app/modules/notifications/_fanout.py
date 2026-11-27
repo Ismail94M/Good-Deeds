@@ -18,7 +18,10 @@ and 3 others you follow shared good deeds today".
   The deed's own reporter and doer get their *About you* rows instead, never a network row.
   At ``network.max_recipients_per_event`` people it stops with status ``capped``.
 - Network rows store **no deed id**: they link to Home (Stories), so one hidden or withdrawn
-  deed never turns the day's row into "This deed is no longer available".
+  deed never turns the day's row into "This deed is no longer available". The contributing
+  deeds are kept per named actor in ``data["deeds"]`` (SEC6-L1, D109/Q93): on read the row names
+  only actors with at least one deed the viewer can still see, and reads "This deed is no
+  longer available" (no names) when none is left.
 """
 
 import uuid
@@ -160,8 +163,10 @@ async def _run_batch(
                     kind=NotificationKind.NETWORK,
                     recipient_id=person.user_id,
                     actor_id=actor,
-                    # Decision (b): no deed id; the row links to Home (Stories).
+                    # Decision (b): no deed id; the row links to Home (Stories). The deed is
+                    # kept per actor in ``data["deeds"]`` for the render check (SEC6-L1).
                     data={"day": ist_day(now, config).isoformat()},
+                    network_deed_id=fanout.deed_id,
                 ),
                 config=config,
                 now=now,

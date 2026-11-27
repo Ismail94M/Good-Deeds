@@ -117,6 +117,28 @@ async def test_unknown_or_inactive_person_is_404(
     assert await _mute(client, me, "person", gone.handle) == 404
 
 
+async def test_unmute_answers_the_same_for_unknown_and_suspended_handles(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """SEC6-L4: no account-state oracle. Unmuting someone you muted works whatever their state
+    is now; otherwise an unknown and a suspended handle both get the same 404."""
+    me, gone, muted_then_gone = await members(session, 3)
+    assert await _mute(client, me, "person", muted_then_gone.handle) == 204
+    await set_status(session, gone, UserStatus.SUSPENDED)
+    await set_status(session, muted_then_gone, UserStatus.SUSPENDED)
+    await session.commit()  # a refused request rolls back uncommitted work
+    unknown = await client.request(
+        "DELETE", MUTES, headers=me.headers, json={"type": "person", "target": "no-such-handle"}
+    )
+    suspended = await client.request(
+        "DELETE", MUTES, headers=me.headers, json={"type": "person", "target": gone.handle}
+    )
+    assert unknown.status_code == suspended.status_code == 404
+    assert unknown.json() == suspended.json()
+    assert await _unmute(client, me, "person", muted_then_gone.handle) == 204
+    assert await _unmute(client, me, "person", muted_then_gone.handle) == 404
+
+
 async def test_mute_a_deed(client: AsyncClient, session: AsyncSession) -> None:
     doer = await rename(session, await make_member(session), "Ahmed")
     reporter, viewer, liker = await members(session, 3)

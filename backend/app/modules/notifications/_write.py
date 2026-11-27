@@ -79,6 +79,10 @@ class Notice:
     data: Mapping[str, Any] = field(default_factory=dict)
     # Required for non-grouped kinds, e.g. ``recognised:{deed_id}``.
     dedupe_key: str | None = None
+    # A network row's deed (SEC6-L1): never the row's ``deed_id`` (one hidden deed must not
+    # turn the day's row into "no longer available"), but kept per actor in ``data["deeds"]``
+    # so the row names only actors with a deed the viewer can still see.
+    network_deed_id: uuid.UUID | None = None
 
 
 def ist_day(now: datetime, config: NotificationsConfig) -> date:
@@ -181,6 +185,19 @@ _INSERT_GROUPED = text(
     "ON CONFLICT (user_id, group_key) WHERE read_at IS NULL AND group_key IS NOT NULL "
     "DO UPDATE SET " + _FOLD.format(table="notifications.") + " RETURNING (xmax = 0) AS inserted"
 )
+# SEC6-L1: add the notice's deed to its actor's list in ``data["deeds"]`` of the unread row,
+# keeping entries only for the actors the row still names (``actor_ids``, at most
+# ``actors_kept``), so ``data`` stays small.
+_ADD_NETWORK_DEED = text(
+    "UPDATE notifications SET data = jsonb_set(data, '{deeds}', COALESCE(("
+    "SELECT jsonb_object_agg(e.key, e.value) FROM jsonb_each("
+    "COALESCE(data->'deeds', CAST('{}' AS jsonb)) || jsonb_build_object(CAST(:actor AS text), ("
+    "SELECT jsonb_agg(DISTINCT v) FROM jsonb_array_elements_text("
+    "COALESCE(data->'deeds'->CAST(:actor AS text), CAST('[]' AS jsonb)) "
+    "|| jsonb_build_array(CAST(:deed AS text))) AS v))) AS e "
+    "WHERE CAST(e.key AS uuid) = ANY(actor_ids)), CAST('{}' AS jsonb)), true) "
+    "WHERE user_id = :user_id AND group_key = :group_key AND read_at IS NULL"
+)
 _INSERT_SINGLE = text(
     "INSERT INTO notifications (id, user_id, kind, category, actor_ids, actor_count, deed_id, "
     "ref_id, data, dedupe_key, created_at, updated_at) VALUES (:id, :user_id, :kind, :category, "
@@ -204,8 +221,6 @@ async def _write_grouped(
     group = group_key(notice.kind, notice.deed_id, day)
     assert group is not None
     claim = f"{group}|{actor}"
-    if not await _claim(session, notice.recipient_id, claim, now):
-        return Outcome.DUPLICATE
     params: dict[str, Any] = {
         "user_id": notice.recipient_id,
         "group_key": group,
@@ -213,7 +228,29 @@ async def _write_grouped(
         "keep": config.actors_kept,
         "now": now,
     }
+    data = dict(notice.data)
+    if notice.network_deed_id is not None:
+        data["deeds"] = {str(actor): [str(notice.network_deed_id)]}
+
+    async def add_deed() -> None:
+        if notice.network_deed_id is not None:
+            await session.execute(
+                _ADD_NETWORK_DEED,
+                {
+                    "user_id": notice.recipient_id,
+                    "group_key": group,
+                    "actor": str(actor),
+                    "deed": str(notice.network_deed_id),
+                },
+            )
+
+    if not await _claim(session, notice.recipient_id, claim, now):
+        # The actor is in the group already: another deed of theirs today still keeps their
+        # name on the row while it is visible.
+        await add_deed()
+        return Outcome.DUPLICATE
     if (await session.execute(_FOLD_UNREAD, params)).first() is not None:
+        await add_deed()
         return Outcome.GROUPED
     cap = config.daily_cap(category)
     if cap is not None and not await _take_daily_slot(
@@ -231,10 +268,12 @@ async def _write_grouped(
                 "category": category.value,
                 "deed_id": notice.deed_id,
                 "ref_id": notice.ref_id,
-                "data": json.dumps(dict(notice.data)),
+                "data": json.dumps(data),
             },
         )
     ).scalar_one()
+    if not inserted:
+        await add_deed()
     return Outcome.CREATED if inserted else Outcome.GROUPED
 
 

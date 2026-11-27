@@ -346,6 +346,25 @@ async def test_avatar_urls(
     assert (await public_summaries(session, [owner.user_id]))[owner.user_id].avatar_ref is None
 
 
+async def test_switching_avatars_off_signs_nothing(
+    client: AsyncClient, session: AsyncSession, storage: MemoryStorage
+) -> None:
+    """SEC6-L6: ``avatars_enabled = false`` is a fast "hide all pictures" switch: every ref
+    comes back null (the frontend shows the default), and switching on again signs again."""
+    owner, viewer = await make_member(session), await make_member(session)
+    live = await _live_avatar(client, session, storage, owner)
+    ref = _keys.avatar_ref(live.id, 1)
+    body = {"refs": [ref]}
+    await publish_media(session, avatars_enabled=False)
+    await session.commit()
+    resp = await client.post("/api/media/avatars/urls", json=body, headers=viewer.headers)
+    assert resp.status_code == 200 and resp.json()["items"] == {ref: None}
+    await publish_media(session, avatars_enabled=True)
+    await session.commit()
+    resp = await client.post("/api/media/avatars/urls", json=body, headers=viewer.headers)
+    assert resp.json()["items"][ref] is not None
+
+
 async def test_avatar_sign_rate_limit(
     client: AsyncClient, session: AsyncSession, storage: MemoryStorage
 ) -> None:

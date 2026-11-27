@@ -79,7 +79,8 @@ async def test_doer_sees_only_verified_and_rejected_deeds_in_list_and_detail(
     # Nothing to change on a rejected deed, and the doer never gets edit or withdraw anyway.
     assert listed[-1]["can_edit"] is False and listed[-1]["can_withdraw"] is False
     for item in listed:
-        assert set(item["reporter"]) == {"handle", "display_name"}
+        # A person ref carries the handle, name and avatar ref (M6A D117), nothing else.
+        assert set(item["reporter"]) == {"handle", "display_name", "avatar"}
 
     for deed in hidden:
         response = await client.get(f"/api/deeds/{deed.id}", headers=doer.headers)

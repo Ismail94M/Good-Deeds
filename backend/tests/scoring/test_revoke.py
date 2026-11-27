@@ -225,6 +225,17 @@ async def test_revoked_title_is_not_passed_on_and_the_final_board_is_frozen(
     assert (audit.action, audit.actor_id, audit.reason) == ("hero_title.revoked", adm.user_id, NOTE)
     (event,) = await events(session, "scoring.hero_title_revoked")
     assert event["title_id"] == str(title.id) and event["case_id"] == str(case_id)
+    # The member-safe twin for notifications: the title's key, no case, reason or admin.
+    (safe,) = await events(session, "scoring.award_withdrawn")
+    assert safe == {
+        "user_id": str(a.user_id),
+        "award": "title",
+        "badge_slug": None,
+        "period_month": title.period_month.isoformat(),
+        "level_kind": title.level_kind.value,
+        "region_id": title.region_id,
+        "title_key": title.title_key,
+    }
 
     status, body = await _revoke(client, adm, title.id, case_id)
     assert (status, body["code"]) == (409, "already_revoked")
@@ -290,6 +301,9 @@ async def test_user_view_and_badge_revocation(client: AsyncClient, session: Asyn
     assert (await badges_for(session, [a.user_id]))[a.user_id] == []
     (event,) = await events(session, "scoring.badge_revoked")
     assert (event["badge_id"], event["badge_slug"]) == (str(badge.id), slug)
+    (safe,) = await events(session, "scoring.award_withdrawn")
+    assert (safe["award"], safe["badge_slug"], safe["user_id"]) == ("badge", slug, str(a.user_id))
+    assert "case_id" not in safe
     status, out = await _revoke(client, adm, badge.id, case_id, kind="badges")
     assert (status, out["code"]) == (409, "already_revoked")
 

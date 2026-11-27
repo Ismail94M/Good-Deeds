@@ -142,6 +142,23 @@ class HeroTitleRevoked(DomainEvent):
     case_id: uuid.UUID
 
 
+class AwardWithdrawn(DomainEvent):
+    """Member-safe twin of ``HeroTitleRevoked`` / ``BadgeRevoked`` (M6A, SEC6 follow-up): the
+    person no longer holds a title or badge. No case, reason or admin, so notifications may hear
+    it (D104, D112) and turn the earlier award row into "This is no longer available". A title
+    is named by ``period_month``, ``level_kind``, ``region_id`` and ``title_key``; a badge by
+    ``badge_slug``."""
+
+    event_type = "scoring.award_withdrawn"
+    user_id: uuid.UUID
+    award: Literal["title", "badge"]
+    badge_slug: str | None = None
+    period_month: date | None = None
+    level_kind: Literal["country", "state", "city", "ward"] | None = None
+    region_id: int | None = None
+    title_key: str | None = None
+
+
 class BadgeRevoked(DomainEvent):
     """An admin revoked a badge for a confirmed case (docs/M5-DESIGN.md D92)."""
 

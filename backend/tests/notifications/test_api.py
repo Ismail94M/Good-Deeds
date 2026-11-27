@@ -13,10 +13,13 @@ from app.core.ratelimit import InMemoryRateLimiter
 from app.modules.identity.models import UserStatus
 from app.modules.notifications._limits import load_notifications
 from app.modules.notifications._purge import purge
+from app.modules.notifications._write import Outcome
 from app.modules.notifications.models import (
+    FanoutStatus,
     NotificationCategory,
     NotificationDailyCount,
     NotificationDedupe,
+    NotificationFanout,
     NotificationKind,
 )
 from tests.deeds.helpers import Member, make_member, members
@@ -378,6 +381,59 @@ async def test_purge_removes_old_rows(session: AsyncSession) -> None:
         select(NotificationDedupe).where(NotificationDedupe.user_id == doer.user_id)
     )
     assert list(left) == []
+
+
+async def test_purge_keeps_group_claims_while_the_row_lives_and_drops_old_fanouts(
+    session: AsyncSession,
+) -> None:
+    """SEC6-L5: a like claim older than ``dedupe_days`` stays while its grouped row exists (so
+    unlike and like again can't count twice in a 90-day row); finished fan-out records go with
+    the history window."""
+    doer, reporter, a, b = await members(session, 4)
+    deed = await verified_deed(session, reporter, doer)
+    lonely = await verified_deed(session, reporter, doer)
+    now = datetime.now(UTC)
+    _, config = await load_notifications(session)
+    assert config.dedupe_days < 40 < config.retention_days
+    then = now - timedelta(days=40)
+    assert await send(session, K.LIKE, doer, actor=a, deed_id=deed, now=then) == Outcome.CREATED
+    # b's claim on a group whose row is gone (read and purged): it may go.
+    session.add(
+        NotificationDedupe(user_id=doer.user_id, key=f"like:{lonely}|{b.user_id}", created_at=then)
+    )
+    old_deed, new_deed, running_deed = [await verified_deed(session, reporter, doer) for _ in "abc"]
+    for deed_id, status, finished in (
+        (old_deed, FanoutStatus.DONE, now - timedelta(days=config.retention_days + 1)),
+        (new_deed, FanoutStatus.CAPPED, now - timedelta(days=10)),
+        (running_deed, FanoutStatus.RUNNING, None),
+    ):
+        session.add(
+            NotificationFanout(
+                deed_id=deed_id,
+                actor_ids=[reporter.user_id],
+                recipients=0,
+                status=status,
+                created_at=now - timedelta(days=config.retention_days + 2),
+                finished_at=finished,
+            )
+        )
+    await session.flush()
+
+    result = await purge(session, config, now)
+    assert result.fanouts >= 1
+    keys = set(
+        await session.scalars(
+            select(NotificationDedupe.key).where(NotificationDedupe.user_id == doer.user_id)
+        )
+    )
+    assert f"like:{deed}|{a.user_id}" in keys
+    assert f"like:{lonely}|{b.user_id}" not in keys
+    left = set(await session.scalars(select(NotificationFanout.deed_id)))
+    assert old_deed not in left and {new_deed, running_deed} <= left
+    # a likes again (after an unlike): still counted once.
+    assert await send(session, K.LIKE, doer, actor=a, deed_id=deed, now=now) == Outcome.DUPLICATE
+    [row] = [r for r in await rows_for(session, doer) if r.kind == K.LIKE]
+    assert row.actor_count == 1
 
 
 async def test_actors_carry_their_avatar_ref(client: AsyncClient, session: AsyncSession) -> None:

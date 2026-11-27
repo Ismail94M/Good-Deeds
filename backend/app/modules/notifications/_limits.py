@@ -1,8 +1,8 @@
 """Typed values of the ``notifications`` config namespace (docs/M6-DESIGN.md §2.5, D107 to D115).
 
 Every key is required and has no default: the ``config_versions`` rows (seeded as
-``notifications`` v1 by migration 0030) are the only source of these values. Change them by
-publishing a new version.
+``notifications`` v1 by migration 0030; migration 0034 adds ``replies.max_recipients_per_comment``)
+are the only source of these values. Change them by publishing a new version.
 """
 
 from typing import Literal, Self
@@ -70,6 +70,8 @@ class ReplyRules(_Frozen):
 
     enabled: bool
     lookback_days: int = Field(ge=1, le=365)
+    # SEC6-M1: earlier commenters told per new comment (the most recent ones first).
+    max_recipients_per_comment: int = Field(ge=1, le=5_000)
 
 
 class DailyCaps(_Frozen):
