@@ -24,7 +24,7 @@ from app.modules.scoring._ledger import reconcile_deed
 from app.modules.scoring._limits import load_leaderboard
 from app.modules.scoring.models import LedgerKind, LedgerReason, LedgerRole, PointsLedger
 from app.modules.scoring.service import badges_for, final_snapshot, titles_for
-from tests.deeds.helpers import Member, members, scan_and_report
+from tests.deeds.helpers import OUTBOX_WRITE_ORDER, Member, members, scan_and_report
 from tests.fraud.helpers import run_fraud
 from tests.scoring.board_helpers import city, counted, entries, ist, month
 from tests.scoring.helpers import active, ledger, points, run_scoring
@@ -72,7 +72,7 @@ async def _points_changed(session: AsyncSession, deed_id: uuid.UUID) -> list[dic
             OutboxEvent.event_type == "scoring.points_changed",
             OutboxEvent.payload["deed_id"].astext == str(deed_id),
         )
-        .order_by(OutboxEvent.occurred_at, OutboxEvent.id)
+        .order_by(*OUTBOX_WRITE_ORDER)
     )
     return [r.payload for r in rows]
 
