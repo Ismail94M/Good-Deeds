@@ -52,6 +52,8 @@ def _users_fk() -> ForeignKey:
 class PhotoPurpose(StrEnum):
     DEED = "deed"
     SELF_LOG = "self_log"
+    # M6A profile picture (D116, migration 0031): no deed or self-log, one live per uploader.
+    AVATAR = "avatar"
 
 
 class PhotoStatus(StrEnum):
@@ -116,15 +118,19 @@ class PhotoReportReason(StrEnum):
     PRIVATE_DETAILS = "private_details"
     INAPPROPRIATE = "inappropriate"
     OTHER = "other"
+    # "Not this person / impersonation" (profile pictures, D121, migration 0031).
+    IMPERSONATION = "impersonation"
 
 
-# Queue priority per reason (Q44): 1 = child, 2 = privacy and harm (equal), 3 = other.
+# Queue priority per reason (Q44): 1 = child, 2 = privacy, harm and impersonation (equal),
+# 3 = other.
 # A case's priority is the minimum over its reports.
 PHOTO_REPORT_PRIORITY: dict[PhotoReportReason, int] = {
     PhotoReportReason.CHILD_NO_GUARDIAN_CONSENT: 1,
     PhotoReportReason.NOT_CONSENTED: 2,
     PhotoReportReason.PRIVATE_DETAILS: 2,
     PhotoReportReason.INAPPROPRIATE: 2,
+    PhotoReportReason.IMPERSONATION: 2,
     PhotoReportReason.OTHER: 3,
 }
 
@@ -133,6 +139,18 @@ class PhotoDecisionAction(StrEnum):
     KEEP = "keep"
     REMOVE = "remove"
     RESTORE = "restore"
+
+
+# ``photos.avatar_crop`` is an object of three numbers in 0..1, ``size`` above 0 (migration 0031).
+AVATAR_CROP_SHAPE_SQL = (
+    "avatar_crop IS NULL OR (jsonb_typeof(avatar_crop) = 'object' AND CASE "
+    "WHEN jsonb_typeof(avatar_crop->'x') = 'number' AND jsonb_typeof(avatar_crop->'y') = 'number' "
+    "AND jsonb_typeof(avatar_crop->'size') = 'number' "
+    "THEN (avatar_crop->>'x')::numeric BETWEEN 0 AND 1 "
+    "AND (avatar_crop->>'y')::numeric BETWEEN 0 AND 1 "
+    "AND (avatar_crop->>'size')::numeric > 0 AND (avatar_crop->>'size')::numeric <= 1 "
+    "ELSE false END)"
+)
 
 
 class Photo(Base):
@@ -146,7 +164,26 @@ class Photo(Base):
             "AND (self_log_id IS NULL OR purpose = 'self_log')",
             name="owner_matches_purpose",
         ),
-        CheckConstraint("takedown = 'none' OR purpose = 'deed'", name="takedown_deed_only"),
+        # Admin removal applies to deed photos and profile pictures (D121); the name is kept.
+        CheckConstraint(
+            "takedown = 'none' OR purpose IN ('deed', 'avatar')", name="takedown_deed_only"
+        ),
+        # A doer removal (Q29) is for deed photos only.
+        CheckConstraint(
+            "takedown <> 'doer_removed' OR purpose = 'deed'", name="doer_removed_deed_only"
+        ),
+        # D116: the crop belongs to profile pictures only, and is required once processing is
+        # queued. ``{x, y, size}`` are numbers normalised 0..1 on the oriented image (the service
+        # checks the square in pixels).
+        CheckConstraint(
+            "avatar_crop IS NULL OR purpose = 'avatar'", name="avatar_crop_avatar_only"
+        ),
+        CheckConstraint(
+            "purpose <> 'avatar' OR avatar_crop IS NOT NULL "
+            "OR status NOT IN ('queued', 'processing', 'ready')",
+            name="avatar_crop_required",
+        ),
+        CheckConstraint(AVATAR_CROP_SHAPE_SQL, name="avatar_crop_shape"),
         CheckConstraint(
             "status <> 'ready' OR (variant_keys IS NOT NULL AND width IS NOT NULL "
             "AND height IS NOT NULL)",
@@ -168,6 +205,13 @@ class Photo(Base):
             name="content_sha256_hex",
         ),
         CheckConstraint("jsonb_typeof(blur_regions) = 'array'", name="blur_regions_array"),
+        # D116: one live profile picture per person.
+        Index(
+            "uq_photos_live_avatar",
+            "uploader_user_id",
+            unique=True,
+            postgresql_where=text("purpose = 'avatar' AND status = 'ready' AND takedown = 'none'"),
+        ),
         # Carousel slots: one live photo per position per owner.
         Index(
             "uq_photos_deed_position",
@@ -260,6 +304,9 @@ class Photo(Base):
     # Of the ``display`` variant.
     width: Mapped[int | None] = mapped_column(Integer)
     height: Mapped[int | None] = mapped_column(Integer)
+    # Profile pictures only: the square ``{x, y, size}`` (normalised 0..1 on the oriented
+    # image) cut out on the server; pixels outside it are never stored (D116).
+    avatar_crop: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
     # Normalised ellipses applied by the worker (numbers only).
     blur_regions: Mapped[list[Any]] = mapped_column(
         JSONB, default=list, server_default=text("'[]'::jsonb")

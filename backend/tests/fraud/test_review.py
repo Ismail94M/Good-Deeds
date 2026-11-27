@@ -725,7 +725,7 @@ async def test_explanation_requests(client: AsyncClient, session: AsyncSession) 
     assert await audit_actions(session, ring.case_id) == ["flag_case.explanation_requested"] * 2
     assert (await case_row(session, ring.case_id)).status == FlagCaseStatus.OPEN
 
-    await publish_fraud(session, explanation={"reply_days": 3})
+    await publish_fraud(session, explanation={"reply_days": 3, "reminder_days_before_due": 1})
     await session.commit()
     other = await reciprocal_case(session)
     res = await client.post(

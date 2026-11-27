@@ -123,10 +123,23 @@ async def test_owner_matches_purpose(session: AsyncSession) -> None:
 
 async def test_takedown_only_on_deed_photos(session: AsyncSession) -> None:
     (user,) = await _users(session, 1)
+    removed_at = datetime(2026, 11, 19, tzinfo=UTC)
     await _rejects(
         session,
         "ck_photos_takedown_deed_only",
-        _photo(user, purpose=PhotoPurpose.SELF_LOG, takedown=PhotoTakedown.DOER_REMOVED),
+        _photo(
+            user,
+            purpose=PhotoPurpose.SELF_LOG,
+            takedown=PhotoTakedown.ADMIN_REMOVED,
+            removed_at=removed_at,
+        ),
+    )
+    # M6A (migration 0031): admins may remove profile pictures, but a doer removal stays
+    # deed-only.
+    await _rejects(
+        session,
+        "ck_photos_doer_removed_deed_only",
+        _photo(user, purpose=PhotoPurpose.AVATAR, takedown=PhotoTakedown.DOER_REMOVED),
     )
 
 
@@ -163,7 +176,7 @@ async def test_photo_value_checks(
     ("column", "value", "constraint"),
     [
         ("status", "lost", "ck_photos_photo_status"),
-        ("purpose", "avatar", "ck_photos_photo_purpose"),
+        ("purpose", "banner", "ck_photos_photo_purpose"),
         ("takedown", "hidden", "ck_photos_photo_takedown"),
         ("declared_type", "image/gif", "ck_photos_photo_declared_type"),
         ("object_move", "copy", "ck_photos_photo_object_move"),
@@ -279,6 +292,7 @@ def test_priorities_follow_q44() -> None:
         PhotoReportReason.NOT_CONSENTED: 2,
         PhotoReportReason.PRIVATE_DETAILS: 2,
         PhotoReportReason.INAPPROPRIATE: 2,
+        PhotoReportReason.IMPERSONATION: 2,  # profile pictures (D121)
         PhotoReportReason.OTHER: 3,
     }
 

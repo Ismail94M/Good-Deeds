@@ -346,6 +346,19 @@ class ExplanationRequest(Base):
     replied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class ExplanationReminder(Base):
+    """The one reminder sent for an explanation request (M6A D112, migration 0033): written by
+    ``fraud.remind_explanations`` with the ``MemberReviewUpdate`` it emits, so the reminder fires
+    once. Insert-only (``forbid_modification()``)."""
+
+    __tablename__ = "explanation_reminders"
+
+    request_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("explanation_requests.id", ondelete="RESTRICT"), primary_key=True
+    )
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class DecisionNotice(Base):
     """What a person is told about an adverse decision on their own deeds (D100): one per person
     per confirmed case, or per lowering override. ``items`` holds ids and numbers only. Only
