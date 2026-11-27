@@ -167,7 +167,7 @@ function Review({ appeal, onReload }: { appeal: AppealDetail; onReload: () => vo
                   </div>
                   <Link
                     to={`/admin/scoring/deeds/${encodeURIComponent(item.deed_id)}`}
-                    className={`${linkClass} self-start text-sm`}
+                    className={`${linkClass} inline-flex min-h-11 items-center self-start text-sm`}
                     aria-label={`Points and overrides for ${item.reporter.display_name} → ${item.doer.display_name}, ${item.category_label}`}
                   >
                     Points and overrides

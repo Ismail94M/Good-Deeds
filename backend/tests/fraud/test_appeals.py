@@ -21,7 +21,7 @@ from app.modules.fraud.models import (
 )
 from app.modules.identity.models import Role
 from app.modules.scoring.models import PointsLedger
-from tests.deeds.helpers import count, make_member, outbox
+from tests.deeds.helpers import Member, count, make_member, outbox
 from tests.fraud.appeal_helpers import (
     APPEAL_EVENT,
     HOLD_EVENT,
@@ -218,6 +218,18 @@ async def test_appeals_queue_tabs_and_cursor(client: AsyncClient, session: Async
 # --------------------------------------------------- overturn and uphold
 
 
+async def _shown_held(client: AsyncClient, who: Member, case_id: uuid.UUID) -> int:
+    """The held count an admin sees on the case page, checked against the resolved queue."""
+    page = await client.get(f"/api/admin/fraud/cases/{case_id}", headers=who.headers)
+    assert page.status_code == 200, page.text
+    queue = await client.get(
+        "/api/admin/fraud/cases", params={"status": "resolved"}, headers=who.headers
+    )
+    (row,) = [c for c in queue.json()["items"] if c["case_id"] == str(case_id)]
+    assert row["held_count"] == page.json()["case"]["held_count"]
+    return int(row["held_count"])
+
+
 async def test_overturn_releases_holds_and_cancels_the_rejection(
     client: AsyncClient, session: AsyncSession
 ) -> None:
@@ -226,6 +238,7 @@ async def test_overturn_releases_holds_and_cancels_the_rejection(
     p = await pair(session)
     await confirm(session, decider, p.case_id, {p.a_to_b: "reject", p.b_to_a: "exclude"})
     assert await _active_holds(session, p.a_to_b) == 1
+    assert await _shown_held(client, decider, p.case_id) == 2
     notice = await notice_of(session, p.case_id, p.a)
     assert (await appeal(client, p.a, notice.id)).status_code == 200
     appeal_id = (await appeal_of(session, notice.id)).id
@@ -239,6 +252,8 @@ async def test_overturn_releases_holds_and_cancels_the_rejection(
     holds = list(await session.scalars(select(PrizeHold).where(PrizeHold.case_id == p.case_id)))
     assert {h.deed_id for h in holds} == {p.a_to_b, p.b_to_a}
     assert all(h.release_reason == HoldReleaseReason.APPEAL_OVERTURNED for h in holds)
+    # The resolved case row is frozen, but the queue and the case page count live holds.
+    assert await _shown_held(client, decider, p.case_id) == 0
     for deed_id in (p.a_to_b, p.b_to_a):
         events = await outbox(session, HOLD_EVENT, deed_id)
         assert [e.payload["held"] for e in events] == [True, False]

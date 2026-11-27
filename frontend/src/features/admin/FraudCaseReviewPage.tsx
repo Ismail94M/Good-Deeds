@@ -706,7 +706,7 @@ function DeedsCard({ deeds }: { deeds: CaseDeed[] }) {
               </div>
               <Link
                 to={deedHref(deed.deed_id)}
-                className={`${linkClass} self-start text-sm`}
+                className={`${linkClass} inline-flex min-h-11 items-center self-start text-sm`}
                 aria-label={`Points and overrides for ${deed.reporter.display_name} → ${deed.doer.display_name}, ${deed.category_label}`}
               >
                 Points and overrides
@@ -772,7 +772,7 @@ function PeopleCard({ detail, confirmed }: { detail: CaseDetail; confirmed: bool
             {confirmed && (
               <Link
                 to={userHref(person.user.handle)}
-                className={`${linkClass} self-start text-sm`}
+                className={`${linkClass} inline-flex min-h-11 items-center self-start text-sm`}
                 aria-label={`Revoke titles or badges for ${person.user.display_name}`}
               >
                 Revoke titles or badges

@@ -161,10 +161,16 @@ export function Layout() {
       <footer className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-6 text-sm text-slate-500 lg:px-6">
         <p>© {YEAR} Good Deeds. All rights reserved.</p>
         <div className="flex gap-5">
-          <Link to="/privacy" className={`hover:text-slate-800 ${focusRing}`}>
+          <Link
+            to="/privacy"
+            className={`inline-flex min-h-11 items-center hover:text-slate-800 ${focusRing}`}
+          >
             Privacy
           </Link>
-          <Link to="/terms" className={`hover:text-slate-800 ${focusRing}`}>
+          <Link
+            to="/terms"
+            className={`inline-flex min-h-11 items-center hover:text-slate-800 ${focusRing}`}
+          >
             Terms
           </Link>
         </div>

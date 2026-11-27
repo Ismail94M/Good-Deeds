@@ -318,6 +318,17 @@ async def _rows(session: AsyncSession, cases: Sequence[FlagCase]) -> list[CaseRo
     deed_map = await _deeds_of(session, ids)
     views = await deeds.get_deeds(session, {d for ds in deed_map.values() for d in ds})
     people = await identity.public_summaries(session, {u for us in subjects.values() for u in us})
+    # Live, not the row's held_count: a resolved row is frozen (flag_cases_guard), but an
+    # overturned appeal still releases its holds afterwards.
+    held = dict(
+        (
+            await session.execute(
+                select(PrizeHold.case_id, func.count())
+                .where(PrizeHold.case_id.in_(ids), PrizeHold.released_at.is_(None))
+                .group_by(PrizeHold.case_id)
+            )
+        ).tuples().all()
+    )
     rows: list[CaseRow] = []
     for case in cases:
         users = sorted(
@@ -341,7 +352,7 @@ async def _rows(session: AsyncSession, cases: Sequence[FlagCase]) -> list[CaseRo
                 users=users[:LIST_USERS],
                 user_count=len(users),
                 deed_count=case.deed_count,
-                held_count=case.held_count,
+                held_count=held.get(case.id, 0),
                 summary=_summary(case, subjects[case.id], case_views, people),
             )
         )
