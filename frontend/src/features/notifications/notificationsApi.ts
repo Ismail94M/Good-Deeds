@@ -57,7 +57,12 @@ export type NotificationItem = {
 
 export type NotificationsPage = Page<NotificationItem>
 
-export type UnreadCount = { unread: number; new_since_seen: number }
+export type UnreadCount = {
+  unread: number
+  new_since_seen: number
+  /** How often to poll, from the `notifications` config (D114). */
+  unread_poll_seconds?: number
+}
 
 export type CategoryPref = {
   id: NotificationCategory
@@ -76,8 +81,10 @@ export type MuteTarget = { type: 'person' | 'deed'; target: string }
 
 export type NotificationsTab = 'all' | 'unread'
 
-/** D114: the bell polls this often while the tab is visible (`unread_poll_seconds`, 60). */
+/** D114: the bell polls this often while the tab is visible, until the server sends `unread_poll_seconds`. */
 export const UNREAD_POLL_MS = 60_000
+/** Never poll faster than this, whatever the server sends. */
+const MIN_POLL_MS = 15_000
 
 export const notificationsApi = {
   list: (tab: NotificationsTab, cursor: string | null) =>
@@ -114,7 +121,10 @@ export function useUnreadCount() {
     enabled: signedIn,
     retry: false,
     refetchOnWindowFocus: true,
-    refetchInterval: UNREAD_POLL_MS,
+    refetchInterval: (query) => {
+      const seconds = query.state.data?.unread_poll_seconds
+      return seconds ? Math.max(seconds * 1000, MIN_POLL_MS) : UNREAD_POLL_MS
+    },
     refetchIntervalInBackground: false,
   })
 }
