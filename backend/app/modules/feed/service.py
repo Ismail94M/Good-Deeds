@@ -1,31 +1,53 @@
 """Public interface of the feed module (docs/M3-DESIGN.md §3.4, D30, D36).
 
 Other modules read feed visibility here: ``media/router.py`` (photo reports and the admin review
-page) and ``notifications`` (M6A D104: ``visible_deed_ids``, re-checked when a list is read).
+page) and ``notifications`` (M6A D104: ``visible_deed_ids``, re-checked when a list is read and
+before a network row is written; ``follower_ids_page`` for the network fan-out, D110;
+``earlier_commenter_ids`` for "also commented", D111; and the feed events it subscribes to).
 Scoring, points, rewards and leaderboard code must never call these (D30; enforced by
 ``tests/test_architecture.py``): visibility never reaches verification, counts or prizes.
 """
 
 import uuid
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Literal
 
-from sqlalchemy import select
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.deeds import service as deeds
 from app.modules.feed import _access
-from app.modules.feed.models import FeedPost, PostState
+from app.modules.feed.events import (
+    CommentModerationDecided,
+    CommentPosted,
+    DeedLiked,
+    UserFollowed,
+)
+from app.modules.feed.models import FeedComment, FeedPost, Follow, PostState
 
 __all__ = [
+    # Events other modules subscribe to (M6A notifications, D104).
+    "CommentModerationDecided",
+    "CommentPosted",
+    "DeedLiked",
+    "Follower",
     "PostState",
+    "UserFollowed",
     "VisibilityView",
     "can_view",
+    "earlier_commenter_ids",
+    "follower_ids_page",
     "is_public",
     "visibility",
     "visible_deed_ids",
 ]
+
+# Who counts as connected to a person (M6A Q89, ``notifications.network.audience``):
+# ``followers`` follow them; ``mutual`` follow them and are followed back;
+# ``followers_or_following`` follow them or are followed by them.
+Audience = Literal["followers", "mutual", "followers_or_following"]
 
 
 @dataclass(frozen=True)
@@ -96,3 +118,94 @@ async def visibility(session: AsyncSession, deed_id: uuid.UUID) -> VisibilityVie
         hidden_by_doer_at=post.hidden_by_doer_at,
         hidden_by_reporter_at=post.hidden_by_reporter_at,
     )
+
+
+@dataclass(frozen=True)
+class Follower:
+    """One person connected to some of the given people (``follower_ids_page``)."""
+
+    user_id: uuid.UUID
+    # Which of the given people they are connected to, sorted.
+    of: tuple[uuid.UUID, ...]
+
+
+async def follower_ids_page(
+    session: AsyncSession,
+    user_ids: Collection[uuid.UUID],
+    *,
+    after: uuid.UUID | None,
+    limit: int,
+    audience: Audience = "followers",
+) -> list[Follower]:
+    """The people connected to any of ``user_ids`` (by ``audience``), ordered by id, after
+    ``after``, at most ``limit``; each once, with the ones they are connected to. The given
+    people themselves are left out. A keyset page, so a fan-out can resume after a restart."""
+    ids = set(user_ids)
+    if not ids or limit < 1:
+        return []
+    followers = select(Follow.follower_id.label("uid"), Follow.followed_id.label("of")).where(
+        Follow.followed_id.in_(ids)
+    )
+    if audience == "mutual":
+        back = Follow.__table__.alias("back")
+        followers = followers.join(
+            back,
+            and_(
+                back.c.follower_id == Follow.followed_id,
+                back.c.followed_id == Follow.follower_id,
+            ),
+        )
+    source = followers
+    if audience == "followers_or_following":
+        following = select(Follow.followed_id.label("uid"), Follow.follower_id.label("of")).where(
+            Follow.follower_id.in_(ids)
+        )
+        source = followers.union(following)  # type: ignore[assignment]
+    links = source.subquery()
+    people = (
+        select(links.c.uid)
+        .where(links.c.uid.not_in(ids))
+        .group_by(links.c.uid)
+        .order_by(links.c.uid)
+        .limit(limit)
+    )
+    if after is not None:
+        people = people.where(links.c.uid > after)
+    page = list(await session.scalars(people))
+    if not page:
+        return []
+    rows = await session.execute(select(links.c.uid, links.c.of).where(links.c.uid.in_(page)))
+    of: dict[uuid.UUID, set[uuid.UUID]] = {}
+    for uid, target in rows:
+        of.setdefault(uid, set()).add(target)
+    return [Follower(user_id=uid, of=tuple(sorted(of.get(uid, set())))) for uid in page]
+
+
+async def earlier_commenter_ids(
+    session: AsyncSession, deed_id: uuid.UUID, *, before: uuid.UUID, since: datetime
+) -> set[uuid.UUID]:
+    """Authors of the deed's live (not deleted) comments written at or after ``since`` and
+    before the comment ``before`` (M6A D111 "also commented"). The author of ``before`` is
+    left out. Empty when ``before`` isn't a comment on this deed."""
+    new = await session.execute(
+        select(FeedComment.created_at, FeedComment.author_id).where(
+            FeedComment.id == before, FeedComment.deed_id == deed_id
+        )
+    )
+    found = new.first()
+    if found is None:
+        return set()
+    created_at, author_id = found
+    rows = await session.scalars(
+        select(FeedComment.author_id)
+        .where(
+            FeedComment.deed_id == deed_id,
+            FeedComment.deleted_at.is_(None),
+            FeedComment.id != before,
+            FeedComment.created_at >= since,
+            FeedComment.created_at <= created_at,
+            FeedComment.author_id != author_id,
+        )
+        .distinct()
+    )
+    return set(rows)

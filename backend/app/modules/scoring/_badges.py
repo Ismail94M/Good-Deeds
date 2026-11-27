@@ -112,7 +112,10 @@ async def award_badges(session: AsyncSession, *, now: datetime | None = None) ->
             )
             held[user_id].add(badge.slug)
             if inserted is not None:
-                emit(session, BadgeAwarded(user_id=user_id, badge_slug=badge.slug))
+                emit(
+                    session,
+                    BadgeAwarded(user_id=user_id, badge_slug=badge.slug, badge_label=badge.label),
+                )
                 awarded += 1
     await session.flush()
     return awarded

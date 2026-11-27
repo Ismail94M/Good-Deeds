@@ -18,6 +18,7 @@ from app.core.errors import Conflict
 from app.modules.fraud import _actions
 from app.modules.fraud._common import Invalid, clean_note
 from app.modules.fraud._limits import FraudConfig
+from app.modules.fraud._updates import review_update
 from app.modules.fraud.models import (
     ExplanationRequest,
     FlagCaseAction,
@@ -103,16 +104,18 @@ async def request_explanations(
 
     due = now + timedelta(days=config.explanation.reply_days)
     ordered = sorted(chosen)
-    session.add_all(
-        ExplanationRequest(
+    for user_id in ordered:
+        request = ExplanationRequest(
+            id=uuid.uuid4(),
             case_id=case.id,
             user_id=user_id,
             requested_by=admin_id,
             requested_at=now,
             reply_due_at=due,
         )
-        for user_id in ordered
-    )
+        session.add(request)
+        # M6A D112: the member hears about it in-app (neutral words, their own request only).
+        review_update(session, user_id, "explanation_requested", request.id, reply_due_at=due)
     _actions.record(
         session,
         case,

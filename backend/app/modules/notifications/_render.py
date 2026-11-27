@@ -49,6 +49,15 @@ AVATAR_REMOVED = "Your profile picture was removed because it didn't follow our 
 COMMENT_REMOVED = "Your comment was removed because it broke our community guidelines."
 PHOTO_REMOVED = "A photo on your deed was removed after review."
 PHOTO_KEPT = "Review complete: your photo stays up. No action needed."
+# Why a profile picture was removed (Q95), by report reason code (media's removal notice
+# wording; notifications may read only media's event classes, D104).
+AVATAR_REMOVAL_REASONS: dict[str, str] = {
+    "child_no_guardian_consent": "Shows a child",
+    "impersonation": "Not this person / impersonation",
+    "private_details": "Private details",
+    "inappropriate": "Inappropriate or harmful",
+    "not_consented": "Shows someone who didn't agree",
+}
 
 
 def avatar_ref(summary: identity.UserSummary) -> str | None:
@@ -164,9 +173,19 @@ def _title_text(data: dict[str, Any], ctx: _Context) -> str:
         except ValueError:
             month = None
     when = f" for {month}" if month else ""
-    if data.get("level_kind") == "ward":
+    if data.get("level_kind") == "ward" and data.get("title_key", "hero") == "hero":
         return f"You're Kindness Hero of {where}{when}!"
+    label = data.get("title_label")
+    if isinstance(label, str) and label:
+        filled = label.replace("{region}", where).replace("{month}", month or "").strip(" ·")
+        return f"You earned the title {filled}!"
     return f"You made the Top 3 in {where}{when}!"
+
+
+def _avatar_removed_text(data: dict[str, Any]) -> str:
+    reason = data.get("removal_reason")
+    label = AVATAR_REMOVAL_REASONS.get(reason) if isinstance(reason, str) else None
+    return f"{AVATAR_REMOVED} Reason: {label}." if label else AVATAR_REMOVED
 
 
 def _badge_text(data: dict[str, Any]) -> str:
@@ -237,7 +256,7 @@ def _render_one(row: Notification, ctx: _Context) -> NotificationItem:
         text = COMMENT_REMOVED
         link = _link("guidelines", "community")
     elif kind == K.AVATAR_REMOVED:
-        text = AVATAR_REMOVED
+        text = _avatar_removed_text(data)
         link = _link("guidelines", "photo")
     elif kind == K.PASSWORD_CHANGED:
         text = PASSWORD_CHANGED

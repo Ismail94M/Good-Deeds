@@ -4,7 +4,8 @@ Other modules may import only this file from fraud, and only what D78 lists:
 ``scoring`` -> ``DeedHoldChanged``, ``AppealDecided``, ``held_deed_ids``, ``is_held``,
 ``confirmed_case_for_user`` (and ``concentration_rule``, D97; ``override_rules`` and
 ``case_standing``, ``case_has_subject``, ``case_covers_month`` and ``case_visible_to`` for
-overrides and revocations, D91, D92, SEC5-L3, L4, review N5); ``deeds`` -> ``FlagDecisionFinal``.
+overrides and revocations, D91, D92, SEC5-L3, L4, review N5); ``deeds`` -> ``FlagDecisionFinal``;
+``notifications`` -> ``MemberReviewUpdate`` and ``ReviewsSeen`` (M6A D104, D112).
 ``tests/test_architecture.py`` enforces the lists. This file imports nothing from ``scoring``.
 
 Nothing here may reach a public or member response: flags are private (D95).
@@ -28,6 +29,8 @@ from app.modules.fraud.events import (
     FlagCaseResolved,
     FlagDecisionFinal,
     FlagRaised,
+    MemberReviewUpdate,
+    ReviewsSeen,
 )
 from app.modules.fraud.models import (
     Appeal,
@@ -52,7 +55,10 @@ __all__ = [
     "FlagCaseResolved",
     "FlagDecisionFinal",
     "FlagRaised",
+    # Member-safe events notifications hears (M6A D104, D112).
+    "MemberReviewUpdate",
     "OverrideRules",
+    "ReviewsSeen",
     "case_covers_month",
     "case_has_subject",
     "case_standing",

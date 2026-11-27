@@ -977,7 +977,7 @@ async def reset_password(session: AsyncSession, phone: str, code: str, new_passw
         actor_id=user.id,
         new_value={"method": "phone_otp", "sessions_revoked": True},
     )
-    emit(session, PasswordChanged(user_id=user.id, method="phone_otp"))
+    emit(session, PasswordChanged(user_id=user.id, method="phone_otp", changed_at=_now()))
     await session.flush()
 
 

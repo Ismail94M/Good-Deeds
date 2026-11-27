@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from app.core.events import DomainEvent
 
@@ -21,6 +22,8 @@ class PasswordChanged(DomainEvent):
     event_type = "identity.password_changed"
     user_id: uuid.UUID
     method: str
+    # When it changed (added with a default, so older events still load).
+    changed_at: datetime | None = None
 
 
 class UserAnonymised(DomainEvent):

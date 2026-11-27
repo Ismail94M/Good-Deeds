@@ -358,8 +358,9 @@ SCORING_FROM_FRAUD = frozenset(
 )
 # deeds imports only the event it subscribes to, and only in deeds/handlers.py.
 DEEDS_FROM_FRAUD = ("deeds/handlers.py", frozenset({"FlagDecisionFinal"}))
-# M6A D104, D112: notifications reads fraud only through its member-safe event.
-NOTIFICATIONS_FROM_FRAUD = frozenset({"MemberReviewUpdate"})
+# M6A D104, D112: notifications reads fraud only through its member-safe events (the review
+# update, and "Reviews was opened" so it can mark review rows read).
+NOTIFICATIONS_FROM_FRAUD = frozenset({"MemberReviewUpdate", "ReviewsSeen"})
 # Feature modules that exist now or may later, even if a test tree lacks them.
 KNOWN_MODULES = frozenset(
     {"identity", "deeds", "media", "feed", "scoring", "fraud", "notifications"}
@@ -605,8 +606,8 @@ NOTIFICATIONS_NEVER_HEARS = frozenset(
         "scoring.points_changed",
     }
 )
-# The only fraud event notifications may hear.
-NOTIFICATIONS_FRAUD_EVENTS = frozenset({"fraud.member_review_update"})
+# The only fraud events notifications may hear.
+NOTIFICATIONS_FRAUD_EVENTS = frozenset({"fraud.member_review_update", "fraud.reviews_seen"})
 # identity/handlers.py may read from media.service only the avatar pointer event (D117).
 IDENTITY_FROM_MEDIA = ("identity/handlers.py", frozenset({"AvatarChanged"}))
 
@@ -792,6 +793,7 @@ def test_notifications_rules_catch_violations(tmp_path: Path) -> None:
     assert _notifications_subscription_violations(
         {
             "fraud.member_review_update": [ours],
+            "fraud.reviews_seen": [ours],
             "fraud.flag_raised": [ours, "app.modules.scoring.handlers.on_flag"],
             "fraud.appeal_decided": [ours],
             "scoring.points_changed": [ours],

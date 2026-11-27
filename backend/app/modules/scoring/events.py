@@ -64,9 +64,14 @@ class DeedNeedsReview(DomainEvent):
 
 
 class BadgeAwarded(DomainEvent):
+    """A badge was awarded. ``badge_label`` is the configured label at award time (M6A), so
+    notifications can say "You earned the 5 deeds badge" without reading scoring; None on
+    events written before it was added."""
+
     event_type = "scoring.badge_awarded"
     user_id: uuid.UUID
     badge_slug: str
+    badge_label: str | None = None
 
 
 class HeroTitleAwarded(DomainEvent):
@@ -77,6 +82,9 @@ class HeroTitleAwarded(DomainEvent):
     level_kind: Literal["country", "state", "city", "ward"]
     place: int
     title_key: str
+    # The configured title label at award time with ``{region}`` and ``{month}`` left in, so
+    # notifications fill them on read (M6A); None on events written before it was added.
+    title_label: str | None = None
 
 
 class MonthFinalized(DomainEvent):

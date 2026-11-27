@@ -264,6 +264,8 @@ async def test_shared_places_all_get_the_title_with_dense_numbering(
     assert {"user_id", "period_month", "region_id", "level_kind", "place", "title_key"} <= set(
         awarded[0].payload
     )
+    # M6A: the configured label (``{region}``/``{month}`` left in) travels with the event.
+    assert all("{month}" in e.payload["title_label"] for e in awarded)
 
 
 async def test_titles_need_counted_deeds_of_that_month(session: AsyncSession) -> None:

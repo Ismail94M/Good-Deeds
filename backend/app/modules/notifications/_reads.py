@@ -61,7 +61,9 @@ async def list_page(
     )
 
 
-async def unread_count(session: AsyncSession, user_id: uuid.UUID) -> UnreadCount:
+async def unread_count(
+    session: AsyncSession, user_id: uuid.UUID, config: NotificationsConfig
+) -> UnreadCount:
     """N2: all unread rows, and those new or updated since the bell was last opened."""
     seen_at = await session.scalar(
         select(NotificationView.seen_at).where(NotificationView.user_id == user_id)
@@ -73,7 +75,11 @@ async def unread_count(session: AsyncSession, user_id: uuid.UUID) -> UnreadCount
             select(func.count(), new).where(Notification.user_id == user_id, unread)
         )
     ).one()
-    return UnreadCount(unread=int(row[0]), new_since_seen=int(row[1]))
+    return UnreadCount(
+        unread=int(row[0]),
+        new_since_seen=int(row[1]),
+        unread_poll_seconds=config.unread_poll_seconds,
+    )
 
 
 async def mark_seen(session: AsyncSession, user_id: uuid.UUID, now: datetime) -> None:

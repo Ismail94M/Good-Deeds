@@ -39,6 +39,7 @@ from app.modules.deeds import service as deeds
 from app.modules.fraud import _coi, _cursor, _member, _notices
 from app.modules.fraud._common import clean_note
 from app.modules.fraud._limits import FraudConfig
+from app.modules.fraud._updates import review_update
 from app.modules.fraud.events import AppealDecided, DeedHoldChanged
 from app.modules.fraud.models import (
     Appeal,
@@ -500,6 +501,7 @@ async def decide_appeal(
     if notice.case_id is not None:
         for deed_id in released:
             emit(session, DeedHoldChanged(deed_id=deed_id, held=False, case_id=notice.case_id))
+    review_update(session, appeal.user_id, "appeal_decided", notice.id)
     emit(
         session,
         AppealDecided(

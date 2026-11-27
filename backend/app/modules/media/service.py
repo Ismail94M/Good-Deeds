@@ -25,7 +25,13 @@ from app.core.storage import ObjectStorage, get_storage, stable_signing_time
 from app.modules.identity import service as identity
 from app.modules.media import _keys
 from app.modules.media._limits import MediaLimits, load_limits
-from app.modules.media.events import AvatarChanged, AvatarModerationDecided, DeedPhotoReady
+from app.modules.media.events import (
+    AvatarChanged,
+    AvatarModerationDecided,
+    DeedPhotoReady,
+    PhotoModerationDecided,
+    PhotoRemovedByDoer,
+)
 from app.modules.media.models import (
     ObjectMove,
     Photo,
@@ -40,7 +46,9 @@ __all__ = [
     "AvatarModerationDecided",  # notifications tells the owner (Q95)
     "AvatarUrls",
     "DeedPhotoReady",  # the event scoring subscribes to (M4 §5, D47)
+    "PhotoModerationDecided",  # notifications tells the uploader (M6A §4.1)
     "PhotoOut",
+    "PhotoRemovedByDoer",  # notifications tells the uploader (M6A §4.1)
     "SignedVariants",
     "admin_photo_urls",
     "admin_signed",

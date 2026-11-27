@@ -40,6 +40,7 @@ from app.modules.fraud import _actions, _appeals, _coi, _cursor, _explain, _noti
 from app.modules.fraud._cases import LIVE, month_review_deadline
 from app.modules.fraud._common import Invalid, clean_note, user_not_found
 from app.modules.fraud._limits import FraudConfig
+from app.modules.fraud._updates import review_update
 from app.modules.fraud.detectors import DETECTORS
 from app.modules.fraud.events import DeedHoldChanged, FlagCaseResolved
 from app.modules.fraud.models import (
@@ -820,6 +821,11 @@ async def decide(
     case.updated_at = now
     await session.flush()
 
+    # M6A D112: people who were asked to explain and got no decision notice hear "We've
+    # finished looking" (those with a notice got ``decision_notice`` above).
+    for user_id, request in sorted((await _explain.requests_for(session, case.id)).items()):
+        if user_id not in adverse:
+            review_update(session, user_id, "review_closed", request.id)
     for deed_id in sorted(held_after - held_before):
         emit(session, DeedHoldChanged(deed_id=deed_id, held=True, case_id=case.id))
     for deed_id in sorted(held_before - held_after):

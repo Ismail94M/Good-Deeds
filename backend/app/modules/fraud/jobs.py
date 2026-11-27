@@ -9,6 +9,8 @@ from app.core.db import SessionLocal
 from app.core.jobs import job_app
 from app.modules.fraud._detect import nightly_windows, sweep_detector
 from app.modules.fraud._finalize import finalize_decisions as _finalize_decisions
+from app.modules.fraud._limits import load_fraud
+from app.modules.fraud._reminders import remind_explanations as _remind_explanations
 from app.modules.fraud.models import DetectorRunTrigger
 
 
@@ -40,3 +42,17 @@ async def finalize_decisions(timestamp: int) -> int:
     async with SessionLocal() as session, session.begin():
         result = await _finalize_decisions(session, datetime.now(UTC))
     return sum(len(ids) for ids in result.rejected.values())
+
+
+# 04:30 UTC is 10:00 IST.
+@job_app.periodic(cron="30 4 * * *", periodic_id="fraud_remind_explanations")
+@job_app.task(
+    name="fraud.remind_explanations", queue="fraud", queueing_lock="fraud_remind_explanations"
+)
+async def remind_explanations(timestamp: int) -> int:
+    """Daily at 10:00 IST: one reminder per explanation request still without a reply,
+    ``explanation.reminder_days_before_due`` days before it is due (M6A D112). Returns how many
+    were sent."""
+    async with SessionLocal() as session, session.begin():
+        _, config = await load_fraud(session)
+        return await _remind_explanations(session, config=config, now=datetime.now(UTC))

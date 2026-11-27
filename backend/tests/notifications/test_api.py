@@ -273,12 +273,12 @@ async def test_unread_count_seen_and_read_state(client: AsyncClient, session: As
     for i in range(3):
         await send(session, K.BADGE_AWARDED, member, now=now + timedelta(seconds=i))
     count = await client.get("/api/notifications/unread-count", headers=member.headers)
-    assert count.json() == {"unread": 3, "new_since_seen": 3}
+    assert count.json() == {"unread": 3, "new_since_seen": 3, "unread_poll_seconds": 60}
 
     assert (await client.post("/api/notifications/seen", headers=member.headers)).status_code == 204
     await send(session, K.BADGE_AWARDED, member)
     count = await client.get("/api/notifications/unread-count", headers=member.headers)
-    assert count.json() == {"unread": 4, "new_since_seen": 1}
+    assert count.json() == {"unread": 4, "new_since_seen": 1, "unread_poll_seconds": 60}
 
     rows = await rows_for(session, member)
     target = rows[0].id
@@ -311,7 +311,7 @@ async def test_unread_count_seen_and_read_state(client: AsyncClient, session: As
         await client.post("/api/notifications/read-all", headers=member.headers)
     ).status_code == 204
     count = await client.get("/api/notifications/unread-count", headers=member.headers)
-    assert count.json() == {"unread": 0, "new_since_seen": 0}
+    assert count.json() == {"unread": 0, "new_since_seen": 0, "unread_poll_seconds": 60}
     items = await _items(client, member)
     assert len(items) == 4 and all(item["read"] for item in items)
 

@@ -5,6 +5,7 @@ modules import them through ``fraud.service`` (D78).
 """
 
 import uuid
+from datetime import datetime
 from typing import Literal
 
 from app.core.events import DomainEvent
@@ -70,3 +71,39 @@ class AppealDecided(DomainEvent):
     user_id: uuid.UUID
     outcome: Literal["upheld", "overturned"]
     reviewer_id: uuid.UUID
+
+
+# --------------------------------------------------- member-safe review updates (M6A D112)
+
+type ReviewUpdateKind = Literal[
+    "explanation_requested",
+    "explanation_reminder",
+    "decision_notice",
+    "appeal_decided",
+    "review_closed",
+]
+
+
+class MemberReviewUpdate(DomainEvent):
+    """Something changed for this member in *Profile -> Reviews* (docs/M6-DESIGN.md D112).
+
+    Member-safe by construction (D101): only the member, what kind of update it is, and the id
+    of the member's own explanation request or decision notice (``item_id``). Never a case id,
+    a case type, a detector, another person or an admin. ``notifications`` turns it into a
+    neutral row that links to Reviews; it may import no other fraud event."""
+
+    event_type = "fraud.member_review_update"
+    user_id: uuid.UUID
+    kind: ReviewUpdateKind
+    item_id: uuid.UUID
+    reply_due_at: datetime | None = None
+
+
+class ReviewsSeen(DomainEvent):
+    """The member opened *Profile -> Reviews* (``POST /api/reviews/seen``): ``notifications``
+    marks their review rows read up to ``seen_at`` (M6A D112). Member-safe like
+    ``MemberReviewUpdate``."""
+
+    event_type = "fraud.reviews_seen"
+    user_id: uuid.UUID
+    seen_at: datetime

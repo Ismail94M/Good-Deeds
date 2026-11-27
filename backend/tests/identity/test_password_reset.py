@@ -133,7 +133,10 @@ async def test_happy_path(
         )
         if e.payload["user_id"] == str(s.user_id)
     ]
-    assert changed == [{"user_id": str(s.user_id), "method": "phone_otp"}]
+    assert [{k: v for k, v in e.items() if k != "changed_at"} for e in changed] == [
+        {"user_id": str(s.user_id), "method": "phone_otp"}
+    ]
+    assert isinstance(changed[0]["changed_at"], str)
 
 
 async def test_phone_accepted_in_same_formats_as_phone_start(

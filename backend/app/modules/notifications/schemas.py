@@ -69,6 +69,8 @@ class UnreadCount(BaseModel):
     unread: int
     # Unread rows new or updated since the bell was last opened (the bell shows this, D114).
     new_since_seen: int
+    # How often the bell should ask again while the tab is visible (config, D114).
+    unread_poll_seconds: int
 
 
 class CategoryOut(BaseModel):

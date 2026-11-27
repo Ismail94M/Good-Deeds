@@ -69,8 +69,8 @@ async def list_notifications(
 
 @router.get("/unread-count")
 async def unread_count(user: CurrentUser, session: Session, limiter: Limiter) -> UnreadCount:
-    await _read(session, limiter, user.id)
-    return await service.unread_count(session, user.id)
+    config = await _read(session, limiter, user.id)
+    return await service.unread_count(session, user.id, config)
 
 
 @router.post("/seen", status_code=204)
