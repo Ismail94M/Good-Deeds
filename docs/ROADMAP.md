@@ -113,9 +113,19 @@ Each milestone is built, tested and reviewed by the product owner before the nex
 - `FlagCase`. Flagged deeds are excluded from prize rank.
 - Admin queue, score overrides with a required reason, audit view.
 
-**M6 Notifications & Challenges**
-- In-app notifications (plus email). Option (PO 2026-11-21): browser push through Firebase Cloud Messaging (FCM) as one more delivery channel, sent from the existing job worker.
-- Monthly challenges, including sponsored ones, and participation tracking.
+**M6 is split into two phases (PO 2026-11-27).** Design: `docs/M6-DESIGN.md`.
+
+**M6A Profile Pictures & In-app Notifications** (next; existing local infrastructure only, no cloud services)
+- Profile pictures: upload, crop, preview, replace and remove on mobile and desktop; default avatars; shown consistently on profiles, leaderboards, deeds, recognition activity, reviews and comments; secure validation and storage through the existing media pipeline.
+- Social-style in-app notifications: bell, unread count, history, tap-through navigation, read/unread, preferences. Covers recognitions of my deeds, recognitions by people I follow, new followers, deed activity, replies, review decisions and appeal outcomes. Limits against too many notifications; no confidential moderation details (M5 D101).
+
+**M6B Cloud Integration** (after M6A and M6C)
+- Email delivery (provider, email verification, the password-changed email deferred from M1).
+- Browser push through Firebase Cloud Messaging (FCM), sent from the existing job worker (PO option 2026-11-21).
+- Other cloud setup carried from earlier milestones as needed.
+
+**M6C Monthly Challenges** (right after M6A, before M6B; local infrastructure only; PO Q96, 2026-11-27)
+- Monthly kindness challenges, including sponsored ones, and participation tracking. Starting design: `docs/M6-DESIGN.md` §13.
 
 **M7 Moderation**
 - Report a post. (Comment reporting and removal were moved into M3, PO decision Q38.)
