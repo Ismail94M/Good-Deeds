@@ -31,6 +31,7 @@ export const REASON_LABELS: Record<PhotoReportReason, string> = {
   private_details: 'It shows private details (like a phone number or address)',
   inappropriate: 'It’s inappropriate or harmful',
   other: 'Something else',
+  impersonation: 'Not this person / impersonation',
 }
 
 /** Q44: child first; privacy and harm equal; then the rest. */
@@ -40,6 +41,7 @@ export const REASON_PRIORITY: Record<PhotoReportReason, ReportPriority> = {
   private_details: 2,
   inappropriate: 2,
   other: 3,
+  impersonation: 2,
 }
 
 /** The reason line in the uploader's "removed after review" banner (§6.3). */
@@ -49,6 +51,7 @@ export const REMOVAL_REASON_TEXT: Record<PhotoReportReason, string> = {
   private_details: 'it showed private details',
   inappropriate: 'it didn’t follow our photo guidelines',
   other: 'it didn’t follow our photo guidelines',
+  impersonation: 'it didn’t show the account holder',
 }
 
 export function photoCount(n: number): string {

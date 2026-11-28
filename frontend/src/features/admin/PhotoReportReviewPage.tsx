@@ -8,6 +8,7 @@ import { categoryLabel, STATUS_LABELS } from '../deeds/deedText'
 import type { DeedStatus } from '../deeds/deedsApi'
 import type { PhotoReportReason } from '../media/mediaApi'
 import { useMediaOptions } from '../media/mediaQueries'
+import { Avatar } from '../media/avatar/Avatar'
 import { firstName } from '../report/format'
 import { adminApi, adminKeys, type PhotoDecisionRequest, type PhotoReportDetail } from './adminApi'
 import { NOTE_MIN, RestoreDialog } from './AdminDialog'
@@ -76,6 +77,8 @@ function Review({
   onConflict: () => void
 }) {
   const { case: kase, photo, deed, reports, decisions } = detail
+  const isAvatar = detail.purpose === 'avatar' || deed === null
+  const owner = detail.owner ?? photo.uploader
   const reasonLabel = useReasonLabel()
   const reasonPriority = useReasonPriority()
   const categories = useDeedOptions().data?.categories
@@ -85,7 +88,7 @@ function Review({
   const [confirmRemove, setConfirmRemove] = useState(false)
   const [restoring, setRestoring] = useState(false)
   const [openedAt] = useState(() => Date.now())
-  const uploaderFirst = firstName(photo.uploader.display_name)
+  const uploaderFirst = firstName((isAvatar ? owner : photo.uploader)?.display_name ?? 'The owner')
 
   const decide = useMutation({
     mutationFn: (data: PhotoDecisionRequest) => adminApi.decidePhotoReport(kase.case_id, data),
@@ -186,7 +189,11 @@ function Review({
           <div className="relative flex h-[380px] items-center justify-center overflow-hidden rounded-[14px] bg-slate-200">
             <img
               src={photo.display_url}
-              alt={`Reported photo: photo ${photo.position} of ${photo.photo_count} on ${deed.doer.display_name}’s deed`}
+              alt={
+                isAvatar
+                  ? `Reported profile picture of ${owner?.display_name ?? 'an unavailable account'}`
+                  : `Reported photo: photo ${photo.position} of ${photo.photo_count} on ${deed?.doer.display_name ?? 'this'}’s deed`
+              }
               className="size-full object-contain"
             />
             <span
@@ -196,28 +203,51 @@ function Review({
             </span>
           </div>
           <p className="text-sm text-slate-600">
-            Photo {photo.position} of {photo.photo_count} · Uploaded{' '}
-            {formatDateTime(photo.uploaded_at)}
+            {isAvatar ? 'Profile picture' : `Photo ${photo.position} of ${photo.photo_count}`} ·
+            Uploaded {formatDateTime(photo.uploaded_at)}
           </p>
         </div>
         <div className="flex min-w-0 flex-[1_1_380px] flex-col gap-3.5">
-          <ReviewCard title="Deed">
-            <p>
-              <strong>{deed.doer.display_name}</strong>, recognised by{' '}
-              <strong>{deed.reporter.display_name}</strong>
-              {photo.uploader.handle === deed.reporter.handle && ' (uploaded the photos)'}
-            </p>
-            <p className="text-sm text-slate-600">
-              {categoryLabel(categories, deed.category)} · {deed.area_name} ·{' '}
-              {STATUS_LABELS[deed.status as DeedStatus] ?? deed.status} ·{' '}
-              {deed.listed ? 'Shown in feed' : 'Hidden from feed'}
-            </p>
-          </ReviewCard>
+          {isAvatar ? (
+            <ReviewCard title="Profile picture of">
+              {owner ? (
+                <div className="flex items-center gap-3">
+                  <Avatar user={owner} size="lg" />
+                  <p className="min-w-0">
+                    <strong>{owner.display_name}</strong>{' '}
+                    {owner.handle && <span className="text-slate-600">@{owner.handle}</span>}
+                  </p>
+                </div>
+              ) : (
+                <p>Unavailable account</p>
+              )}
+              <p className="text-sm text-slate-600">
+                Check that the picture shows the account holder, or no identifiable person, and no
+                child or contact details. Removing it lets the owner add a new one after 24 hours.
+              </p>
+            </ReviewCard>
+          ) : (
+            deed && (
+              <ReviewCard title="Deed">
+                <p>
+                  <strong>{deed.doer.display_name}</strong>, recognised by{' '}
+                  <strong>{deed.reporter.display_name}</strong>
+                  {photo.uploader?.handle === deed.reporter.handle && ' (uploaded the photos)'}
+                </p>
+                <p className="text-sm text-slate-600">
+                  {categoryLabel(categories, deed.category)} · {deed.area_name} ·{' '}
+                  {STATUS_LABELS[deed.status as DeedStatus] ?? deed.status} ·{' '}
+                  {deed.listed ? 'Shown in feed' : 'Hidden from feed'}
+                </p>
+              </ReviewCard>
+            )
+          )}
           <ReviewCard title="Upload record">
             <p className="text-[15px]">
-              Uploaded by {photo.uploader.display_name} on {formatDateTime(photo.uploaded_at)}.
+              Uploaded by {photo.uploader?.display_name ?? 'an unavailable account'} on{' '}
+              {formatDateTime(photo.uploaded_at)}.
             </p>
-            <p className="text-sm text-slate-600">{blurred}</p>
+            {!isAvatar && <p className="text-sm text-slate-600">{blurred}</p>}
           </ReviewCard>
           <ReportsCard
             kind="photo"
@@ -240,9 +270,13 @@ function Review({
               noteMax={noteMax}
               noteTooShort={noteTooShort}
               error={decide.isError && !confirmRemove ? decisionError(decide.error) : null}
-              help={`${uploaderFirst} is told the outcome. The deed, its verification and points never change.`}
-              keepLabel="Keep photo"
-              removeLabel="Remove photo"
+              help={
+                isAvatar
+                  ? `${uploaderFirst} is told the outcome. Points, ranks and deeds never change.`
+                  : `${uploaderFirst} is told the outcome. The deed, its verification and points never change.`
+              }
+              keepLabel={isAvatar ? 'Keep picture' : 'Keep photo'}
+              removeLabel={isAvatar ? 'Remove picture' : 'Remove photo'}
               busy={decide.isPending}
               onKeep={() => {
                 if (noteOk()) decide.mutate({ action: 'keep', note: note.trim() })
@@ -259,6 +293,7 @@ function Review({
       {confirmRemove && (
         <RemovePhotoDialog
           uploaderFirstName={uploaderFirst}
+          avatar={isAvatar}
           defaultReason={kase.top_reason}
           reasonLabel={reasonLabel}
           busy={decide.isPending}

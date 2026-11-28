@@ -29,6 +29,8 @@ import { PhotoGuidelinesPage } from '../features/legal/PhotoGuidelinesPage'
 import { OnboardingPage } from '../features/onboarding/OnboardingPage'
 import { ProfilePage } from '../features/profile/ProfilePage'
 import { PublicProfilePage } from '../features/profile/PublicProfilePage'
+import { NotificationSettingsPage } from '../features/notifications/NotificationSettingsPage'
+import { NotificationsPage } from '../features/notifications/NotificationsPage'
 import { ReviewsPage } from '../features/reviews/ReviewsPage'
 import { MyQrPage } from '../features/qr/MyQrPage'
 import { ManualCodePage } from '../features/report/ManualCodePage'
@@ -79,6 +81,9 @@ export const routes: RouteObject[] = [
           { path: '/leaderboard/:regionCode', element: <LeaderboardPage /> },
           // M5 member reviews (M5-DESIGN §6.2): explanation requests and decision notices.
           { path: '/me/reviews', element: <ReviewsPage /> },
+          // M6 in-app notifications (M6-DESIGN §6.1, D113–D114).
+          { path: '/notifications', element: <NotificationsPage /> },
+          { path: '/settings/notifications', element: <NotificationSettingsPage /> },
         ],
       },
       {

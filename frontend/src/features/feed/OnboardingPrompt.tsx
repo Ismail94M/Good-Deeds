@@ -9,9 +9,10 @@ import { ONBOARDING_PROMPT } from './feedText'
  * Social actions need a finished setup (D44, Q42 = A): the feed is readable before onboarding,
  * and a like, save, comment or follow shows this prompt instead. Returns `guard(action)`, which
  * runs the action only for an onboarded user, `handleError(error)`, which shows the prompt on a
- * 403 `onboarding_required` and returns true, and the `prompt` element to render.
+ * 403 `onboarding_required` and returns true, and the `prompt` element to render. `body` lets
+ * another feature (the profile photo) explain what setup unlocks there.
  */
-export function useOnboardingGate(): {
+export function useOnboardingGate(body: string = ONBOARDING_PROMPT): {
   ready: boolean
   guard: (action: () => void) => void
   handleError: (error: unknown) => boolean
@@ -43,7 +44,7 @@ export function useOnboardingGate(): {
   const prompt = open ? (
     <ConfirmDialog
       title="Finish setting up"
-      body={ONBOARDING_PROMPT}
+      body={body}
       onDismiss={() => setOpen(false)}
       actions={[
         {

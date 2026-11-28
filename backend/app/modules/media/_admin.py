@@ -28,10 +28,10 @@ from app.core.ratelimit import RateLimiter
 from app.core.storage import ObjectStorage
 from app.modules.deeds import service as deeds
 from app.modules.identity import service as identity
-from app.modules.media import _cursor
+from app.modules.media import _avatars, _cursor, _keys
 from app.modules.media._common import Invalid, photo_not_found, utcnow
 from app.modules.media._limits import MediaLimits
-from app.modules.media.events import PhotoModerationDecided
+from app.modules.media.events import AvatarModerationDecided, PhotoModerationDecided
 from app.modules.media.models import (
     PHOTO_REPORT_PRIORITY,
     CaseDecision,
@@ -39,6 +39,7 @@ from app.modules.media.models import (
     Photo,
     PhotoDecision,
     PhotoDecisionAction,
+    PhotoPurpose,
     PhotoReport,
     PhotoReportCase,
     PhotoReportReason,
@@ -64,6 +65,7 @@ from app.modules.media.schemas import (
 from app.modules.media.service import admin_signed
 
 type Queue = Literal["open", "resolved"]
+type PurposeFilter = Literal["deed", "avatar"]
 
 
 def case_not_found() -> NotFound:
@@ -90,6 +92,8 @@ class _Named(Protocol):
     def handle(self) -> str: ...
     @property
     def display_name(self) -> str: ...
+    @property
+    def avatar_ref(self) -> str | None: ...
 
 
 def _ref(summaries: Mapping[uuid.UUID, _Named], user_id: uuid.UUID | None) -> UserRef | None:
@@ -97,7 +101,9 @@ def _ref(summaries: Mapping[uuid.UUID, _Named], user_id: uuid.UUID | None) -> Us
     return (
         None
         if summary is None
-        else UserRef(handle=summary.handle, display_name=summary.display_name)
+        else UserRef(
+            handle=summary.handle, display_name=summary.display_name, avatar=summary.avatar_ref
+        )
     )
 
 
@@ -204,12 +210,16 @@ async def list_cases(
     limits: MediaLimits,
     cursor: str | None = None,
     limit: int = _cursor.DEFAULT_PAGE_SIZE,
+    purpose: PurposeFilter | None = None,
     now: datetime | None = None,
 ) -> CasePage:
     """The queue for ``actor_id``: cases they are part of are left out of the items and the
-    counts (SEC2 M1)."""
+    counts (SEC2 M1). ``purpose`` narrows it to deed photos or profile pictures (M6A §3.3);
+    the counts follow the filter. Children first either way (Q44, Q94: priority order)."""
     now = now or utcnow()
     visible = _uninvolved(actor_id, await _own_deed_ids(session, actor_id))
+    if purpose is not None:
+        visible.append(Photo.purpose == PhotoPurpose(purpose))
     stmt = select(PhotoReportCase).join(Photo, Photo.id == PhotoReportCase.photo_id).where(*visible)
     if queue == "open":
         stmt = stmt.where(PhotoReportCase.status == ReportCaseStatus.OPEN)
@@ -253,7 +263,9 @@ async def list_cases(
     }
     views = await deeds.get_deeds(session, {p.deed_id for p in photos.values() if p.deed_id})
     people = await identity.public_summaries(
-        session, {v.doer_id for v in views.values() if v.doer_id is not None}
+        session,
+        {v.doer_id for v in views.values() if v.doer_id is not None}
+        | {p.uploader_user_id for p in photos.values() if p.purpose == PhotoPurpose.AVATAR},
     )
 
     items = []
@@ -262,16 +274,21 @@ async def list_cases(
         view = views.get(photo.deed_id) if photo.deed_id else None
         signed = admin_signed(photo, storage, limits, now=now)
         case_reports = reports[case.id]
+        is_avatar = photo.purpose == PhotoPurpose.AVATAR
         items.append(
             CaseListItem(
                 **_case_out(case, case_reports).model_dump(),
+                purpose="avatar" if is_avatar else "deed",
                 oldest_report_at=case_reports[0].created_at if case_reports else case.opened_at,
                 photo_thumb_url=signed.thumb_url if signed else None,
-                deed=AdminDeedRef(
+                deed=None
+                if is_avatar
+                else AdminDeedRef(
                     doer=_ref(people, view.doer_id) if view else None,
                     category=view.category if view else "",
                     area_name=deeds.area_name(view) if view else deeds.DEFAULT_AREA_NAME,
                 ),
+                owner=_ref(people, photo.uploader_user_id) if is_avatar else None,
             )
         )
     next_cursor = None
@@ -291,15 +308,19 @@ async def list_cases(
 # --------------------------------------------------- review (#12)
 
 
-async def case_deed_id(session: AsyncSession, case_id: uuid.UUID) -> uuid.UUID:
-    """The deed of a case's photo (for the router's visibility read); 404 if unknown."""
-    deed_id = await session.scalar(
-        select(Photo.deed_id)
-        .join(PhotoReportCase, PhotoReportCase.photo_id == Photo.id)
-        .where(PhotoReportCase.id == case_id)
-    )
-    if deed_id is None:
+async def case_deed_id(session: AsyncSession, case_id: uuid.UUID) -> uuid.UUID | None:
+    """The deed of a case's photo (for the router's visibility read), None for a profile
+    picture; 404 if the case is unknown."""
+    row = (
+        await session.execute(
+            select(Photo.deed_id, Photo.purpose)
+            .join(PhotoReportCase, PhotoReportCase.photo_id == Photo.id)
+            .where(PhotoReportCase.id == case_id)
+        )
+    ).first()
+    if row is None or (row.deed_id is None and row.purpose != PhotoPurpose.AVATAR):
         raise case_not_found()
+    deed_id: uuid.UUID | None = row.deed_id
     return deed_id
 
 
@@ -326,9 +347,10 @@ async def case_detail(
     photo = await session.scalar(
         select(Photo).where(Photo.id == case.photo_id).execution_options(populate_existing=True)
     )
-    assert photo is not None and photo.deed_id is not None
-    view = await deeds.get_deed(session, photo.deed_id)
-    assert view is not None
+    assert photo is not None
+    is_avatar = photo.purpose == PhotoPurpose.AVATAR
+    view = await deeds.get_deed(session, photo.deed_id) if photo.deed_id is not None else None
+    assert is_avatar or view is not None
     if await _involved(session, actor_id, photo, view, case_ids=[case.id]):
         raise case_not_found()
     reports = (await _reports_by_case(session, [case.id]))[case.id]
@@ -339,18 +361,22 @@ async def case_detail(
             .order_by(PhotoDecision.created_at, PhotoDecision.id)
         )
     )
-    photo_count = await session.scalar(
-        select(func.count())
-        .select_from(Photo)
-        .where(Photo.deed_id == photo.deed_id, Photo.status == PhotoStatus.READY)
+    photo_count = (
+        1
+        if is_avatar
+        else await session.scalar(
+            select(func.count())
+            .select_from(Photo)
+            .where(Photo.deed_id == photo.deed_id, Photo.status == PhotoStatus.READY)
+        )
     )
     people = await identity.public_summaries(
         session,
         {
             i
             for i in (
-                view.doer_id,
-                view.reporter_id,
+                view.doer_id if view else None,
+                view.reporter_id if view else None,
                 photo.uploader_user_id,
                 *(r.reporter_user_id for r in reports),
                 *(d.actor_user_id for d in decisions),
@@ -367,6 +393,8 @@ async def case_detail(
     )
     return CaseDetail(
         case=_case_out(case, reports),
+        purpose="avatar" if is_avatar else "deed",
+        owner=_ref(people, photo.uploader_user_id) if is_avatar else None,
         photo=AdminPhoto(
             id=photo.id,
             display_url=signed.display_url if signed else None,
@@ -383,7 +411,9 @@ async def case_detail(
             ),
             purged_at=photo.objects_purged_at,
         ),
-        deed=AdminDeed(
+        deed=None
+        if view is None
+        else AdminDeed(
             doer=_ref(people, view.doer_id),
             reporter=_ref(people, view.reporter_id),
             category=view.category,
@@ -439,6 +469,19 @@ async def _check_conflict(
         )
 
 
+async def _avatar_owner(session: AsyncSession, photo_id: uuid.UUID) -> uuid.UUID | None:
+    """The owner of a profile picture (purpose and uploader never change), else None."""
+    row = (
+        await session.execute(
+            select(Photo.uploader_user_id, Photo.purpose).where(Photo.id == photo_id)
+        )
+    ).first()
+    if row is None or row.purpose != PhotoPurpose.AVATAR:
+        return None
+    owner: uuid.UUID = row.uploader_user_id
+    return owner
+
+
 async def _locked_photo(session: AsyncSession, photo_id: uuid.UUID) -> Photo | None:
     return await session.scalar(
         select(Photo)
@@ -459,7 +502,8 @@ def _record(
     actor_id: uuid.UUID,
     now: datetime,
 ) -> None:
-    assert photo.deed_id is not None
+    is_avatar = photo.purpose == PhotoPurpose.AVATAR
+    assert is_avatar or photo.deed_id is not None
     session.add(
         PhotoDecision(
             photo_id=photo.id,
@@ -480,11 +524,29 @@ def _record(
         actor_id=actor_id,
         new_value={
             "case_id": str(case_id) if case_id else None,
-            "deed_id": str(photo.deed_id),
+            # A profile picture has no deed: its owner is recorded instead.
+            **(
+                {"purpose": "avatar", "owner_id": str(photo.uploader_user_id)}
+                if is_avatar
+                else {"deed_id": str(photo.deed_id)}
+            ),
             "removal_reason": reason.value if reason else None,
         },
         reason=note,
     )
+    if is_avatar:
+        emit(
+            session,
+            AvatarModerationDecided(
+                photo_id=photo.id,
+                case_id=case_id,
+                user_id=photo.uploader_user_id,
+                action=action.value,
+                removal_reason=reason.value if reason else None,
+            ),
+        )
+        return
+    assert photo.deed_id is not None
     emit(
         session,
         PhotoModerationDecided(
@@ -516,6 +578,9 @@ async def decide(
     if photo_id is None:
         raise case_not_found()
     await advisory_xact_lock(session, "photo_case", str(photo_id))
+    owner = await _avatar_owner(session, photo_id)
+    if owner is not None:
+        await _avatars.lock_owner(session, owner)  # photo_case -> media_avatar -> rows
     photo = await _locked_photo(session, photo_id)
     case = await session.scalar(
         select(PhotoReportCase)
@@ -540,6 +605,9 @@ async def decide(
         photo.removed_at = now
         photo.object_move = ObjectMove.HOLD
         case.decision = CaseDecision.REMOVED
+        if photo.purpose == PhotoPurpose.AVATAR:
+            # Held privately for the retention period (Q95); the owner shows the default.
+            _avatars.changed(session, photo.uploader_user_id, None, "admin_removed", now)
     else:
         case.decision = CaseDecision.KEPT
     case.status = ReportCaseStatus.RESOLVED
@@ -574,12 +642,20 @@ async def restore(
     now = now or utcnow()
     note = _note(data.note, limits)
     await advisory_xact_lock(session, "photo_case", str(photo_id))
+    owner = await _avatar_owner(session, photo_id)
+    if owner is not None:
+        await _avatars.lock_owner(session, owner)  # photo_case -> media_avatar -> rows
     photo = await _locked_photo(session, photo_id)
-    if photo is None or photo.deed_id is None:
+    is_avatar = photo is not None and photo.purpose == PhotoPurpose.AVATAR
+    if photo is None or (photo.deed_id is None and not is_avatar):
         raise photo_not_found()
-    if photo.takedown != PhotoTakedown.ADMIN_REMOVED or photo.objects_purged_at is not None:
+    if (
+        photo.takedown != PhotoTakedown.ADMIN_REMOVED
+        or photo.objects_purged_at is not None
+        or photo.status != PhotoStatus.READY
+    ):
         raise Conflict("This photo can't be restored.", code="not_restorable")
-    view = await deeds.get_deed(session, photo.deed_id)
+    view = await deeds.get_deed(session, photo.deed_id) if photo.deed_id is not None else None
     # Any report the actor filed on this photo, in any case (a restore undoes a removal).
     await _check_conflict(session, actor_id, photo, view, case_ids=None)
     last_case = await session.scalar(
@@ -590,6 +666,22 @@ async def restore(
     )
     if last_case is None:  # a removal only ever comes from a case
         raise Conflict("This photo can't be restored.", code="not_restorable")
+    if is_avatar and await _avatars.has_live(session, photo.uploader_user_id):
+        raise Conflict(
+            "This person has a newer profile picture, so this one can't come back.",
+            code="avatar_replaced",
+        )
+    if is_avatar:
+        # The release copies the variants back under the next version: a new reference, so
+        # links from before the removal never work again. It resolves once the move is done.
+        version = _keys.key_version(_keys.variant_keys_of(photo.variant_keys)["avatar_md"])
+        _avatars.changed(
+            session,
+            photo.uploader_user_id,
+            _keys.avatar_ref(photo.id, version + 1),
+            "restored",
+            now,
+        )
     photo.takedown = PhotoTakedown.NONE
     photo.removed_at = None
     photo.object_move = ObjectMove.RELEASE

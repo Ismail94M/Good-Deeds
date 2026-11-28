@@ -15,6 +15,7 @@ from app.modules.scoring.models import (
     LedgerRole,
     PointsLedger,
 )
+from tests.deeds.helpers import OUTBOX_WRITE_ORDER
 
 SCORING_PREFIX = "app.modules.scoring."
 
@@ -26,7 +27,7 @@ async def run_scoring(session: AsyncSession, *deed_ids: uuid.UUID, reverse: bool
         await session.scalars(
             select(OutboxEvent)
             .where(OutboxEvent.payload["deed_id"].astext.in_([str(d) for d in deed_ids]))
-            .order_by(OutboxEvent.occurred_at, OutboxEvent.id)
+            .order_by(*OUTBOX_WRITE_ORDER)
         )
     )
     if reverse:

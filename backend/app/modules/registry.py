@@ -21,6 +21,7 @@ MODULES: list[str] = [
     "feed",  # M3: feed projection, likes, comments, saves, shares, follows, Top
     "scoring",  # M4: points ledger, leaderboards, Kindness Hero titles, badges, tier
     "fraud",  # M5: detectors, flag cases, prize holds, review, notices and appeals
+    "notifications",  # M6A: in-app notifications, preferences, mutes, network fan-out
 ]
 
 _OPTIONAL_PARTS = ("models", "handlers", "jobs")

@@ -103,7 +103,7 @@ function RingButton({ ring, onOpen }: { ring: StoryRing; onOpen: () => void }) {
         style={{ background: ringBackground(ring) }}
       >
         <span className="block rounded-full bg-white p-[2px]">
-          <Avatar name={ring.user.display_name} handle={ring.user.handle ?? ''} size="story" />
+          <Avatar user={ring.user} size="story" />
         </span>
       </span>
       <span

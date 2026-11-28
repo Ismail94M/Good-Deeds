@@ -1,3 +1,4 @@
+import { Avatar } from '../media/avatar/Avatar'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { useLocation } from 'react-router'
@@ -115,16 +116,19 @@ function DeedList({ deeds }: { deeds: { deed: MyDeedRef; effect?: string }[] }) 
   return (
     <ul className="flex flex-col divide-y divide-slate-200 rounded-xl border border-slate-200">
       {deeds.map(({ deed, effect }) => (
-        <li key={deed.deed_id} className="flex flex-col gap-0.5 px-3.5 py-2.5">
-          <span className="font-semibold break-words text-slate-900">
-            {deed.role === 'doer'
-              ? `${deed.other_person.display_name} recognised you`
-              : `You recognised ${deed.other_person.display_name}`}
+        <li key={deed.deed_id} className="flex items-start gap-3 px-3.5 py-2.5">
+          <Avatar user={deed.other_person} size="md" />
+          <span className="flex min-w-0 flex-col gap-0.5">
+            <span className="font-semibold break-words text-slate-900">
+              {deed.role === 'doer'
+                ? `${deed.other_person.display_name} recognised you`
+                : `You recognised ${deed.other_person.display_name}`}
+            </span>
+            <span className="text-sm break-words text-slate-600">
+              {deed.category_label} · {formatDay(deed.occurred_on)} · {deed.area_name}
+            </span>
+            {effect && <span className="text-sm font-semibold text-brand-900">{effect}</span>}
           </span>
-          <span className="text-sm break-words text-slate-600">
-            {deed.category_label} · {formatDay(deed.occurred_on)} · {deed.area_name}
-          </span>
-          {effect && <span className="text-sm font-semibold text-brand-900">{effect}</span>}
         </li>
       ))}
     </ul>

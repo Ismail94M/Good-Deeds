@@ -216,7 +216,7 @@ async def create_scan(
     # Pre-checks for friendly errors; the unique constraints are the real guard.
     if await _window_used(session, witness_id, doer.user_id, doer.window):
         raise _already_scanned()
-    doer_ref = UserRef(handle=doer.handle, display_name=doer.display_name)
+    doer_ref = UserRef(handle=doer.handle, display_name=doer.display_name, avatar=doer.avatar_ref)
     if await _pair_used_today(session, witness_id, doer.user_id, today):
         raise _already_today(doer_ref)
     # D19 pair pre-check (unlocked): refuse before a scan is recorded, so the pair's IST day
@@ -320,7 +320,7 @@ async def get_scan(
         raise scan_not_found()
     return ScanDetail(
         scan_id=scan.id,
-        doer=UserRef(handle=doer.handle, display_name=doer.display_name),
+        doer=UserRef(handle=doer.handle, display_name=doer.display_name, avatar=doer.avatar_ref),
         expires_at=scan.expires_at,
         scanned_at=scan.scanned_at,
         pair_reports_remaining=await pair_reports_remaining(

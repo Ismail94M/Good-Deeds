@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode, type SVGProps } from 'react'
 import { Link } from 'react-router'
-import { initials } from '../report/format'
+import { Avatar } from '../media/avatar/Avatar'
 
 export const focusRing =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700'
@@ -156,58 +156,26 @@ export function ChevronIcon({ dir }: { dir: 'left' | 'right' }) {
 
 // ----------------------------------------------------------------- avatar
 
-const AVATAR_TONES = [
-  'bg-brand-100 text-brand-900',
-  'bg-emerald-100 text-emerald-800',
-  'bg-amber-200 text-amber-900',
-  'bg-pink-100 text-pink-900',
-  'bg-indigo-100 text-indigo-800',
-]
+// The shared avatar (M6 §6.2) lives with the picture loader in `media/avatar`.
+export { Avatar, type AvatarPerson } from '../media/avatar/Avatar'
 
-/** A stable colour per handle, so the same person always looks the same. */
-function toneFor(handle: string): string {
-  let sum = 0
-  for (const ch of handle) sum = (sum + ch.charCodeAt(0)) % 997
-  return AVATAR_TONES[sum % AVATAR_TONES.length]
-}
-
-const AVATAR_SIZES = {
-  sm: 'size-9 text-[13px]',
-  md: 'size-10 text-sm',
-  lg: 'size-11 text-[15px]',
-  xl: 'size-22 text-[30px]',
-  story: 'size-15 text-lg',
-}
-
-/** Initials avatar; decorative (the name is always shown next to it). */
-export function Avatar({
+/** The avatar as a link to the person's profile. */
+export function AvatarLink({
   name,
   handle,
-  size = 'lg',
+  avatar,
 }: {
   name: string
   handle: string
-  size?: keyof typeof AVATAR_SIZES
+  avatar?: string | null
 }) {
-  return (
-    <span
-      aria-hidden
-      className={`flex shrink-0 items-center justify-center rounded-full font-bold ${AVATAR_SIZES[size]} ${toneFor(handle)}`}
-    >
-      {initials(name)}
-    </span>
-  )
-}
-
-/** The avatar as a link to the person's profile. */
-export function AvatarLink({ name, handle }: { name: string; handle: string }) {
   return (
     <Link
       to={`/u/${encodeURIComponent(handle)}`}
       aria-label={`${name}, open profile`}
       className={`shrink-0 rounded-full ${focusRing}`}
     >
-      <Avatar name={name} handle={handle} />
+      <Avatar name={name} handle={handle} avatar={avatar} />
     </Link>
   )
 }

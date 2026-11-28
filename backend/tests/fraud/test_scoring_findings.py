@@ -19,7 +19,7 @@ from app.modules.media.service import DeedPhotoReady
 from app.modules.scoring._concentration import check_concentration
 from app.modules.scoring.models import ImpactEvaluation
 from app.modules.scoring.service import DeedNeedsReview
-from tests.deeds.helpers import Member, members, scan_and_report
+from tests.deeds.helpers import OUTBOX_WRITE_ORDER, Member, members, scan_and_report
 from tests.fraud.helpers import FRAUD_PREFIX, case_deeds, cases_for, publish_fraud, run_fraud
 from tests.scoring.board_helpers import city, counted, ist
 from tests.scoring.helpers import run_scoring
@@ -32,7 +32,7 @@ async def _run_fraud_on(session: AsyncSession, event_type: str) -> int:
     rows = await session.scalars(
         select(OutboxEvent)
         .where(OutboxEvent.event_type == event_type)
-        .order_by(OutboxEvent.occurred_at, OutboxEvent.id)
+        .order_by(*OUTBOX_WRITE_ORDER)
     )
     ran = 0
     for row in list(rows):

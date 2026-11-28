@@ -414,7 +414,11 @@ async def test_outcomes_latest_decision_wins_and_doer_removals(
         ("kept", None, 1),
         ("removed", "not_consented", 1),
     ]
-    assert outcomes[0]["removed_by"] == {"handle": doer.handle, "display_name": doer.display_name}
+    assert outcomes[0]["removed_by"] == {
+        "handle": doer.handle,
+        "display_name": doer.display_name,
+        "avatar": None,
+    }
     assert outcomes[1]["removed_by"] is None and outcomes[2]["removed_by"] is None
     # The doer's view has no outcomes.
     doer_view = (

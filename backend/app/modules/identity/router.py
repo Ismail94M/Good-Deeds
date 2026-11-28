@@ -33,7 +33,7 @@ from app.modules.identity.schemas import (
     SignupRequest,
     TokenResponse,
 )
-from app.modules.identity.service import CurrentUser, DeviceId
+from app.modules.identity.service import CurrentUser, DeviceId, OptionalUser
 
 logger = logging.getLogger(__name__)
 
@@ -321,8 +321,8 @@ async def rotate_qr(user: CurrentUser, session: Session) -> QrCodeResponse:
 
 
 @router.get("/users/{handle}", response_model=PublicProfile, tags=["users"])
-async def get_profile(handle: str, session: Session) -> PublicProfile:
+async def get_profile(handle: str, session: Session, viewer: OptionalUser) -> PublicProfile:
     user = await service.get_user_by_handle(session, handle)
     if user is None or user.status != UserStatus.ACTIVE:
         raise NotFound("We couldn't find that person.", code="user_not_found")
-    return service.public_profile(user)
+    return service.public_profile(user, signed_in=viewer is not None)

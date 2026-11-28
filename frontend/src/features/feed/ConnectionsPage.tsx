@@ -125,7 +125,7 @@ function ConnectionList({ list }: { list: ListName }) {
             key={row.user.handle}
             className={`flex items-center gap-3 px-3.5 py-2.5 ${index > 0 ? 'border-t border-slate-200' : ''}`}
           >
-            <Avatar name={row.user.display_name} handle={row.user.handle} size="md" />
+            <Avatar user={row.user} size="md" />
             <Link
               to={`/u/${encodeURIComponent(row.user.handle)}`}
               className={`min-w-0 grow rounded ${focusRing}`}

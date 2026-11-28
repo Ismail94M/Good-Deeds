@@ -373,7 +373,7 @@ export function StoryViewer({
             ))}
           </div>
           <div className="flex items-center gap-2.5">
-            <Avatar name={ring.user.display_name} handle={handle} size="md" />
+            <Avatar user={ring.user} size="md" />
             <div className="flex min-w-0 flex-1 flex-col">
               <span className="truncate font-semibold">
                 {ownerIsMe ? 'You' : ring.user.display_name}

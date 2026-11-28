@@ -16,6 +16,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import AuditLog
+from app.core.events import OutboxEvent
 from app.core.ratelimit import InMemoryRateLimiter, get_rate_limiter
 from app.core.security import keyed_hash
 from app.core.sms import ConsoleSmsProvider
@@ -123,6 +124,19 @@ async def test_happy_path(
         )
     )
     assert otp is not None and otp.consumed_at is not None
+
+    # M6A A26: an in-app "Your password was changed" row is built from this event.
+    changed = [
+        e.payload
+        for e in await session.scalars(
+            select(OutboxEvent).where(OutboxEvent.event_type == "identity.password_changed")
+        )
+        if e.payload["user_id"] == str(s.user_id)
+    ]
+    assert [{k: v for k, v in e.items() if k != "changed_at"} for e in changed] == [
+        {"user_id": str(s.user_id), "method": "phone_otp"}
+    ]
+    assert isinstance(changed[0]["changed_at"], str)
 
 
 async def test_phone_accepted_in_same_formats_as_phone_start(

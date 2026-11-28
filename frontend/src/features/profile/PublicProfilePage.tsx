@@ -8,7 +8,21 @@ import { identityApi, queryKeys } from '../auth/identityApi'
 import { deedsApi, deedsKeys } from '../deeds/deedsApi'
 import { useSocial, useUserDeeds } from '../feed/feedQueries'
 import { firstName } from '../feed/feedText'
-import { Avatar, EmptyBox, FeedMain, FollowButton } from '../feed/feedUi'
+import {
+  Avatar,
+  DotsIcon,
+  EmptyBox,
+  FeedMain,
+  FollowButton,
+  focusRing,
+  Sheet,
+  SheetButton,
+  SheetCancel,
+  SheetRowIcon,
+  FlagIcon,
+} from '../feed/feedUi'
+import { AvatarReportSheet } from '../media/avatar/AvatarReportSheet'
+import { useMute, usePreferences } from '../notifications/notificationsApi'
 import { useOnboardingGate } from '../feed/OnboardingPrompt'
 import { PostList } from '../feed/PostList'
 import { useToggleFollow } from '../feed/postActions'
@@ -62,9 +76,18 @@ export function PublicProfilePage() {
 
   return (
     <FeedMain>
-      <section className="flex flex-col items-center gap-2 pt-2 text-center">
+      <section className="relative flex flex-col items-center gap-2 pt-2 text-center">
+        {user && user.handle.toLowerCase() !== data.handle.toLowerCase() && (
+          <ProfileMenu
+            handle={data.handle}
+            name={data.display_name}
+            hasPicture={Boolean(data.avatar)}
+            canReport={user.onboarding.complete}
+          />
+        )}
         <span className="rounded-full bg-white p-1 shadow-[0_0_0_1px_#e2e8f0,0_8px_20px_-10px_rgba(36,66,184,0.45)]">
-          <Avatar name={data.display_name} handle={data.handle} size="xl" />
+          {/* D119: visitors always see the default; the response carries no picture for them. */}
+          <Avatar user={user ? data : { ...data, avatar: null }} size="xl" />
         </span>
         <h1 className="mt-1 text-[26px] leading-tight font-bold tracking-tight break-words text-slate-900 sm:text-[32px]">
           {data.display_name}
@@ -123,6 +146,125 @@ export function PublicProfilePage() {
       </p>
       {user && <ProfileDeeds handle={data.handle} name={data.display_name} />}
     </FeedMain>
+  )
+}
+
+/**
+ * The profile "⋯" (§6.1, D113, D121): "Report profile picture" for onboarded members when the
+ * person has a picture, and "Mute notifications from {name}" (silent; undo in settings).
+ */
+function ProfileMenu({
+  handle,
+  name,
+  hasPicture,
+  canReport,
+}: {
+  handle: string
+  name: string
+  hasPicture: boolean
+  canReport: boolean
+}) {
+  const [sheet, setSheet] = useState<'menu' | 'report' | null>(null)
+  const [toast, showToast] = useToast()
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setSheet('menu')}
+        aria-label={`More options for ${name}`}
+        aria-haspopup="dialog"
+        className={`absolute top-0 right-0 flex size-11 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 ${focusRing}`}
+      >
+        <DotsIcon />
+      </button>
+      {sheet === 'menu' && (
+        <ProfileMenuSheet
+          handle={handle}
+          name={name}
+          showReport={hasPicture && canReport}
+          onReport={() => setSheet('report')}
+          onDone={(message) => {
+            setSheet(null)
+            if (message) showToast(message)
+          }}
+        />
+      )}
+      {sheet === 'report' && (
+        <AvatarReportSheet handle={handle} name={firstName(name)} onClose={() => setSheet(null)} />
+      )}
+      {toast}
+    </>
+  )
+}
+
+function ProfileMenuSheet({
+  handle,
+  name,
+  showReport,
+  onReport,
+  onDone,
+}: {
+  handle: string
+  name: string
+  showReport: boolean
+  onReport: () => void
+  onDone: (message?: string) => void
+}) {
+  const prefs = usePreferences()
+  const mute = useMute()
+  const first = firstName(name)
+  const muted = Boolean(
+    prefs.data?.mutes.people.some((p) => p.handle?.toLowerCase() === handle.toLowerCase()),
+  )
+  return (
+    <Sheet title={name} onClose={() => onDone()}>
+      {showReport && (
+        <SheetButton
+          icon={
+            <SheetRowIcon tone="bg-red-50 text-red-700">
+              <FlagIcon />
+            </SheetRowIcon>
+          }
+          onClick={onReport}
+        >
+          Report profile picture
+        </SheetButton>
+      )}
+      <SheetButton
+        icon={
+          <SheetRowIcon tone="bg-slate-100 text-slate-700">
+            <svg
+              viewBox="0 0 24 24"
+              className="size-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M6 9.5a6 6 0 0 1 9.6-4.8M18 9.5c0 4.6 1.8 6.4 2.5 7H8M3 3l18 18M10 20a2.2 2.2 0 0 0 4 0" />
+            </svg>
+          </SheetRowIcon>
+        }
+        onClick={() =>
+          mute.mutate(
+            { type: 'person', target: handle, mute: !muted },
+            {
+              onSuccess: () =>
+                onDone(
+                  muted
+                    ? `You’ll get notifications from ${first} again.`
+                    : `Muted ${first}. You can unmute in notification settings.`,
+                ),
+              onError: (error) => onDone(errorMessage(error)),
+            },
+          )
+        }
+      >
+        {muted ? `Unmute notifications from ${first}` : `Mute notifications from ${first}`}
+      </SheetButton>
+      <SheetCancel onClick={() => onDone()} />
+    </Sheet>
   )
 }
 

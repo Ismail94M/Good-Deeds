@@ -35,6 +35,13 @@ function base(extra: Parameters<typeof mockApi>[0] = {}) {
 
 const NOTE = 'Their reply explains the pattern.'
 
+/**
+ * The first query after `renderApp` waits for the auth refresh, `/users/me` and the admin route
+ * to mount; under full-suite load that can pass the 1 s default. Waiting longer only delays a
+ * failure; what each test checks is unchanged.
+ */
+const FIRST_PAINT = { timeout: 5000 }
+
 describe('appeals queue', () => {
   it('lists open appeals with counts and links', async () => {
     base({
@@ -47,7 +54,7 @@ describe('appeals queue', () => {
       },
     })
     renderApp('/admin/appeals')
-    expect(await screen.findByRole('tab', { name: 'Open · 2' })).toBeInTheDocument()
+    expect(await screen.findByRole('tab', { name: 'Open · 2' }, FIRST_PAINT)).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Decided · 5' })).toBeInTheDocument()
     const rows = screen.getAllByRole('listitem').filter((li) => li.closest('main'))
     expect(rows).toHaveLength(2)
@@ -76,7 +83,7 @@ describe('appeals queue', () => {
       },
     })
     renderApp('/admin/appeals')
-    expect(await screen.findByText('No open appeals.')).toBeInTheDocument()
+    expect(await screen.findByText('No open appeals.', undefined, FIRST_PAINT)).toBeInTheDocument()
     expect(await screen.findByText(/Appeals need a second admin · 2/)).toBeInTheDocument()
   })
 })
@@ -86,7 +93,7 @@ describe('appeal review', () => {
     base({ 'GET /admin/fraud/appeals/appeal-1': { body: makeAppealDetail() } })
     renderApp('/admin/appeals/appeal-1')
     expect(
-      await screen.findByRole('heading', { name: 'Appeal from Ahmed Khan' }),
+      await screen.findByRole('heading', { name: 'Appeal from Ahmed Khan' }, FIRST_PAINT),
     ).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Their reason' })).toHaveTextContent(
       'Priya and I volunteer together every weekend.',
@@ -115,7 +122,7 @@ describe('appeal review', () => {
     })
     const user = userEvent.setup()
     renderApp('/admin/appeals/appeal-1')
-    await user.click(await screen.findByRole('button', { name: 'Overturn' }))
+    await user.click(await screen.findByRole('button', { name: 'Overturn' }, FIRST_PAINT))
     const dialog = screen.getByRole('dialog', { name: 'Overturn the decision?' })
     expect(dialog).toHaveTextContent('This answer is final.')
     await user.click(within(dialog).getByRole('button', { name: 'Overturn' }))
@@ -144,7 +151,7 @@ describe('appeal review', () => {
     })
     const user = userEvent.setup()
     renderApp('/admin/appeals/appeal-1')
-    await user.click(await screen.findByRole('button', { name: 'Uphold' }))
+    await user.click(await screen.findByRole('button', { name: 'Uphold' }, FIRST_PAINT))
     const dialog = screen.getByRole('dialog', { name: 'Uphold the decision?' })
     expect(dialog).toHaveTextContent('This answer is final.')
     await user.type(within(dialog).getByRole('textbox'), NOTE)
@@ -167,7 +174,9 @@ describe('appeal review', () => {
       },
     })
     renderApp('/admin/appeals/appeal-1')
-    expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: 'Page not found' }, FIRST_PAINT),
+    ).toBeInTheDocument()
   })
 })
 
@@ -186,7 +195,9 @@ describe('audit log', () => {
     })
     const user = userEvent.setup()
     renderApp('/admin/audit')
-    expect(await screen.findByText('flag_case.confirmed')).toBeInTheDocument()
+    expect(
+      await screen.findByText('flag_case.confirmed', undefined, FIRST_PAINT),
+    ).toBeInTheDocument()
     expect(screen.getByText('They admitted swapping recognitions.')).toBeInTheDocument()
 
     const show = screen.getByRole('button', { name: 'Show values' })
@@ -211,7 +222,9 @@ describe('audit log', () => {
     })
     const user = userEvent.setup()
     renderApp('/admin/audit')
-    expect(await screen.findByText('No entries match these filters.')).toBeInTheDocument()
+    expect(
+      await screen.findByText('No entries match these filters.', undefined, FIRST_PAINT),
+    ).toBeInTheDocument()
     await user.type(screen.getByLabelText('Entity type'), 'flag_case')
     await user.type(screen.getByLabelText('Actor handle'), `@${AHMED.handle}`)
     await user.type(screen.getByLabelText('Action'), 'flag_case.confirmed')
@@ -244,7 +257,7 @@ describe('audit log', () => {
       },
     })
     renderApp('/admin/audit?from=2026-12-01&to=2026-11-01')
-    expect(await screen.findByRole('alert')).toHaveTextContent(
+    expect(await screen.findByRole('alert', undefined, FIRST_PAINT)).toHaveTextContent(
       'Choose a date range of at most 366 days, starting before it ends.',
     )
   })

@@ -35,6 +35,31 @@ function base(extra: Parameters<typeof mockApi>[0] = {}, role: 'admin' | 'modera
 const NOTE = 'Checked both profiles carefully.'
 
 describe('fraud cases queue', () => {
+  it('shows initials only, never a profile picture, even if a ref is sent (Q97)', async () => {
+    const api = base({
+      'GET /admin/fraud/cases': {
+        body: makeCasePage([
+          makeCaseRow({
+            users: [
+              { ...AHMED, avatar: 'p1-1' },
+              { ...PRIYA, avatar: 'p2-1' },
+            ],
+          }),
+        ]),
+      },
+      'POST /media/avatars/urls': { body: { items: {} } },
+    })
+    renderApp('/admin/fraud')
+    const summary = await screen.findByText(/recognised each other 3 times/)
+    const row = summary.closest('li')
+    if (!row) throw new Error('case row not found')
+    const avatars = row.querySelectorAll('[data-avatar]')
+    expect(avatars.length).toBeGreaterThan(0)
+    avatars.forEach((a) => expect(a).toHaveAttribute('data-avatar', 'initials'))
+    expect(row.querySelectorAll('img')).toHaveLength(0)
+    expect(api.calls('POST /media/avatars/urls')).toHaveLength(0)
+  })
+
   it('shows tabs with counts, type chips, the note and rows', async () => {
     base({
       'GET /admin/fraud/cases': {

@@ -1,6 +1,8 @@
 import { Link, NavLink, Outlet, ScrollRestoration, useLocation } from 'react-router'
 import { LinkButton, LogoMark } from '../components/ui'
 import { useAuth } from '../features/auth/authContext'
+import { Avatar } from '../features/media/avatar/Avatar'
+import { NotificationBell } from '../features/notifications/NotificationBell'
 import { useReviewsUnread } from '../features/reviews/reviewsApi'
 
 const focusRing =
@@ -106,6 +108,8 @@ export function Layout() {
                 </li>
                 <li>
                   <NavLink to="/profile" className={navClass}>
+                    {/* M6 §6.2: my small avatar before "Profile". */}
+                    <Avatar user={user} size="nav" className="mr-1 sm:mr-1.5" />
                     Profile
                     <ReviewsDot />
                   </NavLink>
@@ -144,14 +148,18 @@ export function Layout() {
             )}
           </nav>
           {user && (
-            <LinkButton
-              to="/report"
-              aria-current={onReport ? 'page' : undefined}
-              className="order-2 ml-auto gap-1.5 px-4 text-[15px] sm:order-3 sm:ml-0"
-            >
-              <PlusIcon />
-              Record a deed
-            </LinkButton>
+            <div className="order-2 ml-auto flex items-center gap-1.5 sm:order-3 sm:ml-0">
+              {/* M6 §6.3: the bell sits beside "Record a deed". */}
+              <NotificationBell />
+              <LinkButton
+                to="/report"
+                aria-current={onReport ? 'page' : undefined}
+                className="gap-1.5 px-4 text-[15px]"
+              >
+                <PlusIcon />
+                Record a deed
+              </LinkButton>
+            </div>
           )}
         </div>
       </header>

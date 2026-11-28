@@ -9,7 +9,7 @@ import { PostCard } from './PostCard'
 import { useSignedUrlRefresh } from './useSignedUrlRefresh'
 
 /** Call `onVisible` when the element scrolls into view (no-op where IntersectionObserver is missing). */
-function useOnVisible(onVisible: () => void, enabled: boolean, resetKey: number) {
+export function useOnVisible(onVisible: () => void, enabled: boolean, resetKey: number) {
   const ref = useRef<HTMLDivElement>(null)
   const callback = useRef(onVisible)
   useEffect(() => {

@@ -9,7 +9,7 @@ import { apiGet, apiPost, queryString } from '../../lib/api'
 
 const seg = encodeURIComponent
 
-export type UserRef = { handle: string; display_name: string }
+export type UserRef = { handle: string; display_name: string; avatar?: string | null }
 
 // ----------------------------------------------------------------- #1 options
 

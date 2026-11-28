@@ -431,7 +431,7 @@ function Row({ row, me, title }: { row: LeaderboardRow; me: boolean; title: stri
       >
         {rankText(row)}
       </span>
-      <Avatar name={row.user.display_name} handle={row.user.handle ?? ''} size="md" />
+      <Avatar user={row.user} size="md" />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         {row.user.handle === null ? (
           <span className="truncate font-semibold text-slate-600">{row.user.display_name}</span>

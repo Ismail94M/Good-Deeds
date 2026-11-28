@@ -1,3 +1,4 @@
+import { Avatar } from '../media/avatar/Avatar'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useParams } from 'react-router'
@@ -195,8 +196,11 @@ function Review({
             ) : (
               <p className="text-slate-600 italic">The text has been erased.</p>
             )}
-            <p className="text-sm text-slate-600">
-              By {author} (@{comment.author.handle}) · {formatDateTime(comment.created_at)}
+            <p className="flex items-center gap-2 text-sm text-slate-600">
+              <Avatar user={comment.author} size="xs" />
+              <span>
+                By {author} (@{comment.author.handle}) · {formatDateTime(comment.created_at)}
+              </span>
             </p>
             <p className="text-sm font-medium text-slate-800">
               {author} has had {removedCount === 1 ? '1 comment' : `${removedCount} comments`}{' '}

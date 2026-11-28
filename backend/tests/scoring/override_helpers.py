@@ -12,7 +12,7 @@ from app.core.events import OutboxEvent, handlers_for, run_handler
 from app.core.runtime_config import publish
 from app.modules.scoring._limits import load_scoring
 from app.modules.scoring.models import LedgerRole, ScoreOverride
-from tests.deeds.helpers import Member, members, scan_and_report
+from tests.deeds.helpers import OUTBOX_WRITE_ORDER, Member, members, scan_and_report
 from tests.scoring.helpers import points, run_scoring
 
 NOTE = "The photo shows a different street."
@@ -71,7 +71,7 @@ async def events(session: AsyncSession, event_type: str) -> list[dict[str, Any]]
     rows = await session.scalars(
         select(OutboxEvent)
         .where(OutboxEvent.event_type == event_type)
-        .order_by(OutboxEvent.occurred_at, OutboxEvent.id)
+        .order_by(*OUTBOX_WRITE_ORDER)
     )
     return [r.payload for r in rows]
 
@@ -109,7 +109,7 @@ async def run_scoring_for(session: AsyncSession, event_type: str) -> int:
     rows = await session.scalars(
         select(OutboxEvent)
         .where(OutboxEvent.event_type == event_type)
-        .order_by(OutboxEvent.occurred_at, OutboxEvent.id)
+        .order_by(*OUTBOX_WRITE_ORDER)
     )
     ran = 0
     for row in list(rows):

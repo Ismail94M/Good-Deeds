@@ -24,7 +24,7 @@ from app.modules.deeds.models import (
 )
 from app.modules.feed._projection import sync_post
 from app.modules.feed.models import FeedPost, FeedSave, Follow
-from tests.deeds.helpers import CENTRE, Member
+from tests.deeds.helpers import CENTRE, OUTBOX_WRITE_ORDER, Member
 
 POINT = f"SRID=4326;POINT({CENTRE[1]} {CENTRE[0]})"
 FEED_EVENTS = ("deeds.deed_verified", "deeds.deed_withdrawn", "deeds.deed_rejected")
@@ -148,7 +148,7 @@ async def feed_events(session: AsyncSession, deed_id: uuid.UUID) -> list[OutboxE
             OutboxEvent.event_type.in_(FEED_EVENTS),
             OutboxEvent.payload["deed_id"].astext == str(deed_id),
         )
-        .order_by(OutboxEvent.occurred_at)
+        .order_by(*OUTBOX_WRITE_ORDER)
     )
     return list(rows)
 

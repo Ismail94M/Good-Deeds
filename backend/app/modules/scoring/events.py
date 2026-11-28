@@ -64,9 +64,14 @@ class DeedNeedsReview(DomainEvent):
 
 
 class BadgeAwarded(DomainEvent):
+    """A badge was awarded. ``badge_label`` is the configured label at award time (M6A), so
+    notifications can say "You earned the 5 deeds badge" without reading scoring; None on
+    events written before it was added."""
+
     event_type = "scoring.badge_awarded"
     user_id: uuid.UUID
     badge_slug: str
+    badge_label: str | None = None
 
 
 class HeroTitleAwarded(DomainEvent):
@@ -77,6 +82,9 @@ class HeroTitleAwarded(DomainEvent):
     level_kind: Literal["country", "state", "city", "ward"]
     place: int
     title_key: str
+    # The configured title label at award time with ``{region}`` and ``{month}`` left in, so
+    # notifications fill them on read (M6A); None on events written before it was added.
+    title_label: str | None = None
 
 
 class MonthFinalized(DomainEvent):
@@ -132,6 +140,23 @@ class HeroTitleRevoked(DomainEvent):
     period_month: date
     region_id: int
     case_id: uuid.UUID
+
+
+class AwardWithdrawn(DomainEvent):
+    """Member-safe twin of ``HeroTitleRevoked`` / ``BadgeRevoked`` (M6A, SEC6 follow-up): the
+    person no longer holds a title or badge. No case, reason or admin, so notifications may hear
+    it (D104, D112) and turn the earlier award row into "This is no longer available". A title
+    is named by ``period_month``, ``level_kind``, ``region_id`` and ``title_key``; a badge by
+    ``badge_slug``."""
+
+    event_type = "scoring.award_withdrawn"
+    user_id: uuid.UUID
+    award: Literal["title", "badge"]
+    badge_slug: str | None = None
+    period_month: date | None = None
+    level_kind: Literal["country", "state", "city", "ward"] | None = None
+    region_id: int | None = None
+    title_key: str | None = None
 
 
 class BadgeRevoked(DomainEvent):

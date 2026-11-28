@@ -15,7 +15,8 @@ describe('Layout header (D25)', () => {
 
     const nav = within(header).getByRole('navigation', { name: 'Main' })
     const links = within(nav).getAllByRole('link')
-    expect(links.map((link) => link.textContent)).toEqual([
+    // M6: the Profile link starts with my small (decorative) avatar.
+    expect(links.map((link) => link.textContent?.replace(/^A(?=Profile)/, ''))).toEqual([
       'Home',
       'Leaderboard',
       'My QR',

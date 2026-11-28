@@ -236,7 +236,8 @@ async def test_public_profile_shows_only_public_fields(
     response = await client.get("/api/users/PublicPerson")
     assert response.status_code == 200
     body = response.json()
-    assert set(body) == {"handle", "display_name", "city", "area", "bio", "joined_at"}
+    assert set(body) == {"handle", "display_name", "city", "area", "bio", "joined_at", "avatar"}
+    assert body["avatar"] is None  # signed out (M6A D119)
     assert body["handle"] == "publicperson"
     assert body["city"] == "Bangalore"
     text = response.text

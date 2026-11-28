@@ -17,10 +17,14 @@ RegionKindName = Literal["country", "state", "city", "ward"]
 class UserSummary(BaseModel):
     """The public name of a user (same shape as identity's ``UserSummary``). On final boards and
     title lists an account that is no longer active shows as ``handle=None`` and
-    ``display_name="Unavailable account"`` (SEC3 L6): its place and title stay, its name goes."""
+    ``display_name="Unavailable account"`` (SEC3 L6): its place and title stay, its name goes
+    (and its picture: ``avatar`` null)."""
 
     handle: str | None
     display_name: str
+    # Opaque profile-picture reference (M6A D117), never a URL; always null for an
+    # "Unavailable account" placeholder.
+    avatar: str | None = None
 
 
 class TierOut(BaseModel):

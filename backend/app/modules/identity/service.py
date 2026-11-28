@@ -45,7 +45,12 @@ from app.core.sms import SmsProvider
 from app.modules.identity import _qr
 from app.modules.identity._limits import load_limits
 from app.modules.identity._oauth import OAuthIdentity
-from app.modules.identity.events import PhoneVerified, UserRegistered
+from app.modules.identity.events import (
+    PasswordChanged,
+    PhoneVerified,
+    UserAnonymised,
+    UserRegistered,
+)
 from app.modules.identity.models import (
     Consent,
     DoerCode,
@@ -70,6 +75,14 @@ from app.modules.identity.schemas import (
     SignupRequest,
     UserSummary,
 )
+
+__all__ = [
+    # Re-exported for subscribers (M6A §3.1): notifications; M6B email.
+    "PasswordChanged",
+    "UserAnonymised",
+    # Names, handles and picture references (``public_summaries``).
+    "UserSummary",
+]
 
 MIN_AGE_YEARS = 18
 LAUNCH_TZ = ZoneInfo("Asia/Kolkata")
@@ -165,17 +178,28 @@ async def phone_hashes(session: AsyncSession, user_id: uuid.UUID) -> set[str]:
 async def public_summaries(
     session: AsyncSession, user_ids: Iterable[uuid.UUID]
 ) -> dict[uuid.UUID, UserSummary]:
-    """Handle and display name for each user found, in one query. Unknown IDs are left out."""
+    """Handle, display name and profile-picture reference for each user found, in one query.
+    Unknown IDs are left out. ``avatar_ref`` is None unless the account is active (D122)."""
     ids = set(user_ids)
     if not ids:
         return {}
     result = await session.execute(
-        select(User.id, User.handle, User.display_name).where(User.id.in_(ids))
+        select(User.id, User.handle, User.display_name, User.avatar_ref, User.status).where(
+            User.id.in_(ids)
+        )
     )
-    return {row.id: UserSummary(handle=row.handle, display_name=row.display_name) for row in result}
+    return {
+        row.id: UserSummary(
+            handle=row.handle,
+            display_name=row.display_name,
+            avatar_ref=row.avatar_ref if row.status == UserStatus.ACTIVE else None,
+        )
+        for row in result
+    }
 
 
-def public_profile(user: User) -> PublicProfile:
+def public_profile(user: User, *, signed_in: bool = False) -> PublicProfile:
+    """The profile header. The picture reference only for signed-in viewers (D119)."""
     return PublicProfile(
         handle=user.handle,
         display_name=user.display_name,
@@ -183,6 +207,7 @@ def public_profile(user: User) -> PublicProfile:
         area=user.area,
         bio=user.bio,
         joined_at=user.created_at,
+        avatar=user.avatar_ref if signed_in and user.status == UserStatus.ACTIVE else None,
     )
 
 
@@ -257,6 +282,7 @@ async def me(session: AsyncSession, user: User) -> Me:
         short_id=_qr.SHORT_ID_PREFIX + code.short_id if status.complete else None,
         created_at=user.created_at,
         onboarding=status,
+        avatar=user.avatar_ref,
     )
 
 
@@ -561,6 +587,19 @@ async def current_user(
 
 
 CurrentUser = Annotated[User, Depends(current_user)]
+
+
+async def optional_user(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+) -> User | None:
+    """The signed-in user, or None for a visitor. A bad token is still 401 (as everywhere)."""
+    if credentials is None:
+        return None
+    return await current_user(session, credentials)
+
+
+OptionalUser = Annotated[User | None, Depends(optional_user)]
 
 
 async def require_onboarded(
@@ -938,6 +977,7 @@ async def reset_password(session: AsyncSession, phone: str, code: str, new_passw
         actor_id=user.id,
         new_value={"method": "phone_otp", "sessions_revoked": True},
     )
+    emit(session, PasswordChanged(user_id=user.id, method="phone_otp", changed_at=_now()))
     await session.flush()
 
 
@@ -993,6 +1033,8 @@ class ResolvedDoer:
     display_name: str
     window: int
     short_id: str
+    # The doer's live profile-picture reference (M6A D124: matched doer on Record a deed).
+    avatar_ref: str | None = None
 
 
 async def _active_doer(session: AsyncSession, short_id: str) -> tuple[DoerCode, User] | None:
@@ -1015,6 +1057,7 @@ def _resolved(code: DoerCode, user: User, window: int) -> ResolvedDoer:
         display_name=user.display_name,
         window=window,
         short_id=code.short_id,
+        avatar_ref=user.avatar_ref if user.status == UserStatus.ACTIVE else None,
     )
 
 

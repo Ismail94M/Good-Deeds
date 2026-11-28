@@ -19,7 +19,11 @@ const seg = encodeURIComponent
 export type ScoringRole = 'doer' | 'reporter'
 
 /** `UserSummary`: `handle` is null for an account that is no longer active. */
-export type AdminUserRef = { handle: string | null; display_name: string }
+export type AdminUserRef = {
+  handle: string | null
+  display_name: string
+  avatar?: string | null
+}
 
 /** One `score_overrides` row. `points` null: the override was cleared (back to the rules). */
 export type ScoreOverride = {

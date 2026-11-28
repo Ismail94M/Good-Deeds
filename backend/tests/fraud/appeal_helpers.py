@@ -18,7 +18,7 @@ from app.modules.fraud._limits import load_fraud
 from app.modules.fraud.models import Appeal, DecisionNotice, FlagCaseType
 from app.modules.fraud.schemas import DecisionIn, DeedAction
 from app.modules.scoring.service import PointsOverridden
-from tests.deeds.helpers import Member, members
+from tests.deeds.helpers import OUTBOX_WRITE_ORDER, Member, members
 from tests.fraud.helpers import DAY, days_ago, deed
 from tests.fraud.review_helpers import NOTE, Pair, ask, open_case
 
@@ -120,7 +120,7 @@ async def final_events(session: AsyncSession, case_id: uuid.UUID) -> list[dict[s
             OutboxEvent.event_type == FINAL_EVENT,
             OutboxEvent.payload["case_id"].astext == str(case_id),
         )
-        .order_by(OutboxEvent.occurred_at, OutboxEvent.id)
+        .order_by(*OUTBOX_WRITE_ORDER)
     )
     return list(rows)
 
@@ -142,7 +142,7 @@ async def drain(
                     OutboxEvent.payload["deed_id"].astext.in_(deed_texts)
                     | OutboxEvent.payload["case_id"].astext.in_(case_texts)
                 )
-                .order_by(OutboxEvent.occurred_at, OutboxEvent.id)
+                .order_by(*OUTBOX_WRITE_ORDER)
             )
         )
         ran = 0

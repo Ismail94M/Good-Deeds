@@ -38,7 +38,13 @@ export type OwnerPhoto = {
 
 /** Photo report reasons (§2.2 `photo_reports.reason`). Labels come from `MediaOptions`. */
 export type PhotoReportReason =
-  'not_consented' | 'child_no_guardian_consent' | 'private_details' | 'inappropriate' | 'other'
+  | 'not_consented'
+  | 'child_no_guardian_consent'
+  | 'private_details'
+  | 'inappropriate'
+  | 'other'
+  /** Profile pictures only (M6 D121). */
+  | 'impersonation'
 
 /** A resolved review, or the doer's removal (Q29, reporter only). Open cases never show. */
 export type Outcome = {
@@ -73,6 +79,8 @@ export type MediaOptions = {
   /** Max length of an admin's decision note (the admin note box, §3.4b 7). */
   decision_note_max: number
   report_reasons: ReportReasonOption[]
+  /** Reasons for reporting a profile picture (M6 D121), in the order shown. */
+  avatar_report_reasons?: ReportReasonOption[]
 }
 
 // ----------------------------------------------------------------- uploads

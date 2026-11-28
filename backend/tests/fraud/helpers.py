@@ -20,7 +20,7 @@ from app.modules.fraud.models import (
     FlagCaseStatus,
     FlagCaseType,
 )
-from tests.deeds.helpers import Member, scan_and_report
+from tests.deeds.helpers import OUTBOX_WRITE_ORDER, Member, scan_and_report
 
 FRAUD_PREFIX = "app.modules.fraud."
 DAY = timedelta(days=1)
@@ -43,7 +43,7 @@ async def run_fraud(session: AsyncSession, *deed_ids: uuid.UUID) -> int:
     rows = await session.scalars(
         select(OutboxEvent)
         .where(OutboxEvent.payload["deed_id"].astext.in_([str(d) for d in deed_ids]))
-        .order_by(OutboxEvent.occurred_at, OutboxEvent.id)
+        .order_by(*OUTBOX_WRITE_ORDER)
     )
     ran = 0
     for row in list(rows):

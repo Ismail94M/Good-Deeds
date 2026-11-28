@@ -1,6 +1,13 @@
 # Good Deeds architecture diagrams
 
-**Synced to commit `2c7ba38` (`m3-feed`) plus the uncommitted working tree (migrations `0017_real_ward_areas` and `0018_deeds_v6`, the 127.0.0.1 storage endpoint) on 2026-11-21.** The implemented baseline is M0 + M1 + M2 + M3 (feed and social, photos, photo and comment reports with a moderator/admin review queue, the public share page), backend and screens. M3 is built, QA'd and security-reviewed but **not yet approved by the PO**. M4–M8 are not built. Pages changed for M3 say "Synced to 2c7ba38 (branch m3-feed) + uncommitted 0017/0018"; unchanged pages keep their older sync line.
+**Synced to commit `371606c` (`m6-notifications`) on 2026-11-28, for the M6A changes only (AD5).** M0–M3 are drawn in full. M4 (scoring) and M5 (fraud and review) are merged to `main` but were never given a diagram pass: their modules are now implemented on the module map, and 02 names them, but they have no module pages or workflows yet (discrepancy 25). M6A (profile pictures and in-app notifications) is built, QA'd and security-reviewed (SEC6) and awaits PO review; M6B (email, push) and M7–M8 are not built. Pages changed by AD5 say "Synced to 371606c (branch m6-notifications)"; the others keep their older sync line.
+
+What AD5 changed (M6A, [M6-DESIGN](../M6-DESIGN.md) revision 2, [M6-SEC6](../M6-SEC6.md), checked against the code):
+- **New `notifications` module** (03, new page *Notifications module (M6A)*): router (`/api/notifications`, unread count, seen, read / unread / read-all, preferences, mutes), handlers, two jobs, private files (`_write`, `_fanout`, `_render` + `_catalogue`, `_reads`, `_prefs`, `_purge`, `_limits`) and seven tables (0030). It emits nothing, and nobody imports it (D104).
+- **Event subscriptions:** deeds `DeedVerified`; feed `DeedLiked`, `CommentPosted`, `UserFollowed`, `CommentModerationDecided`; media `PhotoModerationDecided`, `PhotoRemovedByDoer`, `AvatarModerationDecided`; scoring `BadgeAwarded`, `HeroTitleAwarded`, `AwardWithdrawn`; identity `PasswordChanged`; fraud `MemberReviewUpdate` and `ReviewsSeen` only. The D112 never-heard list is drawn too.
+- **Capped fan-outs** (04, new page *6 Notifications*): the network fan-out (≤ 3 per actor a day, then `notifications.fanout_network` every 10 s in batches of 1000 followers, stopping at 5000) and the "also commented" rows (at most `replies.max_recipients_per_comment` = 200 earlier commenters, most recent first, SEC6-M1). Plus `notify()`'s skip, group, dedupe and daily-cap steps, the nightly purge, and the bell, list and settings screens.
+- **Profile-picture pointer** (04, new page *6b*): upload with purpose `avatar` → `PUT /media/me/avatar` with the crop → the worker crops on the server and writes three WebP variants (96 / 256 / 512 px) → `go_live` emits `AvatarChanged` → identity sets `users.avatar_ref` → every person ref carries `avatar` → the browser batches refs into `POST /media/avatars/urls` (signed in only; nulls while `avatars_enabled` is off). Public pages and fraud case and appeal screens always send null (D119, Q97).
+- **Migrations 0030–0034:** 0030 notifications tables + `notifications` v1; 0031 photo purpose `avatar`, `avatar_crop`, one live picture per person, `impersonation` reason, media avatar config; 0032 `users.avatar_ref` + `avatar_changed_at`; 0033 `explanation_reminders` + fraud reminder config; 0034 the reply fan-out cap and the `cooldown` reject reason. Shown in 02 (database), 03 (identity, media and notifications tables) and 05 (`migrate` head 0034).
 
 What AD3 changed since `c294451` (M3, [M3-DESIGN](../M3-DESIGN.md) Revision 2 and the code):
 - **Two new modules (D29):** `media` (uploads, the photo pipeline, signed URLs, photo reports, admin decisions) and `feed` (the feed projection, visibility, likes, comments, saves, shares, follows, Top, comment reports). Each has its own page in 03.
@@ -47,7 +54,8 @@ Good Deeds as one system with its people and external services. M1 covers accoun
 - **Database:** 37 application tables, head `0018`; the box names the media and feed tables and cites every migration.
 - **Worker:** one Procrastinate worker on all queues. It adds `media.process_queued` (every 5 s), `media.move_objects` (1 min), `media.purge_deleted` and `media.sweep_late_puts` (5 min), `media.expire_uploads` (30 min), `media.purge_detached` (hourly), `media.purge_removed` (02:23), `media.sweep_staging` (02:53), `feed.refresh_top` (every minute, each period when due) and `feed.erase_deleted_comments` (03:47), plus the feed's three event handlers.
 - **Object storage** is partial: SeaweedFS in compose works; GCS `asia-south1` with HMAC keys is the launch target and has no configuration yet.
-- **Planned:** AI evaluation (M4) and notifications (M6).
+- **M6A (AD5):** the API box adds `scoring`, `fraud` and `notifications` to the module list and the M6A routes (`/api/notifications/*`, `/api/media/me/avatar`, `/api/media/avatars/urls`); the M4 and M5 routes are not listed. The database box adds the notifications tables, the avatar columns and head **0034** (M4 and M5 tables are counted, not itemised). The worker adds `notifications.fanout_network`, `notifications.purge` and `fraud.remind_explanations`. A new **M6A screens** box covers the avatar editor, avatars everywhere, the bell, `/notifications` and `/settings/notifications`.
+- **Planned:** AI evaluation (M4, not re-checked since M4 shipped) and **email + push delivery (M6B)**; in-app notifications now live inside the API and worker.
 
 ### 03 Backend modules: [`03-backend-modules.drawio`](03-backend-modules.drawio)
 Five pages.
@@ -72,7 +80,12 @@ Five pages.
 
 - **Module map (M1–M8):** Feed & Social is implemented and consumes `DeedVerified`, `DeedWithdrawn`, `DeedRejected`; a new **Media** box (M3-DESIGN D29, not in the PRD table) emits `PhotoRemovedByDoer` and `PhotoModerationDecided`; Feed emits `DeedLiked`, `CommentPosted`, `UserFollowed`, `CommentModerationDecided`. Moderation (M7) notes that photo and comment reports moved into M3.
 
-### 04 Workflows: [`04-workflows.drawio`](04-workflows.drawio), ten pages
+- **Notifications module (M6A, new page, AD5):** router, handlers (one per subscribed event, grouped by source module), jobs (`notifications.fanout_network` every 10 s, `notifications.purge` 03:40 IST), private files and the seven tables (0030; config v1, plus the 0034 reply cap). The right column shows what D104 allows it to import: `deeds.service` and `identity.service`; from feed, media, scoring and fraud only the named events and three feed reads (`visible_deed_ids`, `follower_ids_page`, `earlier_commenter_ids`). A box lists the events it must never hear (D112).
+
+  ![Notifications module](img/03-backend-modules--notifications-module-m6a.svg)
+- **AD5 edits on other 03 pages:** core + identity (the registry lists seven modules; `users.avatar_ref`; `PasswordChanged`, `UserAnonymised`; identity `handlers.py` hears `AvatarChanged`); media (avatar routes, crop and variants in the worker, `avatar_urls`, the 0031 and 0034 columns, `AvatarChanged` and `AvatarModerationDecided`); module map (Scoring, Points & Leaderboard, Fraud Checks, Review & Audit and Notifications promoted to implemented; the event labels on the outbox name their M6A subscribers).
+
+### 04 Workflows: [`04-workflows.drawio`](04-workflows.drawio), twelve pages
 1. **1a Google sign-in** (implemented, sequence diagram; unchanged since AD1):
    - `/auth/config` decides whether the button shows.
    - Google's popup returns an ID token, and `POST /auth/oauth/google` verifies it against Google's keys (audience, issuer, 30 s clock leeway).
@@ -154,11 +167,23 @@ Five pages.
     - An admin removal moves the variants to `held/` (`media.move_objects`); `media.purge_removed` deletes them after 90 days (Q32); uploader and doer can't purge a held photo (L4). Removed comment text is kept 30 days (L3). Guidelines pages are partial (copy awaits PO approval); the full admin area (M5) and post reports (M7) are planned.
 
    ![Workflow 5c: reports and moderation](img/04-workflows--5c-reports-and-moderation-m3.svg)
+11. **6 Notifications: events to rows, fan-out, purge** (M6A, new page, implemented):
+    - Six source modules emit through the outbox; the notifications handlers turn each event into rows through `_write.notify()` (skip the actor, inactive accounts, switched-off categories and mutes; group and dedupe; daily caps of 30 Activity and 1 Your-network rows per IST day). Rows hold ids only; text is built on read, so a hidden or withdrawn deed reads "This deed is no longer available" with no names (Q93).
+    - `on_deed_verified` starts the network fan-out (each actor ≤ 3 a day); `notifications.fanout_network` works through it in batches of 1000 followers, checks each one can still see the deed, and stops at 5000 (`capped`). `on_comment_posted` sends "also commented" to at most 200 earlier commenters of the last 30 days (SEC6-M1).
+    - `on_award_withdrawn` marks the earlier title or badge row "no longer available" and sends nothing; `on_reviews_seen` marks review rows read. The nightly purge, the bell (polls the unread count, floor 15 s), the list and the settings page complete the flow.
+
+   ![Workflow 6: notifications](img/04-workflows--6-notifications-m6a.svg)
+12. **6b Profile picture pointer flow** (M6A, new page, implemented):
+    - The editor sends only a normalised square crop; `POST /media/uploads` (purpose `avatar`, refused while `avatars_enabled` is off), the presigned PUT and `complete` are the photo pipeline's; `PUT /media/me/avatar` queues it.
+    - The worker crops on the server and writes `avatar_sm` / `avatar_md` / `avatar_lg` (96 / 256 / 512 px); a picture finished during an admin-removal cooldown is rejected (`cooldown`, 0034). `go_live` swaps the live picture and emits `AvatarChanged`, as do owner removal and admin remove / restore.
+    - Identity stores the newest `avatar_ref`; every person ref carries it as `avatar` (null for inactive accounts, public pages, and fraud case and appeal screens, Q97). `useAvatarUrls` batches refs from all components into `POST /media/avatars/urls` (signed in only, ≤ 100 per call); `Avatar` falls back to initials on null.
+
+   ![Workflow 6b: profile picture pointer flow](img/04-workflows--6b-profile-picture-pointer-flow-m6a.svg)
 
 ### 05 Infrastructure and deployment: [`05-infrastructure-deployment.drawio`](05-infrastructure-deployment.drawio), two pages
 
-- **Local Docker Compose** (synced to `2c7ba38`):
-  - **Services:** `db` (PostGIS on `127.0.0.1:5432`, `db-data`), a one-shot `migrate` (head **0018**), `api` and `worker` (both built from `./backend`), `web` (Vite), and since M3 **`storage`** (SeaweedFS `chrislusf/seaweedfs:4.48`, S3 on `127.0.0.1:8333`, keys from `infra/seaweedfs/s3.json`, volume `storage-data`) and the one-shot **`storage-init`** (`amazon/aws-cli`, creates bucket `gooddeeds-media` and puts its CORS rules for `http://localhost:5173`).
+- **Local Docker Compose** (synced to `371606c`; only the migration head changed since `2c7ba38`):
+  - **Services:** `db` (PostGIS on `127.0.0.1:5432`, `db-data`), a one-shot `migrate` (head **0034**), `api` and `worker` (both built from `./backend`), `web` (Vite), and since M3 **`storage`** (SeaweedFS `chrislusf/seaweedfs:4.48`, S3 on `127.0.0.1:8333`, keys from `infra/seaweedfs/s3.json`, volume `storage-data`) and the one-shot **`storage-init`** (`amazon/aws-cli`, creates bucket `gooddeeds-media` and puts its CORS rules for `http://localhost:5173`).
   - `api` and `worker` now also wait for `storage-init`. The `&backend-env` anchor adds the `GD_STORAGE_*` settings: the API and worker call `storage:8333`; URLs signed for browsers use `127.0.0.1:8333` (the port is published on IPv4 loopback only, and `localhost` can resolve to `::1` first). Dev keys are refused outside development.
   - The phone path through the cloudflared quick tunnel is unchanged (partial, dev only).
 
@@ -208,6 +233,8 @@ First found on 2026-11-12; re-checked on 2026-11-15 against `4b05a3a` on 2026-11
 22. **(New) M3-DESIGN §4.8's job table is incomplete.** The code also runs `media.process_queued` (every 5 s, the pipeline) and `media.sweep_late_puts` (every 5 min, SEC2 L7), and `feed.refresh_top` is one job every minute that refreshes each period when it is due (10 / 30 / 60 min). *Resolved:* the table now lists them.
 23. **(New) M3-DESIGN's status line** still says "Nothing is built yet", although M3 is built in `5f37066`–`2c7ba38`. *Resolved:* it now says built, QA'd, security-reviewed and awaiting PO review.
 24. **(New) PRD §11 has no Media module.** M3-DESIGN D29 adds a `media` module (uploads, pipeline, photo reports and decisions); the PRD module table and its Moderation row ("reports") don't mention it or that photo and comment reports moved into M3. *Resolved:* §11 has a Media row, Feed consumes `DeedVerified`, `DeedWithdrawn` and `DeedRejected`, and the Moderation row no longer lists photo and comment reports.
+25. **(New, AD5) M4 and M5 were never diagrammed.** The README and the diagrams stayed at M3 (`2c7ba38`) while scoring (M4) and fraud (M5) were merged to `main`. AD5 only promoted their module-map boxes and named them in 02. Still missing: scoring and fraud module pages in 03; page *4 Impact scoring (M4)* in 04 is still drawn as planned; the module map's M4/M5 event labels (`DeedEvaluated`, `FlagRaised`, "DeedVerified (M4/M5)") and the planned AI evaluator in 02 are not checked against the code; 02 does not list the M4/M5 routes, tables or jobs one by one. This needs its own M4/M5 diagram pass.
+26. **(New, AD5, wording) `CLAUDE.md` lists `fraud.remind_explanations` among the notifications jobs.** The job lives in `fraud/jobs.py` (queue `fraud`, daily 04:30 UTC) and emits `MemberReviewUpdate` (`explanation_reminder`), which notifications hears. The diagrams draw it as a fraud job.
 
 ## Keeping this up to date
 

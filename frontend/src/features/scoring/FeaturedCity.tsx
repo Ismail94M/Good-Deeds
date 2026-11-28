@@ -156,11 +156,7 @@ function PodiumPlace({ row, position }: { row: FeaturedRow; position: number }) 
       className={`flex min-w-0 flex-col items-center gap-1.5 ${style.order}`}
     >
       <span className={`rounded-full ring-4 ${style.ring}`}>
-        <Avatar
-          name={row.user.display_name}
-          handle={row.user.handle ?? ''}
-          size={first ? 'xl' : 'lg'}
-        />
+        <Avatar user={row.user} size={first ? 'xl' : 'lg'} />
       </span>
       <Name row={row} className="w-full text-center text-sm" />
       <span className="text-center text-xs leading-snug text-slate-700">
@@ -192,7 +188,7 @@ function ListRow({ row }: { row: FeaturedRow }) {
       >
         {rankText(row)}
       </span>
-      <Avatar name={row.user.display_name} handle={row.user.handle ?? ''} size="md" />
+      <Avatar user={row.user} size="md" />
       <Name row={row} className="min-w-0 flex-1" />
       <span className="shrink-0 text-right text-sm text-slate-700">
         <Stats row={row} />

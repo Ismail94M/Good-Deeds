@@ -1,4 +1,5 @@
-"""The ``media`` config namespace (docs/M3-DESIGN.md §2.5, §8 Config, migration 0014)."""
+"""The ``media`` config namespace (docs/M3-DESIGN.md §2.5, §8 Config, migration 0014; v2 adds the
+profile-picture keys, docs/M6-DESIGN.md §2.5, migration 0031)."""
 
 from typing import Any
 
@@ -45,6 +46,24 @@ DESIGN_V1: dict[str, Any] = {
 }
 
 
+# M6A (migration 0031): media v2 = v1 plus these.
+AVATAR_KEYS: dict[str, Any] = {
+    "avatars_enabled": True,
+    "avatar_variants": [
+        {"name": "avatar_sm", "max_side_px": 96},
+        {"name": "avatar_md", "max_side_px": 256},
+        {"name": "avatar_lg", "max_side_px": 512},
+    ],
+    "avatar_min_side_px": 256,
+    "avatar_url_ttl_minutes": 1440,
+    "avatar_url_step_minutes": 720,
+    "avatar_sign_max_refs": 100,
+    "avatar_reupload_cooldown_hours": 24,
+    "rate_avatar_change_user": "5/86400",
+    "rate_avatar_sign_user": "120/60",
+}
+
+
 async def _v1(session: AsyncSession) -> dict[str, Any]:
     row = await session.get(ConfigVersion, ("media", 1))
     assert row is not None
@@ -52,9 +71,15 @@ async def _v1(session: AsyncSession) -> dict[str, Any]:
     return dict(row.values)
 
 
+async def _current(session: AsyncSession) -> dict[str, Any]:
+    """v1 plus the keys later versions added (what MediaLimits validates today)."""
+    return {**await _v1(session), **AVATAR_KEYS}
+
+
 async def test_media_v1_is_the_design_seed(session: AsyncSession) -> None:
     values = await _v1(session)
     assert values == DESIGN_V1
+    values = await _current(session)
     assert set(MediaLimits.model_fields) == set(values)  # all keys, no extras
     limits = MediaLimits.model_validate(values)
     assert limits.photos_enabled is True  # moved from deeds (D41)
@@ -65,11 +90,12 @@ async def test_media_v1_is_the_design_seed(session: AsyncSession) -> None:
 
 async def test_load_limits_returns_the_active_version(session: AsyncSession) -> None:
     version, limits = await load_limits(session)
-    assert version >= 1 and isinstance(limits, MediaLimits)
+    assert version >= 2 and isinstance(limits, MediaLimits)
+    assert limits.model_dump(mode="json", include=set(AVATAR_KEYS)) == AVATAR_KEYS
 
 
 async def test_media_limits_have_no_defaults_and_no_extras(session: AsyncSession) -> None:
-    values = await _v1(session)
+    values = await _current(session)
     for key in values:
         partial = {k: v for k, v in values.items() if k != key}
         with pytest.raises(ValidationError):
@@ -100,11 +126,15 @@ async def test_media_limits_have_no_defaults_and_no_extras(session: AsyncSession
         {"report_details_max": 501},
         {"rate_upload_user": "forty per hour"},
         {"rate_report_ip": "0/3600"},
+        {"avatar_url_step_minutes": 1440},
+        {"avatar_variants": AVATAR_KEYS["avatar_variants"][:2]},
+        {"avatar_variants": [*AVATAR_KEYS["avatar_variants"], {"name": "thumb", "max_side_px": 1}]},
+        {"rate_avatar_change_user": "5 a day"},
     ],
 )
 async def test_media_limits_reject_inconsistent_values(
     session: AsyncSession, change: dict[str, Any]
 ) -> None:
-    values = await _v1(session)
+    values = await _current(session)
     with pytest.raises(ValidationError):
         MediaLimits.model_validate({**values, **change})

@@ -358,8 +358,13 @@ SCORING_FROM_FRAUD = frozenset(
 )
 # deeds imports only the event it subscribes to, and only in deeds/handlers.py.
 DEEDS_FROM_FRAUD = ("deeds/handlers.py", frozenset({"FlagDecisionFinal"}))
+# M6A D104, D112: notifications reads fraud only through its member-safe events (the review
+# update, and "Reviews was opened" so it can mark review rows read).
+NOTIFICATIONS_FROM_FRAUD = frozenset({"MemberReviewUpdate", "ReviewsSeen"})
 # Feature modules that exist now or may later, even if a test tree lacks them.
-KNOWN_MODULES = frozenset({"identity", "deeds", "media", "feed", "scoring", "fraud"})
+KNOWN_MODULES = frozenset(
+    {"identity", "deeds", "media", "feed", "scoring", "fraud", "notifications"}
+)
 
 Imported = tuple[str, tuple[str, ...]]
 
@@ -415,7 +420,8 @@ def _module_dirs(app_dir: Path) -> set[str]:
 
 def _who_imports_fraud_violations(app_dir: Path) -> list[str]:
     """Imports of fraud from other modules: scoring only SCORING_FROM_FRAUD, deeds/handlers.py
-    only FlagDecisionFinal, everyone else (feed, media, identity, ...) nothing."""
+    only FlagDecisionFinal, notifications only MemberReviewUpdate (M6A D104), everyone else
+    (feed, media, identity, ...) nothing."""
     modules = app_dir / "modules"
     problems: list[str] = []
     for path in sorted(modules.rglob("*.py")) if modules.is_dir() else []:
@@ -427,6 +433,8 @@ def _who_imports_fraud_violations(app_dir: Path) -> list[str]:
             allowed = SCORING_FROM_FRAUD
         elif rel.as_posix() == DEEDS_FROM_FRAUD[0]:
             allowed = DEEDS_FROM_FRAUD[1]
+        elif owner == "notifications":
+            allowed = NOTIFICATIONS_FROM_FRAUD
         else:
             allowed = frozenset()
         for module, names in _imports_of(path, app_dir, FRAUD):
@@ -465,8 +473,9 @@ def _fraud_imports_violations(app_dir: Path) -> list[str]:
 def test_only_scoring_and_deeds_import_fraud_and_only_their_names() -> None:
     problems = _who_imports_fraud_violations(APP)
     assert problems == [], (
-        "Only scoring (hold reads and events) and deeds/handlers.py (FlagDecisionFinal) may "
-        "import fraud.service (D78):\n" + "\n".join(problems)
+        "Only scoring (hold reads and events), deeds/handlers.py (FlagDecisionFinal) and "
+        "notifications (MemberReviewUpdate) may import fraud.service (D78, D104):\n"
+        + "\n".join(problems)
     )
 
 
@@ -556,3 +565,261 @@ def test_fraud_rules_pass_without_fraud_package(tmp_path: Path) -> None:
     _write(app_dir, "modules/deeds/service.py", "import app.core.db\n")
     assert _fraud_imports_violations(app_dir) == []
     assert _who_imports_fraud_violations(app_dir) == []
+
+
+# --- M6A: what notifications may import, who may import it, and what it may hear ---
+# (docs/M6-DESIGN.md D104, D112)
+
+NOTIFICATIONS = "app.modules.notifications"
+# notifications may read these modules' service.py (anything in it).
+NOTIFICATIONS_SERVICE_DEPS = frozenset({"deeds", "identity"})
+# From these modules' service.py, only the named event classes and reads (D104). A new event to
+# notify about is added here on purpose.
+NOTIFICATIONS_NAMED: dict[str, frozenset[str]] = {
+    "media": frozenset({"PhotoModerationDecided", "PhotoRemovedByDoer", "AvatarModerationDecided"}),
+    # AwardWithdrawn: the member-safe twin of HeroTitleRevoked/BadgeRevoked (no case data).
+    "scoring": frozenset({"BadgeAwarded", "HeroTitleAwarded", "AwardWithdrawn"}),
+    "feed": frozenset(
+        {
+            "DeedLiked",
+            "CommentPosted",
+            "UserFollowed",
+            "CommentModerationDecided",
+            "visible_deed_ids",
+            "follower_ids_page",
+            "earlier_commenter_ids",
+        }
+    ),
+    "fraud": NOTIFICATIONS_FROM_FRAUD,
+}
+# The feed reads above (everything else named from feed, media and scoring is an event class).
+NOTIFICATIONS_FEED_READS = frozenset(
+    {"visible_deed_ids", "follower_ids_page", "earlier_commenter_ids"}
+)
+# D112: events notifications never hears. They carry case data or provisional points.
+NOTIFICATIONS_NEVER_HEARS = frozenset(
+    {
+        "fraud.flag_raised",
+        "fraud.flag_case_resolved",
+        "fraud.deed_hold_changed",
+        "fraud.flag_decision_final",
+        "scoring.hero_title_revoked",
+        "scoring.badge_revoked",
+        "scoring.points_changed",
+    }
+)
+# The only fraud events notifications may hear.
+NOTIFICATIONS_FRAUD_EVENTS = frozenset({"fraud.member_review_update", "fraud.reviews_seen"})
+# identity/handlers.py may read from media.service only the avatar pointer event (D117).
+IDENTITY_FROM_MEDIA = ("identity/handlers.py", frozenset({"AvatarChanged"}))
+
+
+def _notifications_imports_violations(app_dir: Path) -> list[str]:
+    """What notifications imports from other modules: deeds.service and identity.service
+    freely, only NOTIFICATIONS_NAMED from media, scoring, feed and fraud, nothing else."""
+    package = app_dir / "modules" / "notifications"
+    if not package.is_dir():
+        return []
+    problems: list[str] = []
+    for path in sorted(package.rglob("*.py")):
+        for other in sorted(_module_dirs(app_dir) - {"notifications"}):
+            target = f"app.modules.{other}"
+            for module, names in _imports_of(path, app_dir, target):
+                service = f"{target}.service"
+                if other in NOTIFICATIONS_SERVICE_DEPS:
+                    ok = module == service or (module == target and names == ("service",))
+                elif other in NOTIFICATIONS_NAMED:
+                    ok = _named_ok(module, names, service, NOTIFICATIONS_NAMED[other])
+                else:
+                    ok = False
+                if not ok:
+                    problems.append(_describe(path, app_dir, module, names))
+    return problems
+
+
+def _who_imports_notifications_violations(app_dir: Path) -> list[str]:
+    """Nobody imports notifications (D104), not even its service."""
+    modules = app_dir / "modules"
+    problems: list[str] = []
+    for path in sorted(modules.rglob("*.py")) if modules.is_dir() else []:
+        rel = path.relative_to(modules)
+        if len(rel.parts) > 1 and rel.parts[0] == "notifications":
+            continue
+        for module, names in _imports_of(path, app_dir, NOTIFICATIONS):
+            problems.append(_describe(path, app_dir, module, names))
+    return problems
+
+
+def _identity_media_violations(app_dir: Path) -> list[str]:
+    """identity reads media only in identity/handlers.py, and only AvatarChanged (D104)."""
+    identity = app_dir / "modules" / "identity"
+    if not identity.is_dir():
+        return []
+    problems: list[str] = []
+    for path in sorted(identity.rglob("*.py")):
+        rel = path.relative_to(app_dir / "modules").as_posix()
+        allowed = IDENTITY_FROM_MEDIA[1] if rel == IDENTITY_FROM_MEDIA[0] else frozenset()
+        for module, names in _imports_of(path, app_dir, MEDIA):
+            if not _named_ok(module, names, f"{MEDIA}.service", allowed):
+                problems.append(_describe(path, app_dir, module, names))
+    return problems
+
+
+def _notifications_subscription_violations(handled: dict[str, list[str]]) -> list[str]:
+    """Event types (with their handler names) that notifications must not hear: the D112 list,
+    and any fraud event other than ``MemberReviewUpdate``."""
+    problems: list[str] = []
+    for event_type, names in sorted(handled.items()):
+        ours = sorted(n for n in names if n.startswith(NOTIFICATIONS + "."))
+        if not ours:
+            continue
+        forbidden = event_type in NOTIFICATIONS_NEVER_HEARS or (
+            event_type.startswith("fraud.") and event_type not in NOTIFICATIONS_FRAUD_EVENTS
+        )
+        if forbidden:
+            problems.extend(f"{event_type} -> {name}" for name in ours)
+    return problems
+
+
+def _registered_handlers() -> dict[str, list[str]]:
+    from app.core import events
+    from app.modules.registry import load_modules
+
+    load_modules()
+    return {t: list(events.handlers_for(t)) for t in events._event_types}
+
+
+def test_notifications_imports_only_what_d104_allows() -> None:
+    problems = _notifications_imports_violations(APP)
+    assert problems == [], (
+        "notifications may import app.core, deeds.service, identity.service and only the named "
+        "events and reads of media, scoring, feed and fraud (D104):\n" + "\n".join(problems)
+    )
+
+
+def test_nobody_imports_notifications() -> None:
+    problems = _who_imports_notifications_violations(APP)
+    assert problems == [], "Nobody may import notifications (D104):\n" + "\n".join(problems)
+
+
+def test_identity_reads_only_avatar_changed_from_media() -> None:
+    problems = _identity_media_violations(APP)
+    assert problems == [], (
+        "identity may import from media.service only AvatarChanged, in handlers.py (D104):\n"
+        + "\n".join(problems)
+    )
+
+
+def test_notifications_never_hears_case_events() -> None:
+    from app.modules.registry import MODULES
+
+    assert "notifications" in MODULES
+    problems = _notifications_subscription_violations(_registered_handlers())
+    assert problems == [], (
+        "notifications must not subscribe to fraud case events, HeroTitleRevoked or "
+        "PointsChanged (D112):\n" + "\n".join(problems)
+    )
+
+
+def test_notifications_named_imports_are_events_or_the_feed_reads() -> None:
+    """Every allowed name that exists today is what D104 says: an event class (the three feed
+    reads are functions)."""
+    import importlib
+
+    from app.core.events import DomainEvent
+
+    for other, allowed in NOTIFICATIONS_NAMED.items():
+        service = importlib.import_module(f"app.modules.{other}.service")
+        for name in sorted(allowed):
+            value = getattr(service, name, None)
+            if value is None:  # added by a later task (B47, B50, B51)
+                continue
+            if name in NOTIFICATIONS_FEED_READS:
+                assert other == "feed" and callable(value), name
+            else:
+                assert isinstance(value, type) and issubclass(value, DomainEvent), name
+
+
+def test_notifications_rules_catch_violations(tmp_path: Path) -> None:
+    """The D104 and D112 rules pass trivially while notifications imports little; prove they
+    bite."""
+    app_dir = tmp_path / "app"
+    n = "modules/notifications"
+    # What notifications imports.
+    _write(app_dir, f"{n}/_ok1.py", "from app.modules.deeds import service as deeds\n")
+    _write(app_dir, f"{n}/_ok2.py", "from app.modules.identity.service import CurrentUser\n")
+    _write(app_dir, f"{n}/_ok3.py", "from app.modules.feed.service import visible_deed_ids\n")
+    _write(app_dir, f"{n}/_ok4.py", "from app.modules.fraud.service import MemberReviewUpdate\n")
+    _write(app_dir, f"{n}/_ok5.py", "from app.modules.scoring.service import BadgeAwarded\n")
+    _write(app_dir, f"{n}/_ok6.py", "from ..media.service import PhotoRemovedByDoer\n")
+    _write(app_dir, f"{n}/_f1.py", "from app.modules.fraud.service import FlagRaised\n")
+    _write(
+        app_dir,
+        f"{n}/_f2.py",
+        "from app.modules.fraud.service import MemberReviewUpdate, FlagCaseResolved\n",
+    )
+    _write(app_dir, f"{n}/_f3.py", "from app.modules.fraud import service\n")
+    _write(app_dir, f"{n}/_s1.py", "from app.modules.scoring.service import PointsChanged\n")
+    _write(app_dir, f"{n}/_s2.py", "from app.modules.scoring.service import doer_points\n")
+    _write(app_dir, f"{n}/_s3.py", "from app.modules.scoring.service import BadgeRevoked\n")
+    _write(app_dir, f"{n}/_ok7.py", "from app.modules.scoring.service import AwardWithdrawn\n")
+    _write(app_dir, f"{n}/_m1.py", "from app.modules.media.service import sign_variants\n")
+    _write(app_dir, f"{n}/_d1.py", "import app.modules.deeds.models\n")
+    _write(app_dir, f"{n}/_fe.py", "from app.modules.feed.service import can_view\n")
+    # Who imports notifications.
+    _write(app_dir, "modules/feed/_n.py", "from app.modules.notifications import service\n")
+    _write(app_dir, "modules/fraud/_n.py", "import app.modules.notifications.models\n")
+    # identity and media.
+    avatar = "from app.modules.media.service import AvatarChanged\n"
+    _write(app_dir, "modules/identity/handlers.py", avatar)
+    _write(app_dir, "modules/identity/_x.py", avatar)
+    _write(app_dir, "modules/identity/handlers2.py", "from app.modules.media.service import urls\n")
+
+    assert _notifications_imports_violations(app_dir) == [
+        f"{n}/_d1.py imports app.modules.deeds.models",
+        f"{n}/_f1.py imports app.modules.fraud.service (FlagRaised)",
+        f"{n}/_f2.py imports app.modules.fraud.service (MemberReviewUpdate, FlagCaseResolved)",
+        f"{n}/_f3.py imports app.modules.fraud (service)",
+        f"{n}/_fe.py imports app.modules.feed.service (can_view)",
+        f"{n}/_m1.py imports app.modules.media.service (sign_variants)",
+        f"{n}/_s1.py imports app.modules.scoring.service (PointsChanged)",
+        f"{n}/_s2.py imports app.modules.scoring.service (doer_points)",
+        f"{n}/_s3.py imports app.modules.scoring.service (BadgeRevoked)",
+    ]
+    assert _who_imports_notifications_violations(app_dir) == [
+        "modules/feed/_n.py imports app.modules.notifications (service)",
+        "modules/fraud/_n.py imports app.modules.notifications.models",
+    ]
+    assert _identity_media_violations(app_dir) == [
+        "modules/identity/_x.py imports app.modules.media.service (AvatarChanged)",
+        "modules/identity/handlers2.py imports app.modules.media.service (urls)",
+    ]
+    ours = f"{NOTIFICATIONS}.handlers.on_x"
+    assert _notifications_subscription_violations(
+        {
+            "fraud.member_review_update": [ours],
+            "fraud.reviews_seen": [ours],
+            "fraud.flag_raised": [ours, "app.modules.scoring.handlers.on_flag"],
+            "fraud.appeal_decided": [ours],
+            "scoring.points_changed": [ours],
+            "scoring.hero_title_revoked": [ours],
+            "scoring.badge_revoked": [ours],
+            "scoring.award_withdrawn": [ours],
+            "scoring.badge_awarded": [ours],
+            "fraud.flag_case_resolved": ["app.modules.scoring.handlers.on_case"],
+        }
+    ) == [
+        f"fraud.appeal_decided -> {ours}",
+        f"fraud.flag_raised -> {ours}",
+        f"scoring.badge_revoked -> {ours}",
+        f"scoring.hero_title_revoked -> {ours}",
+        f"scoring.points_changed -> {ours}",
+    ]
+
+
+def test_notifications_rules_pass_without_the_package(tmp_path: Path) -> None:
+    app_dir = tmp_path / "app"
+    _write(app_dir, "modules/deeds/service.py", "import app.core.db\n")
+    assert _notifications_imports_violations(app_dir) == []
+    assert _who_imports_notifications_violations(app_dir) == []
+    assert _identity_media_violations(app_dir) == []

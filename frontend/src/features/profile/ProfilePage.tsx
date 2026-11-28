@@ -13,8 +13,10 @@ import { ApiError, errorMessage } from '../../lib/api'
 import { useAuth } from '../auth/authContext'
 import { identityApi, type Me } from '../auth/identityApi'
 import { collectErrors, validateDisplayName, validateHandle } from '../auth/validation'
-import { initials } from '../report/format'
+import { Avatar } from '../media/avatar/Avatar'
+import { AvatarEditor } from '../media/avatar/AvatarEditor'
 import { useSocial } from '../feed/feedQueries'
+import { useOnboardingGate } from '../feed/OnboardingPrompt'
 import { useMyScoring } from '../scoring/scoringQueries'
 import { OwnBadges } from '../scoring/OwnBadges'
 import { TierChip } from '../scoring/TierChip'
@@ -22,6 +24,8 @@ import { RankingsButton } from '../scoring/Rankings'
 import { useReviewsUnread } from '../reviews/reviewsApi'
 import { DeedCounts } from './DeedCounts'
 
+const PHOTO_SETUP_PROMPT =
+  'Finish setting up your account (verify your phone) to add a profile photo.'
 const BIO_MAX = 280
 const AREA_MAX = 80
 
@@ -38,6 +42,10 @@ export function ProfilePage() {
   const { user } = useAuth()
   const [editing, setEditing] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [editingPhoto, setEditingPhoto] = useState(false)
+  // Uploads need a finished setup (verified phone), so the photo buttons show the setup prompt.
+  const photoGate = useOnboardingGate(PHOTO_SETUP_PROMPT)
+  const editPhoto = () => photoGate.guard(() => setEditingPhoto(true))
   if (!user) return <Loading />
 
   if (editing) {
@@ -58,12 +66,26 @@ export function ProfilePage() {
   return (
     <main className="mx-auto flex w-full max-w-[720px] flex-col gap-5 px-4 pt-5 pb-10 sm:px-6 sm:pt-10 sm:pb-14">
       <section className="flex flex-col items-center gap-2 pt-2 text-center">
-        <span
-          aria-hidden
-          className="flex size-22 items-center justify-center rounded-full bg-brand-100 text-[30px] font-bold text-brand-900"
-        >
-          {initials(user.display_name)}
+        <span className="relative rounded-full bg-white p-1 shadow-[0_0_0_1px_#e2e8f0,0_8px_20px_-10px_rgba(36,66,184,0.45)]">
+          <Avatar user={user} size="xl" />
+          <button
+            type="button"
+            onClick={editPhoto}
+            // The text button below is the accessible control; this is a bigger mouse/touch target.
+            aria-hidden
+            tabIndex={-1}
+            className={`absolute -right-1 -bottom-1 flex size-11 items-center justify-center rounded-full border-2 border-white bg-brand-700 text-white shadow-md hover:bg-brand-900 ${focusRing}`}
+          >
+            <CameraIcon />
+          </button>
         </span>
+        <button
+          type="button"
+          onClick={editPhoto}
+          className={`inline-flex min-h-11 items-center rounded px-2 text-sm font-semibold text-brand-700 hover:text-brand-900 ${focusRing}`}
+        >
+          {user.avatar ? 'Change photo' : 'Add photo'}
+        </button>
         <h1 className="mt-1 text-[26px] leading-tight font-bold tracking-tight break-words text-slate-900 sm:text-[32px]">
           {user.display_name}
         </h1>
@@ -115,7 +137,27 @@ export function ProfilePage() {
           setEditing(true)
         }}
       />
+      {editingPhoto && <AvatarEditor onClose={() => setEditingPhoto(false)} />}
+      {photoGate.prompt}
     </main>
+  )
+}
+
+function CameraIcon() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      className="size-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 8h3l1.5-2h7L17 8h3v11H4z" />
+      <circle cx="12" cy="13" r="3.5" />
+    </svg>
   )
 }
 

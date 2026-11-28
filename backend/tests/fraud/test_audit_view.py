@@ -41,7 +41,7 @@ async def test_case_actions_show_up_with_their_actor_and_note(
     body = (await _get(client, who, entity_type="flag_case", entity_id=str(pair.case_id))).json()
     (item,) = body["items"]
     assert item["action"] == "flag_case.parked"
-    assert item["actor"] == {"handle": who.handle, "display_name": who.display_name}
+    assert item["actor"] == {"handle": who.handle, "display_name": who.display_name, "avatar": None}
     assert item["reason"] == NOTE
     assert item["old_value"] == {"status": "open"}
     assert item["new_value"] == {"type": "reciprocal", "status": "parked"}

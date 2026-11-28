@@ -117,7 +117,7 @@ export function CommentsSection({ deed, composerId }: { deed: PostDetail; compos
         <ul className="flex flex-col gap-3.5">
           {items.map((comment) => (
             <li key={comment.id} className="flex items-start gap-2.5">
-              <Avatar name={comment.author.display_name} handle={comment.author.handle} size="sm" />
+              <Avatar user={comment.author} size="sm" />
               <div className="min-w-0 grow">
                 <p className="text-sm">
                   <strong>
@@ -188,7 +188,7 @@ export function CommentsSection({ deed, composerId }: { deed: PostDetail; compos
         className="flex flex-col gap-1.5 border-t border-slate-200 pt-3.5"
       >
         <div className="flex items-end gap-2">
-          {user && <Avatar name={user.display_name} handle={user.handle} size="sm" />}
+          {user && <Avatar user={user} size="sm" />}
           <textarea
             id={composerId}
             rows={2}

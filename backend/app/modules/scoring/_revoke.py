@@ -40,7 +40,7 @@ from app.modules.scoring import _coi, _labels
 from app.modules.scoring._limits import load_leaderboard
 from app.modules.scoring._overrides import clean_note
 from app.modules.scoring._reads import _TitleLabels
-from app.modules.scoring.events import BadgeRevoked, HeroTitleRevoked
+from app.modules.scoring.events import AwardWithdrawn, BadgeRevoked, HeroTitleRevoked
 from app.modules.scoring.models import HeroTitle, LedgerRole, PointsLedger, UserBadge
 from app.modules.scoring.schemas import (
     AdminBadge,
@@ -112,7 +112,9 @@ async def user_view(session: AsyncSession, user_id: uuid.UUID) -> AdminUserScori
         .order_by(UserBadge.awarded_at, UserBadge.badge_slug)
     )
     return AdminUserScoring(
-        user=UserSummary(handle=summary.handle, display_name=summary.display_name),
+        user=UserSummary(
+            handle=summary.handle, display_name=summary.display_name, avatar=summary.avatar_ref
+        ),
         titles=title_rows,
         badges=[
             AdminBadge(
@@ -228,6 +230,18 @@ async def revoke_title(
             case_id=body.case_id,
         ),
     )
+    # Member-safe twin: notifications hears this one, never HeroTitleRevoked (D112).
+    emit(
+        session,
+        AwardWithdrawn(
+            user_id=title.user_id,
+            award="title",
+            period_month=title.period_month,
+            level_kind=title.level_kind.value,
+            region_id=title.region_id,
+            title_key=title.title_key,
+        ),
+    )
     return title.user_id
 
 
@@ -278,5 +292,9 @@ async def revoke_badge(
             badge_slug=badge.badge_slug,
             case_id=body.case_id,
         ),
+    )
+    emit(
+        session,
+        AwardWithdrawn(user_id=badge.user_id, award="badge", badge_slug=badge.badge_slug),
     )
     return badge.user_id

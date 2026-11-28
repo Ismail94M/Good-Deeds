@@ -22,7 +22,6 @@ from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
-from pydantic import BaseModel
 from sqlalchemy import ColumnElement, func, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -86,8 +85,8 @@ def _note(note: str, shared: SharedReportLimits) -> str:
     return text
 
 
-def _refs(summaries: Mapping[uuid.UUID, BaseModel]) -> dict[uuid.UUID, UserRef]:
-    return {uid: UserRef(**s.model_dump()) for uid, s in summaries.items()}
+def _refs(summaries: Mapping[uuid.UUID, identity.UserSummary]) -> dict[uuid.UUID, UserRef]:
+    return {uid: UserRef.of(s) for uid, s in summaries.items()}
 
 
 def _top_reason(reports: list[CommentReport]) -> str:

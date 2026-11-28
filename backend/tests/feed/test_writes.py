@@ -187,7 +187,7 @@ async def test_post_and_list_comments(client: AsyncClient, session: AsyncSession
     assert r.status_code == 201, r.text
     first = r.json()
     assert first["body"] == "So kind of you!"
-    assert first["author"] == {"handle": a.handle, "display_name": a.display_name}
+    assert first["author"] == {"handle": a.handle, "display_name": a.display_name, "avatar": None}
     assert first["mine"] is True and first["can_delete"] is True
     await client.post(path, headers=b.headers, json={"body": "Thank you"})
     assert (await _counts(session, deed_id))[2] == 2
@@ -541,11 +541,17 @@ async def test_follow_unfollow_and_remove_follower(
 
     me = (await client.get("/api/me/following", headers=a.headers)).json()
     assert me["items"] == [
-        {"user": {"handle": b.handle, "display_name": b.display_name}, "following": True}
+        {
+            "user": {"handle": b.handle, "display_name": b.display_name, "avatar": None},
+            "following": True,
+        }
     ]
     fans = (await client.get("/api/me/followers", headers=b.headers)).json()
     assert fans["items"] == [
-        {"user": {"handle": a.handle, "display_name": a.display_name}, "following": False}
+        {
+            "user": {"handle": a.handle, "display_name": a.display_name, "avatar": None},
+            "following": False,
+        }
     ]
 
     events_before = len(await _events(session, "feed.user_followed"))

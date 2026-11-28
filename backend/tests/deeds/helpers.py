@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import func, select, text
+from sqlalchemy import func, literal_column, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import OutboxEvent
@@ -295,6 +295,18 @@ def deed_body(scan_id: str | uuid.UUID, **overrides: Any) -> dict[str, Any]:
     return body
 
 
+# Outbox rows in write order. ``occurred_at`` is ``now()``, the start of the transaction, and a
+# test runs in one outer transaction, so every row of a test shares it (and ``id`` is random).
+# Ties are broken by the writing (sub)transaction: each committed savepoint writes with a newer
+# transaction id (``xmin``), and ``ctid`` orders the rows of one savepoint. Valid while the rows
+# are not updated (tests never dispatch them).
+OUTBOX_WRITE_ORDER: tuple[Any, ...] = (
+    OutboxEvent.occurred_at,
+    literal_column("outbox_events.xmin::text::bigint"),
+    literal_column("outbox_events.ctid"),
+)
+
+
 async def outbox(session: AsyncSession, event_type: str, deed_id: uuid.UUID) -> list[OutboxEvent]:
     rows = await session.scalars(
         select(OutboxEvent)
@@ -302,7 +314,7 @@ async def outbox(session: AsyncSession, event_type: str, deed_id: uuid.UUID) -> 
             OutboxEvent.event_type == event_type,
             OutboxEvent.payload["deed_id"].astext == str(deed_id),
         )
-        .order_by(OutboxEvent.occurred_at)
+        .order_by(*OUTBOX_WRITE_ORDER)
     )
     return list(rows)
 

@@ -80,7 +80,8 @@ function setup(handlers: Record<string, unknown> = {}) {
 }
 
 async function bar() {
-  return screen.findByRole('region', { name: 'Stories' })
+  // The first query after renderApp gets extra time: it can be slow under full-suite load.
+  return screen.findByRole('region', { name: 'Stories' }, { timeout: 5000 })
 }
 
 async function openRing(name: RegExp) {

@@ -98,7 +98,7 @@ async def _outs(
         out.append(
             CommentOut(
                 id=c.id,
-                author=UserRef(**author.model_dump()),
+                author=UserRef.of(author),
                 body=c.body,
                 created_at=c.created_at,
                 mine=mine,

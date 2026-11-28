@@ -32,10 +32,12 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import Conflict, NotFound
+from app.core.events import emit
 from app.modules.deeds import service as deeds
 from app.modules.fraud import _notices
 from app.modules.fraud._common import Invalid
 from app.modules.fraud._limits import FraudConfig
+from app.modules.fraud.events import ReviewsSeen
 from app.modules.fraud.models import (
     Appeal,
     AppealOutcome,
@@ -89,6 +91,8 @@ class _Named(Protocol):
     def handle(self) -> str: ...
     @property
     def display_name(self) -> str: ...
+    @property
+    def avatar_ref(self) -> str | None: ...
 
 
 def explanation_not_found() -> NotFound:
@@ -128,7 +132,9 @@ def _ref(people: Mapping[uuid.UUID, _Named], user_id: uuid.UUID | None) -> UserR
     summary = people.get(user_id) if user_id is not None else None
     if summary is None:
         return _GONE
-    return UserRef(handle=summary.handle, display_name=summary.display_name)
+    return UserRef(
+        handle=summary.handle, display_name=summary.display_name, avatar=summary.avatar_ref
+    )
 
 
 def _my_deed(ctx: _Context, me: uuid.UUID, deed_id: uuid.UUID, config: FraudConfig) -> MyDeedRef:
@@ -531,7 +537,9 @@ async def reply(
 
 
 async def mark_seen(session: AsyncSession, user_id: uuid.UUID, now: datetime) -> None:
-    """M4: upsert ``review_views`` (never moves back). The caller commits."""
+    """M4: upsert ``review_views`` (never moves back). M6A D112: also emits ``ReviewsSeen`` so
+    notifications marks the member's review rows read (nobody may import notifications). The
+    caller commits."""
     stmt = insert(ReviewView).values(user_id=user_id, seen_at=now)
     await session.execute(
         stmt.on_conflict_do_update(
@@ -539,3 +547,4 @@ async def mark_seen(session: AsyncSession, user_id: uuid.UUID, now: datetime) ->
             set_={"seen_at": func.greatest(ReviewView.seen_at, stmt.excluded.seen_at)},
         )
     )
+    emit(session, ReviewsSeen(user_id=user_id, seen_at=now))

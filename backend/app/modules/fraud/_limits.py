@@ -34,10 +34,19 @@ class _Frozen(BaseModel):
 
 
 class ExplanationRules(_Frozen):
-    """D99: how long a person has to reply, and how long a reply may be."""
+    """D99: how long a person has to reply, and how long a reply may be. M6A D112 (fraud config
+    from migration 0033): one reminder ``reminder_days_before_due`` days before the reply is due,
+    if there is still no reply."""
 
     reply_days: int = Field(ge=3, le=60)
     reply_max_chars: int = Field(ge=1, le=2000)
+    reminder_days_before_due: int = Field(ge=1)
+
+    @model_validator(mode="after")
+    def _valid(self) -> Self:
+        if self.reminder_days_before_due >= self.reply_days:
+            raise ValueError("explanation.reminder_days_before_due must be less than reply_days")
+        return self
 
 
 class AppealRules(_Frozen):

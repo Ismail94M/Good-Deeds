@@ -516,7 +516,8 @@ def _calls_with_extra(path: Path) -> list[tuple[str, int]]:
 
 def test_only_the_scan_service_passes_extra() -> None:
     """D27 allows ``extra`` on exactly two scan-time errors. Every ``extra=`` in the app is in
-    ``_scans.py`` (the two errors) or the pass-through in ``pair_limit_reached``."""
+    ``_scans.py`` (the two errors) or the pass-through in ``pair_limit_reached``, plus the
+    reporter limit's 429 and the profile-picture cooldown 409 (``available_at`` only)."""
     uses: dict[str, list[str]] = {}
     for path in (BACKEND_DIR / "app").rglob("*.py"):
         calls = _calls_with_extra(path)
@@ -525,7 +526,12 @@ def test_only_the_scan_service_passes_extra() -> None:
     assert uses == {
         "app/modules/deeds/_scans.py": ["Conflict", "pair_limit_reached"],
         "app/modules/deeds/_reporter_limit.py": ["TooManyRequests"],
+        "app/modules/media/_avatars.py": ["Conflict"],
     }
+    # The profile-picture cooldown 409 (M6A Q95) passes exactly ``available_at``.
+    avatars = (BACKEND_DIR / "app/modules/media/_avatars.py").read_text(encoding="utf-8")
+    assert avatars.count("extra=") == 1
+    assert 'extra={"available_at": until.isoformat()}' in avatars
 
 
 # ======================================================================= D24, other endpoints

@@ -218,6 +218,7 @@ async def finalize_month(
                         level_kind=level.kind,
                         place=row.rank,
                         title_key=title.key,
+                        title_label=title.label,
                     ),
                 )
                 titles += 1

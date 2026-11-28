@@ -173,7 +173,13 @@ export function PostCard({
         category={cardCategory(post)}
         area={post.area_name}
         occurredAt={post.occurred_at}
-        avatar={<AvatarLink name={post.doer.display_name} handle={post.doer.handle} />}
+        avatar={
+          <AvatarLink
+            name={post.doer.display_name}
+            handle={post.doer.handle}
+            avatar={post.doer.avatar}
+          />
+        }
         trailing={
           <>
             {!isDoer && (
@@ -328,7 +334,7 @@ export function PublicPostCard({ deed, joinHref }: { deed: PublicDeed; joinHref:
             aria-label={`${deed.doer.display_name}, join to see their profile`}
             className={`shrink-0 rounded-full ${focusRing}`}
           >
-            <Avatar name={deed.doer.display_name} handle={deed.doer.handle} />
+            <Avatar name={deed.doer.display_name} handle={deed.doer.handle} avatar={null} />
           </Link>
         }
         trailing={<MenuButton onClick={() => setSheet('menu')} />}

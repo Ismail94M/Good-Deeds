@@ -111,7 +111,7 @@ async def connections(
     else:
         followed_back = set(ids)
     items = [
-        ConnectionOut(user=UserRef(**names[i].model_dump()), following=i in followed_back)
+        ConnectionOut(user=UserRef.of(names[i]), following=i in followed_back)
         for i in ids
         if i in names
     ]

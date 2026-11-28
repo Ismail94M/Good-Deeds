@@ -1,3 +1,4 @@
+import { Avatar } from '../media/avatar/Avatar'
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useId, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
@@ -177,7 +178,8 @@ function RequestRow({
   return (
     <article className="flex flex-col gap-1.5 rounded-[14px] border border-slate-200 bg-white p-3.5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-[17px] font-bold break-words text-slate-900">
+        <h2 className="flex flex-wrap items-center gap-x-2 text-[17px] font-bold break-words text-slate-900">
+          {request.user && <Avatar user={request.user} size="sm" />}
           {request.user?.handle ? (
             <Link
               to={`/admin/users/${encodeURIComponent(request.user.handle)}`}

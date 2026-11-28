@@ -32,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.audit import AuditLog, record_audit
 from app.modules.deeds import service as deeds
 from app.modules.fraud._limits import FraudConfig
+from app.modules.fraud._updates import review_update
 from app.modules.fraud.models import DecisionNotice, DeedOutcome, NoticeKind
 
 CASE_REASON_KEY = "case"
@@ -90,8 +91,11 @@ def create_case_notices(
         items: list[dict[str, Any]] = [
             {"deed_id": str(d), "effect": EFFECTS[actions[d]]} for d in people[user_id]
         ]
+        notice_id = uuid.uuid4()
+        review_update(session, user_id, "decision_notice", notice_id)
         session.add(
             DecisionNotice(
+                id=notice_id,
                 user_id=user_id,
                 kind=NoticeKind.CASE,
                 case_id=case_id,
@@ -147,6 +151,7 @@ async def create_override_notice(
     )
     if notice_id is None:
         return None
+    review_update(session, user_id, "decision_notice", notice_id)
     entry = record_audit(
         session,
         entity_type=NOTICE_AUDIT_ENTITY,

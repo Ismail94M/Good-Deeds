@@ -43,7 +43,10 @@ async def test_badges_wait_for_the_window_then_award_once(session: AsyncSession)
     events = await session.scalars(
         select(OutboxEvent).where(OutboxEvent.event_type == "scoring.badge_awarded")
     )
-    assert sorted(e.payload["badge_slug"] for e in events) == ["first_recognised", "first_witness"]
+    payloads = sorted((e.payload for e in events), key=lambda p: p["badge_slug"])
+    assert [p["badge_slug"] for p in payloads] == ["first_recognised", "first_witness"]
+    # M6A: the configured label travels with the event, for notifications.
+    assert [p["badge_label"] for p in payloads] == ["First recognition", "First witness"]
 
     # Idempotent, and permanent: a later reversal never removes a badge.
     assert await award_badges(session, now=verified + 2 * WINDOW) == 0

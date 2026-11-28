@@ -32,7 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import emit
 from app.core.storage import ObjectNotFound, ObjectStorage, ObjectTooLarge
-from app.modules.media import _keys, _pipeline
+from app.modules.media import _avatars, _keys, _pipeline
 from app.modules.media._limits import MediaLimits, load_limits
 from app.modules.media.events import DeedPhotoReady
 from app.modules.media.models import (
@@ -56,21 +56,33 @@ def _utcnow() -> datetime:
 class Claimed:
     id: uuid.UUID
     purpose: PhotoPurpose
+    uploader_id: uuid.UUID
     deed_id: uuid.UUID | None
     declared_type: str
     staging_key: str
     blur_regions: tuple[_pipeline.BlurRegion, ...]
     attempts: int
     started_at: datetime
+    # Profile pictures only (M6A D116).
+    avatar_crop: _pipeline.AvatarCrop | None = None
 
 
-def pipeline_config(limits: MediaLimits) -> _pipeline.PipelineConfig:
+def pipeline_config(
+    limits: MediaLimits, purpose: PhotoPurpose = PhotoPurpose.DEED
+) -> _pipeline.PipelineConfig:
+    variants = limits.avatar_variants if purpose == PhotoPurpose.AVATAR else limits.variants
     return _pipeline.PipelineConfig(
         max_image_pixels=limits.max_image_pixels,
         min_image_side_px=limits.min_image_side_px,
-        variants=tuple(_pipeline.VariantSpec(v.name, v.max_side_px) for v in limits.variants),
+        variants=tuple(_pipeline.VariantSpec(v.name, v.max_side_px) for v in variants),
         webp_quality=limits.webp_quality,
     )
+
+
+def crop_from_json(value: dict[str, Any] | None) -> _pipeline.AvatarCrop | None:
+    if not value:
+        return None
+    return _pipeline.AvatarCrop(x=float(value["x"]), y=float(value["y"]), size=float(value["size"]))
 
 
 def regions_from_json(value: list[Any]) -> tuple[_pipeline.BlurRegion, ...]:
@@ -143,11 +155,13 @@ async def claim(
         .returning(
             Photo.id,
             Photo.purpose,
+            Photo.uploader_user_id,
             Photo.deed_id,
             Photo.declared_type,
             Photo.staging_key,
             Photo.blur_regions,
             Photo.attempts,
+            Photo.avatar_crop,
         )
         .execution_options(synchronize_session=False)
     )
@@ -155,12 +169,14 @@ async def claim(
         Claimed(
             id=r.id,
             purpose=PhotoPurpose(r.purpose),
+            uploader_id=r.uploader_user_id,
             deed_id=r.deed_id,
             declared_type=str(r.declared_type),
             staging_key=r.staging_key,
             blur_regions=regions_from_json(r.blur_regions),
             attempts=r.attempts,
             started_at=now,
+            avatar_crop=crop_from_json(r.avatar_crop),
         )
         for r in rows
     ]
@@ -287,7 +303,12 @@ async def _finish_ready(
     keys: dict[str, str],
     sha: str,
     now: datetime,
-) -> None:
+    limits: MediaLimits,
+) -> PhotoStatus:
+    avatar = claimed.purpose == PhotoPurpose.AVATAR
+    if avatar:
+        # The owner's lock before the row lock (_avatars lock order).
+        await _avatars.lock_owner(session, claimed.uploader_id)
     photo = await _locked_if_ours(session, claimed)
     if photo is None:
         # Deleted, expired or taken over while we worked. Remove what we uploaded unless the
@@ -311,8 +332,25 @@ async def _finish_ready(
                 .execution_options(synchronize_session=False)
             )
             await session.commit()
-        return
-    display = variants["display"]
+        return PhotoStatus.READY
+    if avatar and await _avatars.in_cooldown(session, photo.uploader_user_id, limits, now):
+        # Q95, SEC6-L3: an upload queued before an admin removal must not go live during the
+        # wait. Rejected with a reason the owner sees (P3 ``pending.reject_reason``).
+        photo.status = PhotoStatus.REJECTED
+        photo.reject_reason = PhotoRejectReason.COOLDOWN
+        photo.content_sha256 = sha
+        photo.processed_at = now
+        await session.commit()
+        log.info("photo %s rejected: %s", claimed.id, PhotoRejectReason.COOLDOWN.value)
+        await _delete_staging(session, storage, claimed, now)
+        await _delete_keys(storage, claimed.id, list(keys.values()))
+        return PhotoStatus.REJECTED
+    superseded = False
+    purge: list[tuple[uuid.UUID, list[str]]] = []
+    if avatar:
+        # Replace the live picture in this transaction (D116).
+        superseded, purge = await _avatars.make_room(session, photo, now)
+    display = variants["avatar_lg" if avatar else "display"]
     photo.status = PhotoStatus.READY
     photo.variant_keys = keys
     photo.width = display.width
@@ -335,8 +373,15 @@ async def _finish_ready(
                 ready_at=now,
             ),
         )
+    if avatar and superseded:
+        purge.append((photo.id, _avatars.delete_row(photo, photo.uploader_user_id, now)))
+    elif avatar:
+        _avatars.went_live(session, photo, now)
     await session.commit()
     await _delete_staging(session, storage, claimed, now)
+    if purge:
+        await _avatars.purge_now(session, storage, purge, now)
+    return PhotoStatus.READY
 
 
 async def process_one(
@@ -382,7 +427,9 @@ async def process_one(
         declared_type=claimed.declared_type,
         owner_kind=claimed.purpose.value,
         regions=claimed.blur_regions,
-        config=pipeline_config(limits),
+        config=pipeline_config(limits, claimed.purpose),
+        crop=claimed.avatar_crop,
+        crop_min_side_px=limits.avatar_min_side_px,
     )
     del data
     try:
@@ -396,19 +443,21 @@ async def process_one(
         return None
 
     keys = {name: _keys.variant_key(claimed.id, name) for name in variants}
+    cache_control = (
+        _keys.AVATAR_CACHE_CONTROL
+        if claimed.purpose == PhotoPurpose.AVATAR
+        else _keys.CACHE_CONTROL
+    )
     try:
         for name, variant in variants.items():
-            await storage.put_bytes(
-                keys[name], variant.data, variant.content_type, _keys.CACHE_CONTROL
-            )
+            await storage.put_bytes(keys[name], variant.data, variant.content_type, cache_control)
     except Exception as exc:
         log.warning("photo %s: variant upload failed (%s)", claimed.id, type(exc))
         await _delete_keys(storage, claimed.id, list(keys.values()))
         await _retry_or_fail(session, storage, claimed, limits, clock())
         return None
 
-    await _finish_ready(session, storage, claimed, variants, keys, sha, clock())
-    return PhotoStatus.READY
+    return await _finish_ready(session, storage, claimed, variants, keys, sha, clock(), limits)
 
 
 async def process_batch(

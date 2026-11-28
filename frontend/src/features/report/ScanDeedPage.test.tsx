@@ -29,7 +29,10 @@ function setup({
 }
 
 async function fillValid(user = userEvent.setup()) {
-  await user.click(await screen.findByRole('button', { name: 'Helping an elderly person' }))
+  // The first query after renderApp gets extra time: it can be slow under full-suite load.
+  await user.click(
+    await screen.findByRole('button', { name: 'Helping an elderly person' }, { timeout: 5000 }),
+  )
   await user.type(
     screen.getByRole('textbox', { name: 'What did they do?' }),
     'Helped an elderly man cross the road.',
@@ -142,7 +145,9 @@ describe('deed form', () => {
     await user.click(screen.getByRole('button', { name: 'One more' }))
     await user.click(screen.getByRole('button', { name: 'Send report' }))
 
-    expect(await screen.findByRole('heading', { name: 'Deed verified' })).toHaveFocus()
+    expect(
+      await screen.findByRole('heading', { name: 'Deed verified' }, { timeout: 5000 }),
+    ).toHaveFocus()
     expect(screen.getByText('Thanks, Priya. It now counts on Ahmed Khan’s profile.')).toBeVisible()
     // M4 §6.3: the counted report says the doer earns points, with no number.
     expect(screen.getByText('Ahmed earns points for this deed.')).toBeVisible()

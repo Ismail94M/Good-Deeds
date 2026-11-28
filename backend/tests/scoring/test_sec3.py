@@ -154,11 +154,13 @@ async def test_an_account_suspended_after_finalization_keeps_its_place_without_i
     assert board["final"] is True
     first = board["items"][0]
     assert first["rank"] == 1
-    assert first["user"] == {"handle": None, "display_name": "Unavailable account"}
+    assert first["user"] == {"handle": None, "display_name": "Unavailable account", "avatar": None}
     assert board["items"][1]["user"]["handle"] is not None  # b is still shown by name
     hero = board["titles"][0]
     assert hero["place"] == 1
-    assert hero["users"] == [{"handle": None, "display_name": "Unavailable account"}]
+    assert hero["users"] == [
+        {"handle": None, "display_name": "Unavailable account", "avatar": None}
+    ]
 
     heroes = (
         await client.get(
@@ -166,5 +168,5 @@ async def test_an_account_suspended_after_finalization_keeps_its_place_without_i
         )
     ).json()
     users = [u for item in heroes["items"] for t in item["titles"] for u in t["users"]]
-    assert {"handle": None, "display_name": "Unavailable account"} in users
+    assert {"handle": None, "display_name": "Unavailable account", "avatar": None} in users
     assert all(u["handle"] != a.handle for u in users)

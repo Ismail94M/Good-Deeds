@@ -23,6 +23,8 @@ export type Me = {
   short_id: string | null
   created_at: string
   onboarding: OnboardingStatus
+  /** My profile-picture ref (M6 §3.1 `Me.avatar`); null without a picture. */
+  avatar?: string | null
 }
 
 export type PublicProfile = {
@@ -32,6 +34,8 @@ export type PublicProfile = {
   area: string | null
   bio: string | null
   joined_at: string
+  /** Null when signed out (D119) and without a picture. */
+  avatar?: string | null
 }
 
 export type AuthConfig = {

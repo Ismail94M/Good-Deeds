@@ -23,6 +23,7 @@ export function ReportQueue<T extends { case_id: string }>({
   queryKey,
   fetchPage,
   renderRow,
+  toolbar,
 }: {
   title: string
   openNote: string
@@ -31,6 +32,8 @@ export function ReportQueue<T extends { case_id: string }>({
   queryKey: (status: ReportQueueStatus) => readonly unknown[]
   fetchPage: (status: ReportQueueStatus, cursor: string | null) => Promise<QueuePage<T>>
   renderRow: (item: T) => ReactNode
+  /** Extra filters under the tabs (the photo queue's purpose filter, M6). */
+  toolbar?: ReactNode
 }) {
   const [params, setParams] = useSearchParams()
   const status: ReportQueueStatus = params.get('status') === 'resolved' ? 'resolved' : 'open'
@@ -50,8 +53,14 @@ export function ReportQueue<T extends { case_id: string }>({
         status={status}
         openCount={first?.open_count ?? null}
         resolvedCount={first?.resolved_count ?? null}
-        onChange={(next) => setParams(next === 'open' ? {} : { status: next }, { replace: true })}
+        onChange={(next) => {
+          const nextParams = new URLSearchParams(params)
+          if (next === 'open') nextParams.delete('status')
+          else nextParams.set('status', next)
+          setParams(nextParams, { replace: true })
+        }}
       />
+      {toolbar}
       <p className="text-sm text-slate-600">{status === 'open' ? openNote : RESOLVED_NOTE}</p>
       {query.isPending ? (
         <Loading label="Loading reports…" />

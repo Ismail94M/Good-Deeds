@@ -1,3 +1,4 @@
+import { Avatar } from '../media/avatar/Avatar'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useId, useState } from 'react'
 import { useParams } from 'react-router'
@@ -72,8 +73,13 @@ export function UserScoringAdminPage() {
 
   return (
     <AdminMain>
-      <AdminTitle>{data.user.display_name}</AdminTitle>
-      {data.user.handle && <p className="-mt-2 text-slate-600">@{data.user.handle}</p>}
+      <div className="flex items-center gap-3">
+        <Avatar user={data.user} size="lg" />
+        <div className="flex min-w-0 flex-col">
+          <AdminTitle>{data.user.display_name}</AdminTitle>
+          {data.user.handle && <p className="text-slate-600">@{data.user.handle}</p>}
+        </div>
+      </div>
       <p className="text-[15px] text-slate-800">
         Doer points <strong className="tabular-nums">{data.doer_points}</strong> · Reporter points{' '}
         <strong className="tabular-nums">{data.reporter_points}</strong>

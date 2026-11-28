@@ -48,6 +48,10 @@ class User(Base):
         CheckConstraint(
             "(phone_e164 IS NULL) = (phone_verified_at IS NULL)", name="phone_verified_together"
         ),
+        # A picture pointer is only ever written by the AvatarChanged handler, with its time.
+        CheckConstraint(
+            "avatar_ref IS NULL OR avatar_changed_at IS NOT NULL", name="avatar_ref_has_time"
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -66,6 +70,12 @@ class User(Base):
     phone_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # User declared they are 18+. Date of birth is not stored (DPDP data minimisation).
     adult_declared_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    # M6A (D117, migration 0032): the live profile picture, as an opaque media reference
+    # (``{photo_id}-{key_version}``, never a URL), and the ``changed_at`` of the AvatarChanged
+    # event that set it, so an older event never overwrites a newer one.
+    avatar_ref: Mapped[str | None] = mapped_column(String(80))
+    avatar_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     role: Mapped[Role] = mapped_column(_enum(Role, "role"), default=Role.MEMBER)
     # Included in access tokens; bumping it invalidates every access token already issued.

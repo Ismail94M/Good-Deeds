@@ -4,9 +4,11 @@
 
     decode -> validate -> orient -> colour -> [privacy steps] -> derive -> encode
 
-M3's only privacy step is ``apply_blur_regions`` (D33). A later privacy feature (face
-*suggestions*, a guardian-consent hold, a review hold) is one function added to
-``PRIVACY_STEPS`` plus a config flag; upload, attach, storage and serving don't change.
+M3's only privacy step is ``apply_blur_regions`` (D33). Profile pictures (M6A, D116) run
+``avatar_steps()`` instead: no blur, and a server-side square ``crop_square`` before the
+variants are derived, so pixels outside the crop never reach any stored variant. A later
+privacy feature (face *suggestions*, a guardian-consent hold, a review hold) is one function
+added to ``PRIVACY_STEPS`` plus a config flag; upload, attach, storage and serving don't change.
 
 Privacy rules this file keeps:
 - Every variant is derived from the image *after* the privacy steps; nothing is encoded before
@@ -67,6 +69,49 @@ class BlurRegion:
 
 
 @dataclass(frozen=True)
+class AvatarCrop:
+    """A square on the upright (orientation-corrected) image (D116): ``x`` is a fraction of the
+    width, ``y`` a fraction of the height (top-left corner), and ``size`` the side as a fraction
+    of the image's shorter side, so ``size = 1`` is the largest square that fits."""
+
+    x: float
+    y: float
+    size: float
+
+
+class CropTooSmall(Exception):
+    """The square (or the whole image) is smaller than ``avatar_min_side_px``."""
+
+
+class CropInvalid(Exception):
+    """The square doesn't fit inside the image."""
+
+
+def crop_tolerance_px(width: int, height: int) -> int:
+    """Rounding slack for a client's normalised numbers: 2 px, or 0.2% of the longer side."""
+    return max(2, math.ceil(0.002 * max(width, height)))
+
+
+def crop_box(
+    crop: AvatarCrop, width: int, height: int, min_side_px: int
+) -> tuple[int, int, int, int]:
+    """The pixel square ``(left, top, right, bottom)`` of ``crop`` on a ``width`` x ``height``
+    upright image. A square that overshoots an edge by no more than the rounding slack is moved
+    back inside; anything more is ``CropInvalid``. A side under ``min_side_px`` is
+    ``CropTooSmall``."""
+    short = min(width, height)
+    side = min(round(crop.size * short), short)
+    if short < min_side_px or side < min_side_px:
+        raise CropTooSmall
+    left, top = round(crop.x * width), round(crop.y * height)
+    slack = crop_tolerance_px(width, height)
+    if left < 0 or top < 0 or left + side > width + slack or top + side > height + slack:
+        raise CropInvalid
+    left, top = min(left, width - side), min(top, height - side)
+    return left, top, left + side, top + side
+
+
+@dataclass(frozen=True)
 class VariantSpec:
     name: str
     max_side_px: int
@@ -99,6 +144,10 @@ class PhotoJob:
     owner_kind: str
     regions: tuple[BlurRegion, ...]
     config: PipelineConfig
+    # Profile pictures only (``owner_kind == "avatar"``).
+    crop: AvatarCrop | None = None
+    # The crop's smallest side in pixels (``avatar_min_side_px``).
+    crop_min_side_px: int = 1
     image: Image.Image | None = None
     derived: dict[str, Image.Image] = field(default_factory=dict)
     variants: dict[str, EncodedVariant] = field(default_factory=dict)
@@ -180,6 +229,9 @@ def validate(job: PhotoJob) -> None:
     if job.owner_kind == "self_log" and job.regions:
         # Attach refuses this (422); never blur-and-keep a private photo by mistake.
         raise ValueError("self-log photos have no blur regions")
+    if job.owner_kind == "avatar" and (job.regions or job.crop is None):
+        # PUT /me/avatar always sets the crop (ck_photos_avatar_crop_required) and no regions.
+        raise ValueError("a profile picture needs a crop and has no blur regions")
 
 
 # --------------------------------------------------- orient and colour
@@ -297,6 +349,26 @@ def apply_blur_regions(job: PhotoJob) -> None:
 PRIVACY_STEPS: tuple[Step, ...] = (apply_blur_regions,)
 
 
+def crop_square(job: PhotoJob) -> None:
+    """Cut the profile picture's square out of the upright image (D116). Everything after this
+    step sees only the square. ``PUT /me/avatar`` checked the crop against the same header, so
+    a failure here means the file changed or lied about its size: it is rejected."""
+    img = job.current()
+    assert job.crop is not None  # validate() checked
+    try:
+        box = crop_box(job.crop, img.width, img.height, job.crop_min_side_px)
+    except (CropTooSmall, CropInvalid):
+        raise PhotoRejected(PhotoRejectReason.CORRUPT) from None
+    square = img.crop(box)
+    square.load()
+    square.info.clear()
+    job.image = square
+
+
+# Privacy steps for profile pictures, after the crop (none yet; a later review hold goes here).
+AVATAR_PRIVACY_STEPS: tuple[Step, ...] = ()
+
+
 # --------------------------------------------------- derive and encode
 
 
@@ -326,10 +398,44 @@ def steps() -> tuple[Step, ...]:
     return (decode, validate, orient, colour, *PRIVACY_STEPS, derive, encode)
 
 
+def avatar_steps() -> tuple[Step, ...]:
+    """The profile-picture pipeline (D116): no blur; the square crop before any variant."""
+    return (decode, validate, orient, colour, crop_square, *AVATAR_PRIVACY_STEPS, derive, encode)
+
+
+def steps_for(owner_kind: str) -> tuple[Step, ...]:
+    return avatar_steps() if owner_kind == "avatar" else steps()
+
+
+# EXIF orientations that swap width and height (a quarter turn, with or without a mirror).
+_QUARTER_TURNS = frozenset({5, 6, 7, 8})
+_EXIF_ORIENTATION = 0x0112
+
+
+def upright_size(data: bytes, declared_type: str) -> tuple[int, int] | None:
+    """The image's ``(width, height)`` once its EXIF orientation is applied, read from the header
+    only (no pixels decoded). None when the header can't be read safely: the worker then
+    rejects the file with the right reason."""
+    expected = FORMAT_FOR_TYPE.get(declared_type)
+    if expected is None or not magic_matches(data, declared_type):
+        return None
+    try:
+        img = _open(data)
+        if img.format != expected:
+            return None
+        width, height = img.size
+        orientation = img.getexif().get(_EXIF_ORIENTATION)
+    except Exception:
+        return None
+    if orientation in _QUARTER_TURNS:
+        return height, width
+    return width, height
+
+
 def run(job: PhotoJob, pipeline: Sequence[Step] | None = None) -> dict[str, EncodedVariant]:
     """Run every step over ``job``; returns the encoded variants by name. CPU-bound: the worker
     calls it in a thread. Raises ``PhotoRejected`` for a file that can't be used."""
-    for step in pipeline if pipeline is not None else steps():
+    for step in pipeline if pipeline is not None else steps_for(job.owner_kind):
         step(job)
         job.trace.append(step.__name__)
     job.image = None  # drop the full-resolution pixels as soon as possible

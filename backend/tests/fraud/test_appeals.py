@@ -19,7 +19,7 @@ from app.modules.fraud.models import (
     NoticeKind,
     PrizeHold,
 )
-from app.modules.identity.models import Role
+from app.modules.identity.models import Role, User
 from app.modules.scoring.models import PointsLedger
 from tests.deeds.helpers import Member, count, make_member, outbox
 from tests.fraud.appeal_helpers import (
@@ -171,6 +171,51 @@ async def test_decider_and_conflicted_admins_cannot_see_the_appeal(
     assert (await appeal_of(session, notice.id)).outcome is None
     res = await decide_appeal(client, reviewer, appeal_id, "upheld", note="short")
     assert res.status_code == 422 and res.json()["code"] == "note_required"
+
+
+def _avatars(value: object) -> list[object]:
+    """Every ``avatar`` value anywhere in a JSON body."""
+    if isinstance(value, dict):
+        found = [value["avatar"]] if "avatar" in value else []
+        return found + [a for v in value.values() for a in _avatars(v)]
+    if isinstance(value, list):
+        return [a for v in value for a in _avatars(v)]
+    return []
+
+
+async def test_fraud_case_and_appeal_screens_never_carry_profile_pictures(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """Q97 (PO 2026-11-28): initials only on the case queue, case review and appeal screens,
+    even for people who have a picture (no appearance bias)."""
+    decider = await admin(session)
+    p = await pair(session)
+    await confirm(session, decider, p.case_id, {p.a_to_b: "exclude", p.b_to_a: "release"})
+    notice = await notice_of(session, p.case_id, p.a)
+    assert (await appeal(client, p.a, notice.id)).status_code == 200
+    appeal_id = (await appeal_of(session, notice.id)).id
+    reviewer = await admin(session)
+    for person in (p.a, p.b, decider):
+        user = await session.get(User, person.user_id)
+        assert user is not None
+        user.avatar_ref, user.avatar_changed_at = f"{uuid.uuid4()}-1", _now()
+    await session.commit()
+
+    pages = [
+        "/api/admin/fraud/cases",
+        "/api/admin/fraud/cases?status=resolved",
+        f"/api/admin/fraud/cases/{p.case_id}",
+        "/api/admin/fraud/appeals",
+        f"/api/admin/fraud/appeals/{appeal_id}",
+    ]
+    seen = 0
+    for path in pages:
+        res = await client.get(path, headers=reviewer.headers)
+        assert res.status_code == 200, (path, res.text)
+        found = _avatars(res.json())
+        assert all(a is None for a in found), path
+        seen += len(found)
+    assert seen > 0  # people are listed, with ``avatar: null``
 
 
 async def test_appeals_queue_tabs_and_cursor(client: AsyncClient, session: AsyncSession) -> None:
