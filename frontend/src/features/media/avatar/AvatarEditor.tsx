@@ -49,6 +49,7 @@ export const COPY = {
   /** The upload arrived with the wrong size: not a connection problem (SEC6 follow-up). */
   mismatch: 'That upload didn’t finish correctly. Please try again.',
   disabled: 'Profile photos are switched off for now.',
+  onboarding: 'Finish setting up your account (verify your phone) to add a profile photo.',
 }
 
 const REJECT_COPY: Partial<Record<AvatarRejectReason, string>> = {
@@ -74,6 +75,8 @@ export function avatarErrorCopy(error: unknown): string {
       return 'The crop doesn’t fit the photo. Please try again.'
     case 'avatars_disabled':
       return COPY.disabled
+    case 'onboarding_required':
+      return COPY.onboarding
     case 'size_mismatch':
       return COPY.mismatch
     case 'cooldown': {

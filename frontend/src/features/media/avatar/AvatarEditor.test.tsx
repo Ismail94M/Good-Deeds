@@ -143,6 +143,40 @@ describe('avatar editor', () => {
     expect(screen.queryByTestId('crop-frame')).toBeNull()
   })
 
+  it('asks a member who has not finished setup to verify first, instead of opening the editor', async () => {
+    const api = setup(
+      {},
+      makeMe({ onboarding: { adult: true, consents: true, phone: false, complete: false } }),
+    )
+    const user = userEvent.setup()
+    const { router } = renderApp('/profile')
+    await user.click(await screen.findByRole('button', { name: 'Add photo' }))
+    const prompt = await screen.findByRole('dialog', { name: 'Finish setting up' })
+    expect(prompt).toHaveTextContent('verify your phone) to add a profile photo')
+    expect(screen.queryByRole('dialog', { name: 'Add a profile photo' })).toBeNull()
+    expect(api.calls('POST /media/uploads')).toHaveLength(0)
+    await user.click(within(prompt).getByRole('button', { name: 'Finish setting up' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/onboarding'))
+  })
+
+  it('explains a 403 onboarding_required from the upload in plain words', async () => {
+    setup({
+      'POST /media/uploads': {
+        status: 403,
+        body: {
+          detail: 'Please finish setting up your account first.',
+          code: 'onboarding_required',
+        },
+      },
+    })
+    const { user } = await openEditor()
+    pick()
+    await user.click(await screen.findByRole('button', { name: 'Save' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Finish setting up your account (verify your phone) to add a profile photo.',
+    )
+  })
+
   it('explains the daily limit and the 24 h wait', async () => {
     setup({
       'PUT /media/me/avatar': [

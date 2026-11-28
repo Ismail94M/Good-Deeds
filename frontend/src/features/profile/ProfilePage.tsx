@@ -16,6 +16,7 @@ import { collectErrors, validateDisplayName, validateHandle } from '../auth/vali
 import { Avatar } from '../media/avatar/Avatar'
 import { AvatarEditor } from '../media/avatar/AvatarEditor'
 import { useSocial } from '../feed/feedQueries'
+import { useOnboardingGate } from '../feed/OnboardingPrompt'
 import { useMyScoring } from '../scoring/scoringQueries'
 import { OwnBadges } from '../scoring/OwnBadges'
 import { TierChip } from '../scoring/TierChip'
@@ -23,6 +24,8 @@ import { RankingsButton } from '../scoring/Rankings'
 import { useReviewsUnread } from '../reviews/reviewsApi'
 import { DeedCounts } from './DeedCounts'
 
+const PHOTO_SETUP_PROMPT =
+  'Finish setting up your account (verify your phone) to add a profile photo.'
 const BIO_MAX = 280
 const AREA_MAX = 80
 
@@ -40,6 +43,9 @@ export function ProfilePage() {
   const [editing, setEditing] = useState(false)
   const [saved, setSaved] = useState(false)
   const [editingPhoto, setEditingPhoto] = useState(false)
+  // Uploads need a finished setup (verified phone), so the photo buttons show the setup prompt.
+  const photoGate = useOnboardingGate(PHOTO_SETUP_PROMPT)
+  const editPhoto = () => photoGate.guard(() => setEditingPhoto(true))
   if (!user) return <Loading />
 
   if (editing) {
@@ -64,7 +70,7 @@ export function ProfilePage() {
           <Avatar user={user} size="xl" />
           <button
             type="button"
-            onClick={() => setEditingPhoto(true)}
+            onClick={editPhoto}
             // The text button below is the accessible control; this is a bigger mouse/touch target.
             aria-hidden
             tabIndex={-1}
@@ -75,7 +81,7 @@ export function ProfilePage() {
         </span>
         <button
           type="button"
-          onClick={() => setEditingPhoto(true)}
+          onClick={editPhoto}
           className={`inline-flex min-h-11 items-center rounded px-2 text-sm font-semibold text-brand-700 hover:text-brand-900 ${focusRing}`}
         >
           {user.avatar ? 'Change photo' : 'Add photo'}
@@ -132,6 +138,7 @@ export function ProfilePage() {
         }}
       />
       {editingPhoto && <AvatarEditor onClose={() => setEditingPhoto(false)} />}
+      {photoGate.prompt}
     </main>
   )
 }
